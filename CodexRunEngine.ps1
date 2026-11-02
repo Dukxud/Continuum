@@ -92,12 +92,20 @@ function Enter-CodexSessionRun {
     }
 }
 
+# Only the canonical hash from the backend-selected workspace is a valid binding.
+function Test-CanonicalWorkspaceIdentity {
+    param([string]$Identity)
+    return ($Identity -cmatch '^workspace-sha256:[0-9a-f]{64}$')
+}
+
 function Schedule-LimitRetry {
     param($Job, [long]$ResetAt, [long]$RunAt, [string]$BucketId,
           [string]$AppDirectory, [string]$RuntimeDirectory)
     $attempt = [int]$Job.retryAttempt + 1
     if ($attempt -gt 4) { Write-Host 'Automatic resume stopped: maximum four attempts reached.' -ForegroundColor Yellow; return $false }
-    if (-not $Job.accountId) { throw 'No saved account identity; automatic retry refused.' }
+    if (-not (Test-CanonicalWorkspaceIdentity ([string]$Job.accountId))) {
+        throw 'No verified workspace identity; automatic retry refused.'
+    }
     Assert-RuntimeFingerprint -Directory $RuntimeDirectory -RelativeFiles (Get-CodexRuntimeFiles) -ExpectedFingerprint ([string]$Job.runtimeFingerprint)
     $when = [DateTimeOffset]::FromUnixTimeSeconds($RunAt).LocalDateTime
     $rounded = [datetime]::new($when.Year,$when.Month,$when.Day,$when.Hour,$when.Minute,0)
@@ -173,12 +181,17 @@ function Invoke-CodexScheduledJob {
         Write-Host "Model: $($job.model) | Reasoning: $($job.effort) | Access: $($job.access) | Message: $($job.message)"
         $model = [string]$job.model
         Assert-ModelEffortSupported (Read-CodexModelCatalog) $model ([string]$job.effort)
-        $auto = $job.autoResume -eq $true
-        if ($auto -and -not $job.accountId) { throw 'Automatic retry requires a verified saved account identity. Reschedule after refreshing usage.' }
-        if ($auto) {
-            $state = Read-UsageState $model
-            if (-not $state.accountId -or $job.accountId -cne $state.accountId) { throw 'Codex account identity unavailable or changed; refusing automated continuation.' }
+        # A one-time task is unattended even when automatic retry is disabled.
+        # Check selected workspace identity immediately before running the CLI.
+        if (-not (Test-CanonicalWorkspaceIdentity ([string]$job.accountId))) {
+            throw 'Scheduled job lacks verified workspace identity. Refresh usage and reschedule.'
         }
+        $state = Read-UsageState $model
+        if (-not (Test-CanonicalWorkspaceIdentity ([string]$state.accountId)) -or
+            [string]$job.accountId -cne [string]$state.accountId) {
+            throw 'Selected workspace identity is unavailable or changed; scheduled execution refused.'
+        }
+        $auto = $job.autoResume -eq $true
         if ($auto -and [int]$job.retryAttempt -gt 0) {
             if (-not $state.canAttempt) {
                 if ($state.recommendationKind -eq 'exhausted-window' -and $state.recommendedResetAt -and [int]$job.retryAttempt -lt 4) {

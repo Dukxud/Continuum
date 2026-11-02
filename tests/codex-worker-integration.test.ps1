@@ -19,9 +19,9 @@ if(process.argv.includes('app-server')){
  rl.on('line',line=>{
   const m=JSON.parse(line);
   if(m.method==='initialize')process.stdout.write(JSON.stringify({id:m.id,result:{userAgent:'test'}})+'\n');
-  if(m.method==='account/read')process.stdout.write(JSON.stringify({id:m.id,result:{account:{type:'chatgpt',email:'worker@example.test'},workspaceRouting:{chatgptAccountId:process.env.CODEX_STUB_ACCOUNT||'acct-1',backendOrigin:'https://chatgpt.com',accountRoutingOverride:'NO_CONSTRAINT'}}})+'\n');
+  if(m.method==='account/read')process.stdout.write(JSON.stringify({id:m.id,result:{account:{type:'chatgpt',email:'worker@example.test'},workspaceRouting:process.env.CODEX_STUB_ACCOUNT==='missing'?{}:{chatgptAccountId:process.env.CODEX_STUB_ACCOUNT||'acct-1',backendOrigin:'https://chatgpt.com',accountRoutingOverride:'NO_CONSTRAINT'}}})+'\n');
   if(m.method==='model/list')process.stdout.write(JSON.stringify({id:m.id,result:{data:[{model:'test-model',displayName:'Mock',defaultReasoningEffort:'high',supportedReasoningEfforts:[{reasoningEffort:'high'}],isDefault:true}],nextCursor:null}})+'\n');
-  if(m.method==='account/rateLimits/read')process.stdout.write(JSON.stringify({id:m.id,result:{accountId:process.env.CODEX_STUB_ACCOUNT||'acct-1',ordinaryUsageAllowed:true,rateLimits:{limitId:'test-model',normalModelSlug:'test-model',primary:{usedPercent:0,resetsAt:Math.floor(Date.now()/1000)+3600,windowDurationMins:300}}}})+'\n');
+  if(m.method==='account/rateLimits/read')process.stdout.write(JSON.stringify({id:m.id,result:{accountId:process.env.CODEX_STUB_ACCOUNT==='missing'?null:(process.env.CODEX_STUB_ACCOUNT||'acct-1'),ordinaryUsageAllowed:true,rateLimits:{limitId:'test-model',normalModelSlug:'test-model',primary:{usedPercent:0,resetsAt:Math.floor(Date.now()/1000)+3600,windowDurationMins:300}}}})+'\n');
  });
 }else if(process.argv.includes('exec')){
  if(process.env.CODEX_STUB_MARKER)fs.writeFileSync(process.env.CODEX_STUB_MARKER,'executed');
@@ -52,14 +52,14 @@ exit /b %errorlevel%
     $settingsDir=Join-Path $temp 'isolated-appdata'
     [void](New-Item -ItemType Directory -Path $settingsDir -Force)
 
-    function Run-CodexStub([int]$expectedExit,[bool]$auto,[string]$activeAccount,[bool]$emitLimit,[bool]$writerConflict=$false) {
+    function Run-CodexStub([int]$expectedExit,[bool]$auto,[string]$activeAccount,[bool]$emitLimit,[bool]$writerConflict=$false,[string]$savedAccountId=$expectedAccountIdentity) {
         if(Test-Path $marker){Remove-Item -LiteralPath $marker -Force}
         if(Test-Path $outcomePath){Remove-Item -LiteralPath $outcomePath -Force}
         [pscustomobject]@{
             sessionId='00000000-0000-0000-0000-000000000001'
             repo=$repoRoot;branch='feature';model='test-model';effort='high'
             access='read-only';message='Resume.';autoResume=$auto
-            retryAttempt=0;accountId=$expectedAccountIdentity;runtimeFingerprint=$fingerprint
+            retryAttempt=0;accountId=$savedAccountId;runtimeFingerprint=$fingerprint
             log=(Join-Path $temp 'worker.log')
         } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $jobPath
         $psi=[Diagnostics.ProcessStartInfo]::new()
@@ -109,6 +109,15 @@ exit /b %errorlevel%
     Require ($external.Exit -ne 0 -and $external.Executed) 'Mock native-writer conflict was not reproduced.'
     $externalOutcome=Read-JobOutcome -Path $outcomePath
     Require ($externalOutcome.status -eq 'blocked' -and $externalOutcome.message -match 'active writer') 'Native thread-store conflict was not distinguished from a generic failure.'
+
+    # One-time jobs with Auto-resume OFF must still refuse a changed account.
+    $changedOnce=Run-CodexStub 0 $false 'different-account' $false
+    Require ($changedOnce.Exit -ne 0 -and -not $changedOnce.Executed) 'One-time job crossed workspace boundary with auto-resume disabled.'
+    Require ((Read-JobOutcome -Path $outcomePath).status -eq 'failed') 'One-time account mismatch was not recorded.'
+    $missingBackend=Run-CodexStub 0 $false 'missing' $false
+    Require ($missingBackend.Exit -ne 0 -and -not $missingBackend.Executed) 'Unidentified active workspace was allowed to run.'
+    $missingSaved=Run-CodexStub 0 $false 'acct-1' $false $false ''
+    Require ($missingSaved.Exit -ne 0 -and -not $missingSaved.Executed) 'Unbound saved job was allowed to run.'
 
     $ok=Run-CodexStub 0 $false 'acct-1' $false
     Require ($ok.Exit -eq 0 -and $ok.Executed) "Successful Codex execution must return zero: $($ok.Output) $($ok.Errors)"

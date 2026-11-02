@@ -40,7 +40,7 @@ There are two layers:
 
 1. **UI launch**: Start-Codex-Scheduler.vbs starts CodexResumeScheduler.ps1 with no terminal. The entrypoint loads app-specific adapters and then the GUI. No scheduled worker code requires a WinForms window.
 2. **Discovery**: CodexUiRefresh asynchronously reads sessions, the selected thread's current directory and Windows tasks. CodexUsage.js communicates through the documented App Server handshake. UI state is updated on the WinForms thread.
-3. **Scheduling**: CodexUiActions validates model, reasoning effort, Git root, branch, access and requested time. When auto-resume is selected, a trustworthy account identity is also required. It calls RuntimeBundle to snapshot its exact worker dependencies, writes task metadata containing that fingerprint, and uses OneTimeTasks to register and re-read the task definition.
+3. **Scheduling**: CodexUiActions validates model, reasoning effort, Git root, branch, access and requested time. Every scheduled run requires a trustworthy selected-workspace identity, even when Auto-resume is disabled. It calls RuntimeBundle to snapshot its exact worker dependencies, writes task metadata containing that fingerprint, and uses OneTimeTasks to register and re-read the task definition.
 4. **Worker launch**: Task Scheduler invokes the exact saved CodexRunJob.vbs inside the fingerprinted runtime, which launches the thin entrypoint in job mode. The worker checks the saved fingerprint **before** executing Codex and then verifies the repository, branch, model and effort.
 5. **Codex execution**: The worker launches one saved Codex session and writes a transcript plus JSONL events. It returns 0 only for a successful CLI execution or a verified deferral that registered a new retry; a CLI failure or a refused retry is nonzero.
 6. **Retry**: Only a failed CLI execution with a genuine usage-limit error can be reconsidered. Fresh App Server data must identify the applicable quota, future reset, ordinary usage permission and matching active account. Retry preserves the original parameters and runtime fingerprint. Four reschedules maximum.
@@ -68,7 +68,7 @@ A queued retry is persisted as `deferred`, not `completed`. Removing an upcoming
 
 ## v1.16 adversarial acceptance
 
-Auto-resume hashes a backend-selected workspace ID (experimental workspaceRouting or rate-limit accountId). Email-only identity and contradictory IDs fail closed. No raw workspace identifiers or emails are written to job metadata.
+All scheduled runs bind to a hashed backend-selected workspace ID (experimental workspaceRouting or rate-limit accountId), checked again just before execution. Email-only, missing and contradictory IDs fail closed regardless of the Auto-resume setting. No raw workspace identifiers or emails are written to job metadata.
 
 Run-history files (`*.result.json`) are parsed independently of pending job payloads (`*.json`); the former never displace repository evidence. Deferred outcomes retain the next scheduled task name. The UI displays completion, failure, blocking, deferral and cancellation statuses, including malformed records. Countdown updates use a prebuilt index rather than scanning the entire pending queue for each row.
 

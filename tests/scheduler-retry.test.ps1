@@ -33,7 +33,7 @@ try {
     $job = [pscustomobject]@{
         sessionId='00000000-0000-0000-0000-000000000001'; repo=$appDir; branch='feature'
         model='some-future-model'; effort='deep'; access='workspace-write'; message='Resume.'
-        autoResume=$true; retryAttempt=0; accountId='account'
+        autoResume=$true; retryAttempt=0; accountId=('workspace-sha256:' + ('a' * 64))
         runtimeFingerprint=(Get-RuntimeFingerprint -Directory $root -RelativeFiles (Get-CodexRuntimeFiles))
     }
     $reset = [long]([math]::Floor([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() / 60) * 60) + 3600

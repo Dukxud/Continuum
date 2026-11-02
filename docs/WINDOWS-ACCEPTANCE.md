@@ -15,7 +15,7 @@ Record the exact Git commit SHA and mark each item PASS, FAIL, or NOT TESTED. Pr
 7. Schedule one real, non-destructive Codex session with the intended local time and account. Inspect Windows Task Scheduler: one registered task, correct session identity, pinned worker snapshot, and no visible console.
 8. Allow a benign scheduled session to complete and inspect Recent results: completed means actual success; failure preserves the Codex exit code. A verified quota postponement is deferred and names the next task, never completed.
 9. Cancel a pending task: it disappears from Windows Task Scheduler and the interface, records cancelled, and does not reappear after refreshing.
-10. Change accounts or workspaces before an account-bound unattended retry. The runner must refuse execution under another identity. Missing or conflicting workspace identity must fail closed.
+10. Change accounts or workspaces before a one-time run with Auto-resume OFF, and repeat with Auto-resume ON. Both must refuse execution under another identity. Missing or conflicting workspace identity must fail closed, including at scheduling time.
 11. Check the result-history screen and repository suggestions after adding many completed result records; those records must not hide valid scheduled-job evidence.
 12. Verify unsigned engineering preview warnings and antivirus treatment without disabling Bitdefender. Confirm that an ordinary push or merge cannot publish a GitHub release.
 
@@ -41,6 +41,6 @@ The WPF dashboard visual test must provide pixel evidence of true fill/track con
 
 ## One complete local suite
 
-Run the repository's scripts/Invoke-LocalAcceptance.ps1 with its -ExpectedCommit parameter against the latest PR #16 head from the isolated QA checkout. It checks PowerShell syntax and all *.test.ps1/*.test.js files in a single invocation, records individual logs and fails if any file fails. This is local Windows acceptance, not GitHub CI.
+Run the repository's scripts/Invoke-LocalAcceptance.ps1 with its -ExpectedCommit parameter against the latest PR #16 head from the isolated QA checkout. It checks PowerShell syntax and reserved-variable assignments, prepares missing pinned WebView2 SDK dependencies, and runs all *.test.ps1/*.test.js files in a single invocation. It records individual logs and fails if any file fails. An initial SDK preparation requires network access to NuGet. This is local Windows acceptance, not GitHub CI.
 
 In addition to synthetic coverage, manually inspect v1.16's running-status card and Appearance Save/Cancel. Do not replay old Horizon continuations, and do not merge the PR before both the suite and targeted operational behavior are accepted.

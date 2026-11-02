@@ -133,9 +133,9 @@ $schedule.Add_Click({
         $effort = [string]$effortBox.SelectedItem
         if ($effort -notmatch '^[a-zA-Z][a-zA-Z0-9_-]{0,40}$') { throw 'Select a valid reasoning effort.' }
         Assert-ModelEffortSupported $script:ui.Selection.models $model $effort
-        if ($autoResumeCheck.Checked -and (-not $script:ui.Usage.usageSnapshot -or
-            [string]::IsNullOrWhiteSpace([string]$script:ui.Usage.usageSnapshot.accountId))) {
-            throw 'Automatic resume requires verified account identity. Refresh usage, or turn off Auto-resume for manual scheduling.'
+        $accountId = [string]$script:ui.Usage.usageSnapshot.accountId
+        if (-not (Test-CanonicalWorkspaceIdentity $accountId)) {
+            throw 'Every scheduled run requires a verified workspace identity. Refresh usage before scheduling.'
         }
         # A GUI catalog snapshot can age before the scheduled task starts;
         # the runner independently revalidates the model and effort.
@@ -159,7 +159,7 @@ $schedule.Add_Click({
             model=$model; effort=$effort; access=$access; message=$message
             autoResume=[bool]$autoResumeCheck.Checked; retryAttempt=0
             createdAt=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-            accountId=$script:ui.Usage.usageSnapshot.accountId
+            accountId=$accountId
             runtimeFingerprint=$runtime.Fingerprint; log=$log
         } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $jobFilePath -Encoding utf8
         $installedRunner = Join-Path $runtime.Directory 'CodexRunJob.vbs'

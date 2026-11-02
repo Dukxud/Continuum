@@ -115,3 +115,13 @@ test('model catalog and async jobs have single state-owning controllers',()=>{
  assert.doesNotMatch(asyncDispatcher,/\$script:ui\.Selection\.data(?:Jobs|Queued)/);
  assert.match(asyncDispatcher,/\$script:ui\.Async\.dataJobs/);
 });
+
+test('all scheduled executions must bind to a verified selected workspace',()=>{
+ const ui=read('CodexUiActions.ps1'), worker=read('CodexRunEngine.ps1');
+ assert.match(ui,/Test-CanonicalWorkspaceIdentity \$accountId/);
+ assert.match(ui,/accountId=\$accountId/);
+ assert.match(worker,/function Test-CanonicalWorkspaceIdentity/);
+ assert.match(worker,/Test-CanonicalWorkspaceIdentity \(\[string\]\$job.accountId\)/);
+ assert.match(worker,/\$state = Read-UsageState \$model/);
+ assert.match(worker,/scheduled execution refused/);
+});
