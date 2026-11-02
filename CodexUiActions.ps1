@@ -84,7 +84,7 @@ $cancelRun.Add_Click({
     if ([System.Windows.Forms.MessageBox]::Show("Cancel and remove the one-time task '$name'?",'Cancel scheduled run','YesNo','Question') -ne 'Yes') { return }
     $taskRemoved = $false
     try {
-        Remove-OneTimeTask -Name $name
+        Remove-OneTimeTask -Name $name -OnlyBeforeStart
         $taskRemoved = $true
         $payloadPath=Join-Path $appDir ($name + '.json')
         if(Test-Path -LiteralPath $payloadPath -PathType Leaf){

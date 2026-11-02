@@ -84,6 +84,15 @@ test('run history is user-visible and retry linking is persistent',()=>{
  assert.match(read('CodexRunEngine.ps1'),/NextJob \(\[string\]\$nextJob\)/);
 });
 
+test('cancellation rechecks authoritative Windows state before unregistering',()=>{
+ const generic=read('components/OneTimeTasks/OneTimeTasks.psm1');
+ const ui=read('CodexUiActions.ps1');
+ assert.match(generic,/function Remove-OneTimeTask/);
+ assert.match(generic,/\[switch\]\$OnlyBeforeStart/);
+ assert.match(generic,/Get-ScheduledTask -TaskName \$Name/);
+ assert.match(generic,/Get-ScheduledTaskInfo -TaskName \$Name/);
+ assert.match(ui,/Remove-OneTimeTask -Name \$name -OnlyBeforeStart/);
+});
 test('model catalog and async jobs have single state-owning controllers',()=>{
  const selection=read('CodexUiSelection.ps1');
  const usage=read('CodexUiUsage.ps1');

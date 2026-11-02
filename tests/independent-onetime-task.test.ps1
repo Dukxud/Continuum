@@ -24,12 +24,23 @@ try {
         if($script:badRead){return [pscustomobject]@{Actions=@([pscustomobject]@{Execute='unexpected.exe';Arguments='';WorkingDirectory=$temp});Triggers=$task.Triggers;Principal=$task.Principal;State='Ready'}}
         return $task
     }
+    function global:Get-ScheduledTaskInfo {
+        param($TaskName,$TaskPath)
+        return [pscustomobject]@{LastRunTime=[datetime]'1999-11-30';LastTaskResult=267011}
+    }
     function global:Unregister-ScheduledTask {param($TaskName,[switch]$Confirm) [void]$script:tasks.Remove($TaskName)}
     function global:Disable-ScheduledTask {param($TaskName) $script:tasks[$TaskName].State='Disabled'}
     $name=Register-OneTimeTask -Name 'Unrelated-Background-Job' -At (Get-Date).AddHours(2) -Executable (Get-Command pwsh.exe).Source -Arguments '-NoProfile -File worker.ps1' -WorkingDirectory $temp
     if($name -ne 'Unrelated-Background-Job' -or -not $script:tasks.ContainsKey($name)){throw 'Standalone registration failed.'}
+    $pendingWasRemoved = $false
+    try { Remove-OneTimeTask -Name $name -OnlyBeforeStart; $pendingWasRemoved = $true } catch { throw "Prestart removal should succeed: $_" }
+    if(-not $pendingWasRemoved -or $script:tasks.ContainsKey($name)){throw 'Safe prestart removal failed.'}
+    $name=Register-OneTimeTask -Name 'Unrelated-Background-Job' -At (Get-Date).AddHours(2) -Executable (Get-Command pwsh.exe).Source -Arguments '-NoProfile -File worker.ps1' -WorkingDirectory $temp
     Disable-OneTimeTask -Name $name
     if($script:tasks[$name].State -ne 'Disabled'){throw 'Standalone disable failed.'}
+    $unsafeWasRejected=$false
+    try { Remove-OneTimeTask -Name $name -OnlyBeforeStart } catch { $unsafeWasRejected=$true }
+    if(-not $unsafeWasRejected -or -not $script:tasks.ContainsKey($name)) {throw 'A disabled task must not be reported as safely cancelled before execution.'}
     Remove-OneTimeTask -Name $name
     if($script:tasks.Count -ne 0){throw 'Standalone removal failed.'}
     $utcFuture=[DateTimeOffset]::UtcNow.AddHours(3).UtcDateTime

@@ -56,8 +56,28 @@ function Disable-OneTimeTask {
 }
 function Remove-OneTimeTask {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Name)
+    param([Parameter(Mandatory)][string]$Name,
+          [switch]$OnlyBeforeStart)
     if ($Name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$') { throw 'Invalid one-time task name.' }
+    if ($OnlyBeforeStart) {
+        # Do not confuse unregistering a Windows task with cancelling a process
+        # that is already running. Enforce the pre-start condition at the
+        # mutation boundary, not from an asynchronously refreshed GUI list.
+        $current = Get-ScheduledTask -TaskName $Name -ErrorAction Stop
+        if ($current.State -ne 'Ready') {
+            throw "Task '$Name' is '$($current.State)'; cannot safely cancel it before execution."
+        }
+        $triggers = @($current.Triggers | Where-Object { $_.StartBoundary })
+        if ($triggers.Count -ne 1) { throw "Task '$Name' has no unambiguous one-time trigger." }
+        $when = [datetime]$triggers[0].StartBoundary
+        if ($when -le (Get-Date).AddSeconds(90)) {
+            throw "Task '$Name' is too close to its trigger for safe cancellation; inspect its run status."
+        }
+        $info = Get-ScheduledTaskInfo -TaskName $Name -TaskPath $current.TaskPath -ErrorAction Stop
+        if ([datetime]$info.LastRunTime -ge $when.AddYears(-1)) {
+            throw "Task '$Name' has execution history; do not overwrite a real run with a cancellation outcome."
+        }
+    }
     Unregister-ScheduledTask -TaskName $Name -Confirm:$false -ErrorAction Stop | Out-Null
 }
 Export-ModuleMember -Function Register-OneTimeTask,Disable-OneTimeTask,Remove-OneTimeTask
