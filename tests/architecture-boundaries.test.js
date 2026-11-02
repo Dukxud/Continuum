@@ -93,6 +93,18 @@ test('cancellation rechecks authoritative Windows state before unregistering',()
  assert.match(generic,/Get-ScheduledTaskInfo -TaskName \$Name/);
  assert.match(ui,/Remove-OneTimeTask -Name \$name -OnlyBeforeStart/);
 });
+test('WinForms acceptance cannot silently ignore UI-thread exceptions',()=>{
+ const harness=read('tests/WinFormsEventGuard.ps1');
+ assert.match(harness,/add_ThreadException/);
+ assert.match(harness,/throw \('Unhandled Windows Forms event exceptions/);
+ for(const name of ['aero-appearance-dialog','aero-runtime-fallback','aero-webview-rendering',
+                     'dashboard-layout','dashboard-visuals','history-dialog',
+                     'second-application-reuse','standalone-aero-consumer','wpf-flow-animation']){
+   const source=read('tests/'+name+'.test.ps1');
+   assert.match(source,/WinFormsEventGuard.ps1/);
+   assert.match(source,/Assert-NoUnhandledWinFormsErrors/);
+ }
+});
 test('model catalog and async jobs have single state-owning controllers',()=>{
  const selection=read('CodexUiSelection.ps1');
  const usage=read('CodexUiUsage.ps1');
