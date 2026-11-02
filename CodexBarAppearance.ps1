@@ -232,6 +232,9 @@ function Show-AeroAppearanceDialog {
     $dialog.AcceptButton = $save
     $dialog.CancelButton = $cancel
 
+    # An outstanding autosave timer may fire while this modal editor is open.
+    # Expose the original appearance as the only persistable state until Save.
+    $script:appearanceBeforeDraft = $previous
     $accepted = $false
     try {
         $result = $dialog.ShowDialog($Owner)
@@ -249,5 +252,6 @@ function Show-AeroAppearanceDialog {
             }
         }
         $dialog.Dispose()
+        $script:appearanceBeforeDraft = $null
     }
 }

@@ -20,7 +20,8 @@ function Save-CurrentFormState {
         autoResume = [bool]$autoResumeCheck.Checked
         runAt = $whenBox.Value.ToString('yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture)
     }
-    Write-CodexUiSettings $appDir ([pscustomobject]@{ version = 1; lastAccess = $access; compactMode = [bool]$script:ui.Dashboard.compactToggle.Checked; barAppearance = $script:aeroAppearance; draft = $draft })
+    $appearanceForStorage = if ($script:appearanceBeforeDraft) { $script:appearanceBeforeDraft } else { $script:aeroAppearance }
+    Write-CodexUiSettings $appDir ([pscustomobject]@{ version = 1; lastAccess = $access; compactMode = [bool]$script:ui.Dashboard.compactToggle.Checked; barAppearance = $appearanceForStorage; draft = $draft })
     $script:ui.Preferences.savedDraft = $draft
     $script:ui.Selection.preferredSessionId = $sessionId
 }

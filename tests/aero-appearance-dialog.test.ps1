@@ -20,7 +20,10 @@ $owner.Show()
 $timer = [System.Windows.Forms.Timer]::new()
 $timer.Interval = 120
 $script:attempts = 0
+$script:appearanceTestPhase = 'save'
 $timer.Add_Tick({
+    # A modal Forms event pump can reenter the same timer while controls update.
+    $timer.Stop()
     $script:attempts++
     if ($script:attempts -gt 30) {
         $timer.Stop()
@@ -32,8 +35,16 @@ $timer.Add_Tick({
     $dialog = @([System.Windows.Forms.Application]::OpenForms | Where-Object {
         $_.Text -eq 'Customize progress bars'
     }) | Select-Object -First 1
-    if (-not $dialog) { return }
-
+    if (-not $dialog) { $timer.Start(); return }
+    if ($script:appearanceTestPhase -eq 'cancel') {
+        $combo = @($dialog.Controls | Where-Object { $_ -is [System.Windows.Forms.ComboBox] })[0]
+        $combo.SelectedIndex = 0
+        Require ($script:aeroAppearance['quota'] -eq 'green') 'Cancel test did not apply live change.'
+        $button = @($dialog.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq 'Cancel' }) | Select-Object -First 1
+        Require ($null -ne $button) 'Cancel control missing.'
+        $button.PerformClick()
+        return
+    }
     $combos = @($dialog.Controls | Where-Object { $_ -is [System.Windows.Forms.ComboBox] })
     $sliders = @($dialog.Controls | Where-Object { $_ -is [System.Windows.Forms.TrackBar] })
     $checkboxes = @($dialog.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] })
@@ -59,7 +70,6 @@ $timer.Add_Tick({
     Require ($script:saves -eq 0) 'Draft appearance changes must not persist until Save.'
     $save = @($dialog.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq 'Save and close' }) | Select-Object -First 1
     Require ($null -ne $save) 'Save and close button missing.'
-    $timer.Stop()
     $save.PerformClick()
 })
 try {
@@ -85,18 +95,7 @@ try {
     # Cancel must roll back live edits rather than saving them or leaving
     # modified colors on the open scheduler.
     $script:attempts = 0
-    $timer.Add_Tick({
-        $dialog = @([System.Windows.Forms.Application]::OpenForms | Where-Object {
-            $_.Text -eq 'Customize progress bars'
-        }) | Select-Object -First 1
-        if (-not $dialog) { return }
-        $combo = @($dialog.Controls | Where-Object { $_ -is [System.Windows.Forms.ComboBox] })[0]
-        $combo.SelectedIndex = 0
-        Require ($script:aeroAppearance['quota'] -eq 'green') 'Cancel test did not apply live change.'
-        $button = @($dialog.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq 'Cancel' }) | Select-Object -First 1
-        $timer.Stop()
-        $button.PerformClick()
-    })
+    $script:appearanceTestPhase = 'cancel'
     $timer.Start()
     Show-AeroAppearanceDialog $owner
     Require ($script:aeroAppearance['quota'] -eq 'cyan') 'Cancel did not restore original color.'
