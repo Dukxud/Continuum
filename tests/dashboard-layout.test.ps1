@@ -49,7 +49,7 @@ try {
     $cancelRun = New-TestControl panel 185 774 154 31
     $openFolder = New-TestControl panel 352 774 154 31
     $recentResults = New-TestControl panel 520 774 158 31
-    $viewResult = New-TestControl panel 693 774 205 31
+    $removeResult = New-TestControl panel 693 774 205 31
     $status = New-TestControl label 18 823 880 25
     $script:ui.Preferences.uiSettings = $null
     $script:ui.Dashboard.pendingSnapshot = @()
@@ -89,11 +89,11 @@ try {
     Require ($grid.Visible) 'The full run list should be restored.'
     Require ($recentResults.Visible) 'Run-history control must be available in normal mode.'
     Require ($script:ui.Dashboard.activityPanel.Visible) 'Activity strip must be available in normal mode.'
-    Require ($viewResult.Visible) 'View selected result button must be visible alongside the main runs table.'
+    Require ($removeResult.Visible) 'Remove from lists must be visible alongside the main runs table.'
     $script:ui.Dashboard.pendingSnapshot=@()
     $script:ui.Dashboard.displayedRunCount=2
     Update-DashboardLayout
-    Require ($grid.Visible -and $viewResult.Visible) 'Finished results must keep main Runs table and View result action visible without an active task.'
+    Require ($grid.Visible -and $removeResult.Visible) 'Finished results must keep main Runs table and removal action visible without an active task.'
     [void]$grid.Rows.Add('Time','5m','Demo 1')
     [void]$grid.Rows.Add('Time','7m','Demo 2')
     [void]$grid.Rows.Add('Time','9m','Demo 3')

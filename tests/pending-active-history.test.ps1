@@ -13,7 +13,7 @@ $grid=[System.Windows.Forms.DataGridView]::new()
 $grid.AllowUserToAddRows=$false
 foreach($name in @('Scheduled','Countdown','Project','Details','Session')){[void]$grid.Columns.Add($name,$name)}
 $cancelRun=[System.Windows.Forms.Button]::new()
-$viewResult=[System.Windows.Forms.Button]::new()
+$removeResult=[System.Windows.Forms.Button]::new()
 $pending=[System.Windows.Forms.Label]::new()
 $emptyRuns=[System.Windows.Forms.Label]::new()
 function Update-DashboardLayout {}
@@ -46,17 +46,27 @@ try {
     Apply-PendingList -Items @($failed,$upcoming,$ended)
     $after=@($grid.Rows | Where-Object { [string]$_.Tag -ceq $completedName }) | Select-Object -First 1
     Require ([object]::ReferenceEquals($before,$after)) 'Periodic refresh rebuilt identical rows, causing a flicker.'
-    Require ($after.Selected -and $viewResult.Enabled) 'Periodic refresh discarded a selected finished run.'
+    Require ($after.Selected -and $removeResult.Enabled) 'Periodic refresh discarded a selected finished run.'
     Apply-PendingList -Items @($failed,$ended)
     Require ($script:ui.Dashboard.pendingSnapshot.Count -eq 0) 'Finished jobs must not enter the active queue.'
     Require ($grid.Rows.Count -eq 3) 'Previous runs disappeared when the next run completed.'
     Require (@($grid.Rows | Where-Object { [string]$_.Tag -ceq $completedName }).Count -eq 1) 'Persisted result was lost after removing the active row.'
-    Require ($viewResult.Enabled) 'Selected finished result lost its View action after reshuffling.'
-    Write-Host 'Recent results persist, remain selectable, survive refresh, and keep countdowns separate.'
+    Require ($removeResult.Enabled) 'Selected finished result lost its removal action after reshuffling.'
+    Hide-CodexRunRecord -Directory $appDir -Name $completedName
+    Apply-PendingList -Items @($failed,$ended)
+    Require (@($grid.Rows | Where-Object { [string]$_.Tag -ceq $completedName }).Count -eq 0) 'Hidden saved outcome reappeared on refresh.'
+    Require (@(Get-CodexRunHistory -Directory $appDir).Count -eq 0) 'Hidden run remained in persisted history.'
+    Require (Test-Path -LiteralPath (Join-Path $appDir ($completedName+'.result.json'))) 'Hiding a result deleted its audit evidence.'
+    Hide-CodexRunRecord -Directory $appDir -Name $failed.Name
+    Apply-PendingList -Items @($failed,$ended)
+    Require ($grid.Rows.Count -eq 1 -and [string]$grid.Rows[0].Tag -ceq $ended.Name) 'Hidden historical Windows task reappeared.'
+    $hidden=Get-HiddenCodexRunNames -Directory $appDir
+    Require ($hidden.Contains($completedName) -and $hidden.Contains($failed.Name)) 'Hidden list did not persist both records.'
+    Write-Host 'Results persist and remain selectable; removing finished rows hides them across refresh while preserving files.'
 } finally {
     $grid.Dispose()
     $cancelRun.Dispose()
-    $viewResult.Dispose()
+    $removeResult.Dispose()
     $pending.Dispose()
     $emptyRuns.Dispose()
     $script:ui.Dashboard.compactToggle.Dispose()

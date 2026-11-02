@@ -2,8 +2,13 @@
 # finished jobs. Refreshes reconcile by job identity to avoid a flashing list.
 function Apply-PendingList {
     param([object[]]$Items)
-    $upcoming=@($Items | Where-Object { $_.Status -in @('Running','Scheduled') })
-    $history=@($Items | Where-Object { $_.Status -notin @('Running','Scheduled') })
+    $hidden=Get-HiddenCodexRunNames -Directory $appDir
+    # Hiding applies only to past runs, never to live or future tasks.
+    $shown=@($Items | Where-Object {
+        $_.Status -in @('Running','Scheduled') -or -not $hidden.Contains([string]$_.Name)
+    })
+    $upcoming=@($shown | Where-Object { $_.Status -in @('Running','Scheduled') })
+    $history=@($shown | Where-Object { $_.Status -notin @('Running','Scheduled') })
     $known=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach($item in @($upcoming)+@($history)){
         if($item.Name){[void]$known.Add([string]$item.Name)}
@@ -101,7 +106,7 @@ function Apply-PendingList {
     $cancelRun.Enabled=($grid.SelectedRows.Count -eq 1 -and
         $pendingIndex.ContainsKey([string]$grid.SelectedRows[0].Tag) -and
         $pendingIndex[[string]$grid.SelectedRows[0].Tag].Status -eq 'Scheduled')
-    $viewResult.Enabled=($grid.SelectedRows.Count -eq 1 -and
+    $removeResult.Enabled=($grid.SelectedRows.Count -eq 1 -and
         $resultIndex.ContainsKey([string]$grid.SelectedRows[0].Tag))
     $pending.Text="Runs ($($upcoming.Count) active, $($recent.Count) recent)"
     $emptyRuns.Visible=$false

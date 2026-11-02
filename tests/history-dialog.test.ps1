@@ -45,6 +45,10 @@ try {
             }
             $split=@($dialog.Controls | Where-Object { $_ -is [System.Windows.Forms.SplitContainer] }) | Select-Object -First 1
             if(-not $split){throw 'History must contain both result list and evidence pane.'}
+            $actions=@($split.Panel1.Controls | Where-Object { $_ -is [System.Windows.Forms.Panel] }) | Select-Object -First 1
+            $remove=@($actions.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq 'Remove from lists' }) | Select-Object -First 1
+            if(-not $remove){throw 'History does not offer removal from the list.'}
+            if($remove.Top -lt 0 -or $remove.Bottom -gt $actions.Height){throw 'History removal control is clipped.'}
             $grid=@($split.Panel1.Controls | Where-Object { $_ -is [System.Windows.Forms.DataGridView] }) | Select-Object -First 1
             $tabs=@($split.Panel2.Controls | Where-Object { $_ -is [System.Windows.Forms.TabControl] }) | Select-Object -First 1
             if(-not $tabs -or $tabs.TabPages.Count -ne 2){throw 'Codex response and worker-log tabs are missing.'}
@@ -85,6 +89,7 @@ try {
             if($grid.SelectedRows.Count -ne 1 -or [string]$grid.SelectedRows[0].Tag -ne 'CodexResume-20260101-1000-abcdef01'){
                 throw 'Open selected result must honor the chosen completed run.'
             }
+            if(-not $remove.Enabled){throw 'A selected completed run must enable removal from history.'}
             $completed=@($grid.Rows | Where-Object { [string]$_.Cells['Status'].Value -eq 'completed' })[0]
             $grid.ClearSelection()
             $grid.CurrentCell=$completed.Cells[0]

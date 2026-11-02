@@ -34,7 +34,9 @@ test('pending list shows recognizable project and preserves full task identity',
   assert.match(fn, /\$script:ui\.Dashboard\.pendingSnapshot=\$upcoming/);
   assert.match(fn, /\$resultIndex\.ContainsKey/);
   assert.match(fn, /\$same=\(\$grid\.Rows\.Count/);
-  assert.match(source, /\$viewResult\.Add_Click/);
+  assert.match(source, /\$removeResult\.Add_Click/);
+  assert.match(source, /Hide-CodexRunRecord/);
+  assert.doesNotMatch(source, /\$viewResult\b/);
   assert.match(source, /\$grid\.Add_CellDoubleClick/);
   assert.match(fn, /\$emptyRuns\.Visible=\$false/);
   assert.match(fn, /Update-DashboardLayout/);

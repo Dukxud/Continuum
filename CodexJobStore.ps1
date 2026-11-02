@@ -1,5 +1,6 @@
 # Codex-specific on-disk task and outcome readers. No GUI or worker globals.
 Import-Module (Join-Path $PSScriptRoot 'components/JobOutcomes/JobOutcomes.psm1') -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot 'components/SettingsStore/SettingsStore.psm1') -ErrorAction Stop
 function Get-CodexJobPayloadFiles {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Directory)
@@ -10,11 +11,42 @@ function Get-CodexJobPayloadFiles {
         Where-Object { $_.Name -notmatch '\.result\.json$' } |
         Sort-Object LastWriteTime -Descending
 }
+# Hidden rows are a local display preference, never a deletion of
+# Windows tasks, Codex conversations, saved outcomes, events, or transcripts.
+function Get-HiddenCodexRunNames {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Directory)
+    $names=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $stored=Read-JsonSettings -Path (Join-Path $Directory 'hidden-runs.json')
+    if($stored -and $stored.schema -eq 1){
+        foreach($name in @($stored.names)){
+            if($name -is [string] -and $name -match '^(?:CodexResume-[0-9]{8}-[0-9]{4}-[0-9a-fA-F]{8}|BP[0-9]+-Codex-(?:Resume|Test))$'){
+                [void]$names.Add($name)
+            }
+        }
+    }
+    return ,$names
+}
+function Hide-CodexRunRecord {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Directory,
+          [Parameter(Mandatory)][string]$Name)
+    if($Name -cnotmatch '^(?:CodexResume-[0-9]{8}-[0-9]{4}-[0-9a-fA-F]{8}|BP[0-9]+-Codex-(?:Resume|Test))$'){
+        throw 'Run identifier is not a recognized Scheduler task.'
+    }
+    $names=Get-HiddenCodexRunNames -Directory $Directory
+    if(-not $names.Add($Name)){return}
+    Write-JsonSettings -Path (Join-Path $Directory 'hidden-runs.json') -Value ([pscustomobject]@{
+        schema=1; names=@($names | Sort-Object)
+    })
+}
 function Get-CodexRunHistory {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Directory,[ValidateRange(1,1000)][int]$Limit=50)
     if(-not (Test-Path -LiteralPath $Directory -PathType Container)){return}
+    $hidden=Get-HiddenCodexRunNames -Directory $Directory
     $paths=Get-ChildItem -LiteralPath $Directory -Filter 'CodexResume-*.result.json' -File -ErrorAction SilentlyContinue |
+        Where-Object { -not $hidden.Contains($_.Name.Substring(0,$_.Name.Length - '.result.json'.Length)) } |
         Sort-Object LastWriteTime -Descending | Select-Object -First $Limit
     foreach($file in $paths){
         $name=$file.Name.Substring(0,$file.Name.Length - '.result.json'.Length)

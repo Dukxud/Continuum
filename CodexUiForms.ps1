@@ -209,7 +209,7 @@ $emptyRuns.Dock = 'Fill'
 $grid.Controls.Add($emptyRuns)
 $grid.Add_SelectionChanged({
     $cancelRun.Enabled = $false
-    $viewResult.Enabled = $false
+    $removeResult.Enabled = $false
     if ($grid.SelectedRows.Count -eq 1) {
         $key = [string]$grid.SelectedRows[0].Tag
         if ($key -and $script:ui.Dashboard.pendingIndex.ContainsKey($key)) {
@@ -217,7 +217,7 @@ $grid.Add_SelectionChanged({
             $cancelRun.Enabled = (-not $item.Status -or $item.Status -eq 'Scheduled')
         }
         if ($key -and $script:ui.Dashboard.resultIndex.ContainsKey($key)) {
-            $viewResult.Enabled = $true
+            $removeResult.Enabled = $true
         }
     }
 })
@@ -227,8 +227,8 @@ $cancelRun = Add-Button 'Cancel selected' 185 774 154
 $cancelRun.Enabled = $false
 $openFolder = Add-Button 'Open logs folder' 352 774 154
 $recentResults = Add-Button 'Recent results' 520 774 158
-$viewResult = Add-Button 'View selected result' 693 774 205
-$viewResult.Enabled = $false
+$removeResult = Add-Button 'Remove from lists' 693 774 205
+$removeResult.Enabled = $false
 $status = Add-Label 'Ready. Keep Windows awake and signed in for scheduled runs.' 18 823 880
 $status.ForeColor = [System.Drawing.Color]::DimGray
 $status.AutoEllipsis = $true
@@ -242,6 +242,7 @@ $repoHints = [System.Windows.Forms.ToolTip]::new()
 $usageHints = [System.Windows.Forms.ToolTip]::new()
 $actionHints = [System.Windows.Forms.ToolTip]::new()
 $actionHints.SetToolTip($schedule, 'Creates one Windows Task Scheduler run. Your settings are rechecked when the task starts.')
+$actionHints.SetToolTip($pending, 'Double-click a finished run to read its Codex response. Select it to remove it from both lists.')
 $actionHints.SetToolTip($autoResumeCheck, 'Only retries after a confirmed Codex usage-limit failure; does not monitor other Codex terminals.')
 $actionHints.SetToolTip($useReset, 'Uses the applicable exhausted quota reset time plus two minutes, when Codex reports one.')
 

@@ -39,6 +39,17 @@ function Show-CodexRunHistoryDialog {
     $historyGrid.Columns['NextJob'].FillWeight=190
     $historyGrid.Columns['Message'].FillWeight=295
     $split.Panel1.Controls.Add($historyGrid)
+    $actionPanel=[System.Windows.Forms.Panel]::new()
+    $actionPanel.Dock='Bottom'
+    $actionPanel.Height=40
+    $removeRecord=[System.Windows.Forms.Button]::new()
+    $removeRecord.Text='Remove from lists'
+    $removeRecord.AccessibleName='Remove selected finished run from lists'
+    $removeRecord.Size=[Drawing.Size]::new(172,30)
+    $removeRecord.Location=[Drawing.Point]::new(8,5)
+    $removeRecord.Enabled=$false
+    $actionPanel.Controls.Add($removeRecord)
+    $split.Panel1.Controls.Add($actionPanel)
 
     $tabs=[System.Windows.Forms.TabControl]::new()
     $tabs.Dock='Fill'
@@ -63,6 +74,7 @@ function Show-CodexRunHistoryDialog {
     $split.Panel2.Controls.Add($tabs)
 
     try {
+        $hidden=Get-HiddenCodexRunNames -Directory $Directory
         $known=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         foreach($entry in @(Get-CodexRunHistory -Directory $Directory -Limit 100)){
             [void]$known.Add([string]$entry.Name)
@@ -78,7 +90,7 @@ function Show-CodexRunHistoryDialog {
             $historyGrid.Rows[$row].Cells['NextJob'].ToolTipText=[string]$entry.NextJob
         }
         foreach($task in @($RecentTasks | Sort-Object When -Descending)){
-            if(-not $task.Name -or $known.Contains([string]$task.Name)) { continue }
+            if(-not $task.Name -or $known.Contains([string]$task.Name) -or $hidden.Contains([string]$task.Name)) { continue }
             if($task.Status -in @('Running','Scheduled')) { continue }
             $row=$historyGrid.Rows.Add()
             $record=$historyGrid.Rows[$row]
@@ -92,11 +104,34 @@ function Show-CodexRunHistoryDialog {
             $historyGrid.Rows[$row].Cells['Message'].ToolTipText=[string]$task.Description
         }
         $historyGrid.Add_SelectionChanged({
+            $removeRecord.Enabled=($historyGrid.SelectedRows.Count -eq 1)
             if($historyGrid.SelectedRows.Count -ne 1){return}
             $name=[string]$historyGrid.SelectedRows[0].Tag
             $evidence=Get-CodexRunEvidence -Directory $Directory -Name $name
             $responseBox.Text=[string]$evidence.Response
             $logBox.Text=[string]$evidence.Transcript
+        })
+        $removeRecord.Add_Click({
+            if($historyGrid.SelectedRows.Count -ne 1){return}
+            $selectedRow=$historyGrid.SelectedRows[0]
+            $name=[string]$selectedRow.Tag
+            if([System.Windows.Forms.MessageBox]::Show($dialog,
+                "Remove '$name' from Runs and Recent results?`n`nThe Windows task and saved Codex logs will not be deleted.",
+                'Remove finished run from lists','YesNo','Question') -ne 'Yes'){return}
+            try {
+                Hide-CodexRunRecord -Directory $Directory -Name $name
+                $historyGrid.Rows.Remove($selectedRow)
+                $removeRecord.Enabled=($historyGrid.SelectedRows.Count -eq 1)
+                if($historyGrid.Rows.Count -eq 0){
+                    $responseBox.Text='No results to display.'
+                    $logBox.Text='No worker transcript selected.'
+                } else {
+                    $historyGrid.CurrentCell=$historyGrid.Rows[0].Cells[0]
+                    $historyGrid.Rows[0].Selected=$true
+                }
+            } catch {
+                [System.Windows.Forms.MessageBox]::Show($dialog,$_.Exception.Message,'Unable to remove run') | Out-Null
+            }
         })
         if($historyGrid.Rows.Count -eq 0){
             $dialog.Text+=' (no results yet)'

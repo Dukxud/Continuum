@@ -20,5 +20,14 @@ try {
     if($deferred.Count -ne 1 -or $deferred[0].NextJob -ne 'CodexResume-20261101-1400-abc43210' -or $deferred[0].ExitCode -ne 17){throw 'Deferred retry linkage was lost.'}
     if($corrupt.Count -ne 1){throw 'Unreadable results must not be silently hidden.'}
     if(@(Get-CodexRunHistory -Directory $temp -Limit 1).Count -ne 1){throw 'History limit ignored.'}
+    Hide-CodexRunRecord -Directory $temp -Name 'CodexResume-20261101-1300-def12345'
+    Hide-CodexRunRecord -Directory $temp -Name 'CodexResume-20261101-1300-def12345'
+    if(@(Get-CodexRunHistory -Directory $temp).Count -ne 1){throw 'Hiding a result must survive history re-read and ignore duplicates.'}
+    if(-not (Test-Path -LiteralPath $result)){throw 'Hiding must not delete run evidence.'}
+    if(@(Get-HiddenCodexRunNames -Directory $temp).Count -ne 1){throw 'Hidden-store reader produced multiple objects.'}
+    if(-not (Get-HiddenCodexRunNames -Directory $temp).Contains('CodexResume-20261101-1300-def12345')){throw 'Hidden selection not persisted.'}
+    try { Hide-CodexRunRecord -Directory $temp -Name '../bad'; throw 'Unsafe ID accepted.' }
+    catch { if($_.Exception.Message -eq 'Unsafe ID accepted.'){throw} }
+    if(@(Get-HiddenCodexRunNames -Directory $temp).Count -ne 1){throw 'Invalid hide operation changed saved choices.'}
     Write-Host 'Result records, job discovery isolation, linked retries and corrupt-history visibility PASS.'
 }finally{Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue}
