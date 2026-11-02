@@ -38,3 +38,9 @@ Run a scheduled, non-destructive task while the v1.16 dashboard is open. Within 
 Exercise the Appearance dialog Save and Cancel paths and check that live preview changes are not saved by background form-autosave before explicit Save. Run `aero-appearance-dialog.test.ps1` and require a real nonzero process exit for any Forms-event assertion, rather than trusting a PASS after an unhandled dialog exception.
 
 The WPF dashboard visual test must provide pixel evidence of true fill/track contrast and independently moving reflections. The single-pixel red-channel failure recorded on November 2 remains unresolved until a local retest supplies measured colors. Do not weaken the acceptance threshold just to obtain a green suite.
+
+## One complete local suite
+
+Run the repository's scripts/Invoke-LocalAcceptance.ps1 with its -ExpectedCommit parameter against the latest PR #16 head from the isolated QA checkout. It checks PowerShell syntax and all *.test.ps1/*.test.js files in a single invocation, records individual logs and fails if any file fails. This is local Windows acceptance, not GitHub CI.
+
+In addition to synthetic coverage, manually inspect v1.16's running-status card and Appearance Save/Cancel. Do not replay old Horizon continuations, and do not merge the PR before both the suite and targeted operational behavior are accepted.

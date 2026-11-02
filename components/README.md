@@ -92,3 +92,7 @@ The scheduler-specific adapter tracks native fallback bars alongside browser-bac
 ### AeroProgress consumer independence
 
 AeroProgress has a public status API and no longer uses adopter-owned Control.Tag. The scheduler adapter alone owns its quota/time metadata. An unrelated program may store arbitrary data in Control.Tag without affecting renderer readiness or state. For value and failure checks, use Get-AeroProgressViewStatus instead of reading the control's Tag.
+
+## OneTimeTasks cancellation contract
+
+Unregistering a Windows task never guarantees a running worker is terminated. To cancel via the UI, the scheduler now invokes the reusable Remove-OneTimeTask command with -OnlyBeforeStart, which rereads Windows state and last-run information and refuses removal unless the task is Ready, has not run before, and has a single trigger at least 90 seconds in the future. Plain Remove-OneTimeTask remains available for explicit maintenance; callers must not misrepresent it as process cancellation. The conservative pre-start guard is designed to avoid accidental deletion of live worker payloads, not to establish an atomic Windows Task Scheduler transaction.
