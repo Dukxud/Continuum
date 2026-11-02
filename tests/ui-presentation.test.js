@@ -29,7 +29,7 @@ test('pending list shows recognizable project and preserves full task identity',
   assert.match(fn, /\$project = if \(\$path/);
   assert.match(fn, /\$row\.Tag = \$item\.Name/);
   assert.match(fn, /\$row\.Cells\[4\]\.ToolTipText/);
-  assert.match(fn, /\$pending\.Text = "Upcoming runs/);
+  assert.match(fn, /\$pending\.Text = "Scheduled and recent runs/);
   assert.match(fn, /\$emptyRuns\.Visible = \$false/);
   assert.match(fn, /Update-DashboardLayout/);
   assert.doesNotMatch(fn, /Update-Status/);

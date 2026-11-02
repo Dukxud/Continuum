@@ -21,6 +21,7 @@ function New-CodexUiState {
         Preferences = @{
             uiSettings=$null; savedDraft=$null; settingsReady=$false
             settingsTimer=$null; lastAccessPreference='workspace-write'
+            appearanceBeforeDraft=$null
         }
         Dashboard = @{
             appearanceButton=$null; compactRunDate=$null; compactRunDetails=$null

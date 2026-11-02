@@ -234,15 +234,17 @@ function Show-AeroAppearanceDialog {
 
     # An outstanding autosave timer may fire while this modal editor is open.
     # Expose the original appearance as the only persistable state until Save.
-    $script:appearanceBeforeDraft = $previous
+    $script:ui.Preferences.appearanceBeforeDraft = $previous
     $accepted = $false
     try {
         $result = $dialog.ShowDialog($Owner)
         if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
             # Control event callbacks have already applied the final live state.
             & $previewChanged
-            Queue-FormStateSave
             $accepted = $true
+            # The accepted preview must be persistable before autosave is queued.
+            $script:ui.Preferences.appearanceBeforeDraft = $null
+            Queue-FormStateSave
         }
     } finally {
         if (-not $accepted) { Update-AeroAppearance $previous }
@@ -252,6 +254,6 @@ function Show-AeroAppearanceDialog {
             }
         }
         $dialog.Dispose()
-        $script:appearanceBeforeDraft = $null
+        $script:ui.Preferences.appearanceBeforeDraft = $null
     }
 }

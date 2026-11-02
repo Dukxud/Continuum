@@ -47,6 +47,17 @@ test('UI state ownership is explicit and cross-file categories are declared',()=
    }
  }
 });
+test('appearance draft is owned by the Preferences context',()=>{
+ const state=read('CodexUiState.ps1');
+ const editor=read('CodexBarAppearance.ps1');
+ const actions=read('CodexUiActions.ps1');
+ assert.match(state,/appearanceBeforeDraft=\$null/);
+ assert.match(editor,/\$script:ui\.Preferences\.appearanceBeforeDraft = \$previous/);
+ assert.match(actions,/\$appearanceForStorage = if \(\$script:ui\.Preferences\.appearanceBeforeDraft\)/);
+ for(const source of [editor,actions]){
+   assert.doesNotMatch(source,/\$script:appearanceBeforeDraft\b/,'appearance draft escapes UI Preferences ownership');
+ }
+});
 test('scheduled runtime snapshot excludes every GUI module',()=>{
  const worker=read('CodexRunEngine.ps1');
  const runtime=worker.match(/function Get-CodexRuntimeFiles\s*\{([\s\S]*?)\n\}/)?.[1];
