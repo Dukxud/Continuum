@@ -29,7 +29,8 @@ function New-CodexUiState {
             compactRunPanel=$null; compactRunTrack=$null; compactTitleFont=$null
             compactToggle=$null; compactUsageModel=$null; compactUsageStatus=$null
             countdownBlue=$null; countdownTimer=$null; dashboardStandardOnly=@()
-            fullTitleFont=$null; pendingSnapshot=@(); pendingIndex=@{}; runBarHosts=$null
+            fullTitleFont=$null; pendingSnapshot=@(); historySnapshot=@()
+            pendingIndex=@{}; runBarHosts=$null
         }
     }
     # One constructor owns every initial value; GUI modules do not reset

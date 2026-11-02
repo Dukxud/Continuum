@@ -2,7 +2,8 @@
 function Show-CodexRunHistoryDialog {
     [CmdletBinding()]
     param([Parameter(Mandatory)][System.Windows.Forms.Form]$Owner,
-          [Parameter(Mandatory)][string]$Directory)
+          [Parameter(Mandatory)][string]$Directory,
+          [object[]]$RecentTasks=@())
     $dialog=[System.Windows.Forms.Form]::new()
     $dialog.Text='Recent Codex run results'
     $dialog.StartPosition='CenterParent'
@@ -27,13 +28,23 @@ function Show-CodexRunHistoryDialog {
     $grid.Columns['Message'].FillWeight=295
     $dialog.Controls.Add($grid)
     try {
+        $known=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         foreach($entry in @(Get-CodexRunHistory -Directory $Directory -Limit 100)){
+            [void]$known.Add([string]$entry.Name)
             $row=$grid.Rows.Add($entry.When.ToString('yyyy-MM-dd HH:mm'),$entry.Status,
                 $(if($null -eq $entry.ExitCode){''}else{[string]$entry.ExitCode}),
                 $(if($null -eq $entry.Attempt){''}else{[string]$entry.Attempt}),
                 $entry.NextJob,$entry.Message)
             $grid.Rows[$row].Tag=$entry.Name
             $grid.Rows[$row].Cells['NextJob'].ToolTipText=[string]$entry.NextJob
+        }
+        foreach($task in @($RecentTasks | Sort-Object When -Descending)){
+            if(-not $task.Name -or $known.Contains([string]$task.Name)) { continue }
+            if($task.Status -in @('Running','Scheduled')) { continue }
+            $row=$grid.Rows.Add($task.When.ToString('yyyy-MM-dd HH:mm'),[string]$task.Status,
+                '', '', '', 'Windows Task Scheduler record; no saved worker outcome available here.')
+            $grid.Rows[$row].Tag=[string]$task.Name
+            $grid.Rows[$row].Cells['Message'].ToolTipText=[string]$task.Description
         }
         if($grid.Rows.Count -eq 0){$dialog.Text+=' (no results yet)'}
         [void]$dialog.ShowDialog($Owner)

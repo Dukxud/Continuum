@@ -24,7 +24,7 @@ function Show-AeroAppearanceDialog {
     $dialog.Text = 'Customize progress bars'
     $dialog.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
     $dialog.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterParent
-    $dialog.ClientSize = [System.Drawing.Size]::new(566,625)
+    $dialog.ClientSize = [System.Drawing.Size]::new(566,652)
     $dialog.MaximizeBox = $false
     $dialog.MinimizeBox = $false
     $dialog.ShowInTaskbar = $false
@@ -175,6 +175,33 @@ function Show-AeroAppearanceDialog {
     $enabled.Location = [System.Drawing.Point]::new(20,503)
     $dialog.Controls.Add($enabled)
 
+    # Do not mistake a successful browser launch for an active liquid shader.
+    # The component receives an explicit engine report from its local page.
+    $rendererStatus=Add-Label 'Aero renderer: initializing...' 20 531 520 23
+    $rendererStatus.Font=[System.Drawing.Font]::new('Segoe UI',9)
+    $rendererStatus.ForeColor=[System.Drawing.Color]::DimGray
+    $rendererTimer=[System.Windows.Forms.Timer]::new()
+    $rendererTimer.Interval=500
+    $rendererTimer.Add_Tick({
+        try {
+            if($previewQuota -is [System.Windows.Forms.Integration.ElementHost]){
+                $rendererStatus.Text="Aero renderer: WPF fallback ($script:aeroError)"
+            } else {
+                $engine=Get-AeroProgressViewStatus -View $previewQuota
+                if($engine.Failure){
+                    $rendererStatus.Text="Aero renderer failed: $($engine.Failure)"
+                } elseif($engine.Engine -eq 'native-only'){
+                    $rendererStatus.Text="Aero Liquid unavailable: $($engine.ShaderError)"
+                } elseif($engine.Engine -eq 'webgl2'){
+                    $rendererStatus.Text=if($enabled.Checked){'Aero Liquid: WebGL2 ACTIVE'}else{'WebGL2 ready; Aero optics disabled'}
+                } else {
+                    $rendererStatus.Text='Aero renderer: WebGL2 not confirmed yet'
+                }
+            }
+        } catch { $rendererStatus.Text="Aero diagnostic failed: $($_.Exception.Message)" }
+    }.GetNewClosure())
+    $rendererTimer.Start()
+
     # Preview all edits immediately in the dialog and in the underlying app.
     # Settings persistence is intentionally deferred until the user clicks Save.
     $previewChanged = {
@@ -199,14 +226,14 @@ function Show-AeroAppearanceDialog {
 
     $separator = [System.Windows.Forms.Label]::new()
     $separator.BorderStyle = [System.Windows.Forms.BorderStyle]::Fixed3D
-    $separator.Location = [System.Drawing.Point]::new(19,544)
+    $separator.Location = [System.Drawing.Point]::new(19,564)
     $separator.Size = [System.Drawing.Size]::new(524,2)
     $dialog.Controls.Add($separator)
 
     $defaults = [System.Windows.Forms.Button]::new()
     $defaults.Name = 'AppearanceDefaults'
     $defaults.Text = 'Defaults'
-    $defaults.Location = [System.Drawing.Point]::new(19,568)
+    $defaults.Location = [System.Drawing.Point]::new(19,590)
     $defaults.Size = [System.Drawing.Size]::new(98,33)
     $defaults.Add_Click({
         $quota.SelectedIndex=0;$time.SelectedIndex=1
@@ -219,14 +246,14 @@ function Show-AeroAppearanceDialog {
     $cancel.Name = 'AppearanceCancel'
     $cancel.Text = 'Cancel'
     $cancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
-    $cancel.Location = [System.Drawing.Point]::new(305,568)
+    $cancel.Location = [System.Drawing.Point]::new(305,590)
     $cancel.Size = [System.Drawing.Size]::new(102,33)
     $dialog.Controls.Add($cancel)
     $save = [System.Windows.Forms.Button]::new()
     $save.Name = 'AppearanceSave'
     $save.Text = 'Save and close'
     $save.DialogResult = [System.Windows.Forms.DialogResult]::OK
-    $save.Location = [System.Drawing.Point]::new(416,568)
+    $save.Location = [System.Drawing.Point]::new(416,590)
     $save.Size = [System.Drawing.Size]::new(126,33)
     $dialog.Controls.Add($save)
     $dialog.AcceptButton = $save
@@ -247,6 +274,8 @@ function Show-AeroAppearanceDialog {
             Queue-FormStateSave
         }
     } finally {
+        $rendererTimer.Stop()
+        $rendererTimer.Dispose()
         if (-not $accepted) { Update-AeroAppearance $previous }
         foreach ($bar in @($previewQuota,$previewTime)) {
             if ($bar) {

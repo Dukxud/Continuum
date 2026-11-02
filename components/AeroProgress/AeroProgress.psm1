@@ -25,6 +25,8 @@ function Get-AeroProgressViewStatus {
     return [pscustomobject]@{
         Ready = [bool]$state.Ready
         Failure = $state.Failure
+        Engine = [string]$state.Engine
+        ShaderError = [string]$state.ShaderError
         Color = [string]$state.Color
         Value = if ($null -eq $state.State) { $null } else { [double]$state.State['value'] }
     }
@@ -104,6 +106,7 @@ function New-AeroProgressView {
     $view.AccessibleName = $AccessibleName
     $viewState = [pscustomobject]@{
         Ready = $false; State = $null; Failure = $null
+        Engine = 'pending'; ShaderError = $null
         Color = $Color; AllowedUri = $support.AssetUri.AbsoluteUri
     }
     $script:viewStates.Add($view,$viewState)
@@ -122,6 +125,20 @@ function New-AeroProgressView {
             return
         }
         $viewState.Failure = $null
+        # A loaded browser is not proof of an active optical shader.
+        # The bundled page reports WebGL2 readiness and shader errors.
+        $control.CoreWebView2.Add_WebMessageReceived({
+            param($source,$messageEvent)
+            try {
+                $message=$messageEvent.WebMessageAsJson | ConvertFrom-Json -ErrorAction Stop
+                if([string]$message.type -eq 'ready'){
+                    $viewState.Engine=[string]$message.engine
+                    $viewState.ShaderError=[string]$message.error
+                }
+            } catch {
+                $viewState.ShaderError="Aero renderer handshake invalid: $($_.Exception.Message)"
+            }
+        }.GetNewClosure())
         $settings = $control.CoreWebView2.Settings
         $settings.AreDefaultContextMenusEnabled = $false
         $settings.AreDevToolsEnabled = $false

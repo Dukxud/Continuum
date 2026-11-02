@@ -186,7 +186,7 @@ let ready=false,shaderReady=false,shaderError=null;
 const barCanvas=$('native'),overlay=$('aero');
 for(const color of colors){
  const image=new Image();
- image.onload=()=>nativePaint(barCanvas,selected,true);
+ image.onload=()=>paintNative();
  image.src=assets[color.key];
  images[color.key]=image;
 }
@@ -256,7 +256,17 @@ function nativePaint(canvas,idx,hybrid){
  ctx.drawImage(img,399,0,1,13,w-edgeX,0,edgeX,h);
 }
 
-function paintNative(){nativePaint(barCanvas,selected,true);}
+// Leave the captured Windows source and liquid shader intact. The v1.8
+// capture has near-black terminal columns that are too harsh on light UI.
+function softenOutline(canvas){
+ const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+ if(!w||!h)return;
+ const edgeX=Math.max(1,Math.round(w/400));
+ ctx.fillStyle=selectedColor==='blue'?'#B4C8E5':'#B3CFC2';
+ ctx.fillRect(0,0,edgeX,h);
+ ctx.fillRect(w-edgeX,0,edgeX,h);
+}
+function paintNative(){nativePaint(barCanvas,selected,true);softenOutline(barCanvas);}
 function shader(gl,type,src){const sh=gl.createShader(type);gl.shaderSource(sh,src);gl.compileShader(sh);
  if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(sh));
  return sh;
@@ -335,7 +345,7 @@ window.aeroBarProof={
  set:(next,color)=>apply({value:next,color}),setAppearance:apply,render:()=>{paintNative();drawOptics();}
 };
 ready=true;
-if(window.chrome?.webview)window.chrome.webview.postMessage({type:'ready',engine:window.aeroBarProof.getEngine()});
+if(window.chrome?.webview)window.chrome.webview.postMessage({type:'ready',engine:window.aeroBarProof.getEngine(),error:window.aeroBarProof.getError()});
 requestAnimationFrame(tick);
 })();
 </script></body></html>

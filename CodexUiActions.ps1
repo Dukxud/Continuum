@@ -102,7 +102,7 @@ $cancelRun.Add_Click({
         try { Refresh-PendingList } catch { Update-Status "Pending-list refresh failed: $($_.Exception.Message)" }
     }
 })
-$recentResults.Add_Click({ Show-CodexRunHistoryDialog -Owner $form -Directory $appDir })
+$recentResults.Add_Click({ Show-CodexRunHistoryDialog -Owner $form -Directory $appDir -RecentTasks $script:ui.Dashboard.historySnapshot })
 $openFolder.Add_Click({
     [void](New-Item -Path $appDir -ItemType Directory -Force)
     Start-Process explorer.exe -ArgumentList ('"' + $appDir + '"')

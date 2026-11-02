@@ -18,6 +18,10 @@ try {
     [void](Write-JobOutcome -Path (Join-Path $temp 'CodexResume-20260101-1000-abcdef01.result.json') -Status 'completed' -ExitCode 0 -Message 'Complete.')
     [void](Write-JobOutcome -Path (Join-Path $temp 'CodexResume-20260101-1100-abcdef02.result.json') -Status 'deferred' -ExitCode 17 -Attempt 1 -NextJob 'CodexResume-20260101-1200-abcdef03' -Message 'Rescheduled.')
     '{corrupt' | Set-Content -LiteralPath (Join-Path $temp 'CodexResume-20260101-0900-abcdef04.result.json')
+    $legacyTask=[pscustomobject]@{
+        Name='BP101-Codex-Test';When=(Get-Date).AddMinutes(-30)
+        Status='Failed (task exit 1)';Description='Old Windows registration'
+    }
     $owner.Show()
     $timer.Add_Tick({
         $dialog=$null
@@ -28,9 +32,9 @@ try {
                 return
             }
             $grid=@($dialog.Controls | Where-Object { $_ -is [System.Windows.Forms.DataGridView] }) | Select-Object -First 1
-            if(-not $grid -or $grid.Rows.Count -ne 3){throw 'History must render completed, deferred and unreadable rows.'}
+            if(-not $grid -or $grid.Rows.Count -ne 4){throw 'History must render persisted outcomes and old Windows task records.'}
             $statuses=@($grid.Rows | ForEach-Object { [string]$_.Cells['Status'].Value })
-            foreach($status in @('completed','deferred','unreadable')){
+            foreach($status in @('completed','deferred','unreadable','Failed (task exit 1)')){
                 if($statuses -notcontains $status){throw "History omitted status $status"}
             }
             $next=@($grid.Rows | Where-Object { [string]$_.Cells['Status'].Value -eq 'deferred' })[0].Cells['NextJob'].Value
@@ -43,7 +47,7 @@ try {
         }
     })
     $timer.Start()
-    Show-CodexRunHistoryDialog -Owner $owner -Directory $temp
+    Show-CodexRunHistoryDialog -Owner $owner -Directory $temp -RecentTasks @($legacyTask)
     if($script:historyError){throw $script:historyError}
     if(-not $script:historySeen){throw 'The history dialog did not render its persisted outcomes.'}
     Write-Host 'WinForms history dialog renders completed, deferred, unreadable and follow-up task PASS.'

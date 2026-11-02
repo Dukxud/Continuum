@@ -1,14 +1,17 @@
 # Codex-specific upcoming-task projection into WinForms.
 function Apply-PendingList {
     param([object[]]$Items)
-    $script:ui.Dashboard.pendingSnapshot = @($Items)
+    # Active jobs are actionable; completed/failed Windows tasks are history.
+    $upcoming = @($Items | Where-Object { $_.Status -in @('Running','Scheduled') })
+    $script:ui.Dashboard.historySnapshot = @($Items | Where-Object { $_.Status -notin @('Running','Scheduled') })
+    $script:ui.Dashboard.pendingSnapshot = $upcoming
     $pendingByName = [Collections.Generic.Dictionary[string,object]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($item in @($Items)) {
+    foreach ($item in $upcoming) {
         if ($item.Name) { $pendingByName[[string]$item.Name] = $item }
     }
     $script:ui.Dashboard.pendingIndex = $pendingByName
     $grid.Rows.Clear()
-    foreach ($item in $Items) {
+    foreach ($item in $upcoming) {
         $path = ([string]$item.Repo).TrimEnd([char[]]@('/','\'))
         $project = if ($path -and $path -ne '-') { [System.IO.Path]::GetFileName($path) } else { 'Unknown project' }
         $session = if ([string]$item.Session -match '^[0-9a-fA-F]{8}-') { ([string]$item.Session).Substring(0,8) } else { '-' }
@@ -21,7 +24,7 @@ function Apply-PendingList {
     }
     $grid.ClearSelection()
     $cancelRun.Enabled = $false
-    $pending.Text = "Scheduled and recent runs ($($Items.Count))"
+    $pending.Text = "Upcoming runs ($($upcoming.Count))"
     $emptyRuns.Visible = $false
     Update-DashboardLayout
     Update-DashboardCountdowns

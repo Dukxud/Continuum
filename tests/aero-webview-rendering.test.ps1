@@ -33,6 +33,8 @@ function Snapshot($bar,[string]$path) {
         $picture = [System.Drawing.Bitmap]::new($stream)
         try {
             Require ($picture.Width -ge 350 -and $picture.Height -ge 13) 'WebView screenshot has incorrect dimensions.'
+            $edge=$picture.GetPixel($picture.Width-1,[int]($picture.Height/2))
+            Require ($edge.R -gt 90 -and $edge.G -gt 90 -and $edge.B -gt 90) 'Black Windows-capture endcap remains visible.'
             $picture.Save($path,[System.Drawing.Imaging.ImageFormat]::Png)
             return $picture.GetPixel(40,[int]($picture.Height/2))
         } finally { $picture.Dispose() }
@@ -83,6 +85,11 @@ try {
     Require ((Evaluate $run 'window.aeroBarProof.getColor()') -eq 'blue') 'Countdown color must be blue.'
     Require ((Evaluate $quota 'window.aeroBarProof.getEngine()') -eq 'webgl2') 'Approved optical shader failed to initialize.'
     Require ((Evaluate $run 'window.aeroBarProof.getEngine()') -eq 'webgl2') 'Second shader failed.'
+    PumpUntil {
+        (Get-AeroProgressViewStatus -View $quota).Engine -eq 'webgl2' -and
+        (Get-AeroProgressViewStatus -View $run).Engine -eq 'webgl2'
+    }
+    Require (-not (Get-AeroProgressViewStatus -View $quota).ShaderError) 'Aero handshake reported a shader error.'
 
     # The original CI only tested that percentages changed. It did not
     # prove animation continued at a CONSTANT percentage.

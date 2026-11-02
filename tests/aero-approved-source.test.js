@@ -39,7 +39,10 @@ test('production preserves captured Windows v1.8 bar pixels and compositor',()=>
   const a=reference.match(/function nativePaint\(([\s\S]*?)function drawNativeAll\(\)/);
   const b=production.match(/function nativePaint\(([\s\S]*?)function paintNative\(\)/);
   assert.ok(a&&b);
-  assert.equal(a[1].trim(),b[1].replaceAll('aeroEnabled','aero').trim());
+  // The approved image compositor remains byte-for-byte intact; only its
+  // outermost captured black terminal pixels are softened afterward.
+  assert.equal(a[1].trim(),b[1].split('// Leave the captured Windows source')[0].replaceAll('aeroEnabled','aero').trim());
+  assert.match(production,/function softenOutline\(canvas\)/);
 });
 
 test('isolated WebView2 page is local and its host API is syntactically valid',()=>{
@@ -50,6 +53,7 @@ test('isolated WebView2 page is local and its host API is syntactically valid',(
   assert.match(production,/connect-src 'none'/);
   assert.match(source[1],/window\.chrome\.webview\.addEventListener\('message'/);
   assert.match(source[1],/window\.aeroBarProof/);
+  assert.match(source[1],/error:window\.aeroBarProof\.getError\(\)/);
   assert.match(source[1],/requestAnimationFrame\(tick\)/);
   assert.equal((production.match(/getContext\('webgl2'/g)||[]).length,1);
   assert.match(source[1],/function updateCustomSprite/);
