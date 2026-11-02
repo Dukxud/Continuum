@@ -250,11 +250,13 @@ function Invoke-CodexScheduledJob {
         try { Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -Attempt $(if ($job) { [int]$job.retryAttempt } else { 0 }) -ExitCode 1 -Message $failure } catch { }
         return 1
     } finally {
-        if ($transcribing) { Stop-Transcript | Out-Null }
+        # Releasing the writer lock must not depend on transcript shutdown.
+        # A failing Stop-Transcript is never allowed to strand ownership.
         if ($sessionGuard) {
             try { $sessionGuard.ReleaseMutex() }
             finally { $sessionGuard.Dispose() }
         }
+        if ($transcribing) { Stop-Transcript | Out-Null }
         Write-Host 'Run finished. Check the logs folder for the transcript.' -ForegroundColor Cyan
     }
 }
