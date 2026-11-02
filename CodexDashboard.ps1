@@ -307,12 +307,11 @@ function Update-DashboardLayout {
             $usageCards[$i].Panel.Visible = $true
             $usageCards[$i].Panel.Location = [System.Drawing.Point]::new($(if ($i -eq 0) { 18 } else { 470 }),358)
         }
-        $hasRuns = $script:ui.Dashboard.displayedRunCount -gt 0
-        foreach ($control in @($separator2,$pending,$grid,$refreshRuns,$cancelRun,$removeResult)) { $control.Visible = $hasRuns }
+        $hasRuns = $script:ui.Dashboard.pendingSnapshot.Count -gt 0
+        foreach ($control in @($separator2,$pending,$grid,$refreshRuns,$cancelRun)) { $control.Visible = $hasRuns }
         $openFolder.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 352 } else { 18 }),$(if ($hasRuns) { 774 } else { 523 }))
         $recentResults.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 520 } else { 185 }),$(if ($hasRuns) { 774 } else { 523 }))
         $recentResults.Visible = $true
-        $removeResult.Location = [System.Drawing.Point]::new(693,774)
         $script:ui.Dashboard.activityPanel.Location = [System.Drawing.Point]::new(18,$(if ($hasRuns) { 817 } else { 574 }))
         $script:ui.Dashboard.activityPanel.Size = [System.Drawing.Size]::new(880,29)
         $script:ui.Dashboard.activityLabel.Width = 840

@@ -172,7 +172,7 @@ $separator2.Location = [System.Drawing.Point]::new(18,512)
 $separator2.Size = [System.Drawing.Size]::new(880,2)
 $form.Controls.Add($separator2)
 
-$pending = Add-Label 'Runs' 18 527 400
+$pending = Add-Label 'Upcoming runs' 18 527 400
 $pending.Font = [System.Drawing.Font]::new('Segoe UI',12,[System.Drawing.FontStyle]::Bold)
 $pending.Height = 30
 
@@ -189,7 +189,7 @@ $grid.RowHeadersVisible = $false
 $grid.AutoSizeColumnsMode = 'Fill'
 $grid.BackgroundColor = [System.Drawing.Color]::White
 [void]$grid.Columns.Add('When','Scheduled (local)')
-[void]$grid.Columns.Add('Countdown','Time / status')
+[void]$grid.Columns.Add('Countdown','Time to run')
 [void]$grid.Columns.Add('Project','Project')
 [void]$grid.Columns.Add('Details','Model / access / instruction')
 [void]$grid.Columns.Add('Session','Session')
@@ -202,22 +202,18 @@ $grid.RowTemplate.Height = 54
 $grid.ShowCellToolTips = $true
 $form.Controls.Add($grid)
 $emptyRuns = New-Object System.Windows.Forms.Label
-$emptyRuns.Text = 'No runs recorded'
+$emptyRuns.Text = 'No upcoming runs'
 $emptyRuns.ForeColor = [System.Drawing.Color]::DimGray
 $emptyRuns.TextAlign = 'MiddleCenter'
 $emptyRuns.Dock = 'Fill'
 $grid.Controls.Add($emptyRuns)
 $grid.Add_SelectionChanged({
     $cancelRun.Enabled = $false
-    $removeResult.Enabled = $false
     if ($grid.SelectedRows.Count -eq 1) {
         $key = [string]$grid.SelectedRows[0].Tag
         if ($key -and $script:ui.Dashboard.pendingIndex.ContainsKey($key)) {
             $item = $script:ui.Dashboard.pendingIndex[$key]
             $cancelRun.Enabled = (-not $item.Status -or $item.Status -eq 'Scheduled')
-        }
-        if ($key -and $script:ui.Dashboard.resultIndex.ContainsKey($key)) {
-            $removeResult.Enabled = $true
         }
     }
 })
@@ -226,9 +222,7 @@ $refreshRuns = Add-Button 'Refresh runs' 18 774 154
 $cancelRun = Add-Button 'Cancel selected' 185 774 154
 $cancelRun.Enabled = $false
 $openFolder = Add-Button 'Open logs folder' 352 774 154
-$recentResults = Add-Button 'Recent results' 520 774 158
-$removeResult = Add-Button 'Remove from lists' 693 774 205
-$removeResult.Enabled = $false
+$recentResults = Add-Button 'Recent runs' 520 774 178
 $status = Add-Label 'Ready. Keep Windows awake and signed in for scheduled runs.' 18 823 880
 $status.ForeColor = [System.Drawing.Color]::DimGray
 $status.AutoEllipsis = $true
@@ -242,7 +236,7 @@ $repoHints = [System.Windows.Forms.ToolTip]::new()
 $usageHints = [System.Windows.Forms.ToolTip]::new()
 $actionHints = [System.Windows.Forms.ToolTip]::new()
 $actionHints.SetToolTip($schedule, 'Creates one Windows Task Scheduler run. Your settings are rechecked when the task starts.')
-$actionHints.SetToolTip($pending, 'Double-click a finished run to read its Codex response. Select it to remove it from both lists.')
+$actionHints.SetToolTip($pending, 'Only scheduled and actively running tasks appear here. See Recent runs for finished results and their responses.')
 $actionHints.SetToolTip($autoResumeCheck, 'Only retries after a confirmed Codex usage-limit failure; does not monitor other Codex terminals.')
 $actionHints.SetToolTip($useReset, 'Uses the applicable exhausted quota reset time plus two minutes, when Codex reports one.')
 

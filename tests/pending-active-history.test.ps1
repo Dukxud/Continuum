@@ -1,10 +1,10 @@
-# Regression: old Windows task outcomes must not occupy the live queue.
-# No scheduled task is registered, started, or removed by this test.
+# Upcoming runs and recent history are distinct views.
+# Exercises the UI projection without creating, modifying or launching Windows tasks.
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 Add-Type -AssemblyName System.Windows.Forms
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexUiState.ps1')
-$appDir=Join-Path ([IO.Path]::GetTempPath()) ('codex-persistent-runs-' + [guid]::NewGuid().ToString('N'))
+$appDir=Join-Path ([IO.Path]::GetTempPath()) ('codex-upcoming-only-' + [guid]::NewGuid().ToString('N'))
 [void](New-Item -ItemType Directory -Path $appDir -Force)
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexJobStore.ps1')
 $script:ui=New-CodexUiState
@@ -13,7 +13,6 @@ $grid=[System.Windows.Forms.DataGridView]::new()
 $grid.AllowUserToAddRows=$false
 foreach($name in @('Scheduled','Countdown','Project','Details','Session')){[void]$grid.Columns.Add($name,$name)}
 $cancelRun=[System.Windows.Forms.Button]::new()
-$removeResult=[System.Windows.Forms.Button]::new()
 $pending=[System.Windows.Forms.Label]::new()
 $emptyRuns=[System.Windows.Forms.Label]::new()
 function Update-DashboardLayout {}
@@ -21,52 +20,51 @@ function Update-DashboardCountdowns {}
 function Update-DashboardActivity { param([object[]]$Items,[string]$Directory) }
 function Request-UsageRefresh {}
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexUiPending.ps1')
-function Require($check,[string]$message){if(-not $check){throw $message}}
+function Require($condition,[string]$message){if(-not $condition){throw $message}}
 $now=Get-Date
-$failed=[pscustomobject]@{Name='BP090-Codex-Test';When=$now.AddHours(-2);Repo='-';Description='Old Windows task';Session='-';Model='';Status='Failed (task exit 1)'}
-$ended=[pscustomobject]@{Name='BP091-Codex-Test';When=$now.AddHours(-1);Repo='-';Description='Old Windows task';Session='-';Model='';Status='Ended (no result recorded)'}
-$upcoming=[pscustomobject]@{Name='CodexResume-test';When=$now.AddMinutes(30);Repo='C:\qa';Description='QA continuation';Session='00000000-0000-0000-0000-000000000001';Model='test-model';Status='Scheduled'}
+$failed=[pscustomobject]@{Name='BP090-Codex-Test';When=$now.AddHours(-2);Repo='-';Description='Historical failure';Session='-';Model='';Status='Failed (task exit 1)'}
+$ended=[pscustomobject]@{Name='BP091-Codex-Test';When=$now.AddHours(-1);Repo='-';Description='Historical completion';Session='-';Model='';Status='Ended (no result recorded)'}
+$scheduled=[pscustomobject]@{Name='CodexResume-20261102-1700-abc12345';When=$now.AddMinutes(30);Repo='C:\qa';Description='QA continuation';Session='00000000-0000-0000-0000-000000000001';Model='test-model';Status='Scheduled'}
+$running=[pscustomobject]@{Name='CodexResume-20261102-1600-abc12346';When=$now.AddMinutes(-1);Repo='C:\qa';Description='Running';Session='00000000-0000-0000-0000-000000000001';Model='test-model';Status='Running'}
 $completedName='CodexResume-20261102-1501-f0e770de'
 [void](Write-JobOutcome -Path (Join-Path $appDir ($completedName+'.result.json')) -Status 'completed' -ExitCode 0)
-[pscustomobject]@{repo='C:\qa';sessionId='00000000-0000-0000-0000-000000000001';message='SCHEDULER_QA_COMPLETED'} |
-    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $appDir ($completedName+'.json'))
 try {
-    Apply-PendingList -Items @($failed,$upcoming,$ended)
-    Require ($script:ui.Dashboard.pendingSnapshot.Count -eq 1) 'Live queue included old results.'
-    Require ($script:ui.Dashboard.pendingSnapshot[0].Name -eq $upcoming.Name) 'Next run is not the actual upcoming task.'
-    Require ($script:ui.Dashboard.historySnapshot.Count -eq 3) 'Persisted outcome was missing from history.'
-    Require ($grid.Rows.Count -eq 4) 'Main Runs table must retain three finished results with the active task.'
-    Require ($pending.Text -eq 'Runs (1 active, 3 recent)') 'Active/recent heading is incorrect.'
-    $completed=@($grid.Rows | Where-Object { [string]$_.Tag -ceq $completedName }) | Select-Object -First 1
-    Require ($completed -and $completed.Cells[1].Value -eq 'completed') 'Saved completion was not visible/selectable.'
-    Require ($completed.Cells[1].Tag -eq 'history') 'A finished job must not show a countdown bar.'
-    $grid.CurrentCell=$completed.Cells[0]
-    $completed.Selected=$true
-    $before=$completed
-    Apply-PendingList -Items @($failed,$upcoming,$ended)
-    $after=@($grid.Rows | Where-Object { [string]$_.Tag -ceq $completedName }) | Select-Object -First 1
-    Require ([object]::ReferenceEquals($before,$after)) 'Periodic refresh rebuilt identical rows, causing a flicker.'
-    Require ($after.Selected -and $removeResult.Enabled) 'Periodic refresh discarded a selected finished run.'
+    Apply-PendingList -Items @($failed,$scheduled,$running,$ended)
+    Require ($grid.Rows.Count -eq 2) 'Main queue must contain only scheduled and running jobs.'
+    Require ($pending.Text -eq 'Upcoming runs (2)') 'Main queue heading must say Upcoming runs.'
+    Require ($script:ui.Dashboard.pendingSnapshot.Count -eq 2) 'Layout count must exclude historical jobs.'
+    Require ($script:ui.Dashboard.pendingSnapshot.Count -eq 2) 'Upcoming snapshot contained history.'
+    Require ($script:ui.Dashboard.historySnapshot.Count -eq 2) 'Historical Windows tasks disappeared from Recent runs.'
+    Require (@($grid.Rows | Where-Object { $_.Tag -eq $completedName -or $_.Tag -eq $failed.Name }).Count -eq 0) 'Historical row leaked into Upcoming runs.'
+    $scheduledRow=@($grid.Rows | Where-Object { $_.Tag -eq $scheduled.Name })[0]
+    $grid.CurrentCell=$scheduledRow.Cells[0]
+    $scheduledRow.Selected=$true
+    Apply-PendingList -Items @($failed,$scheduled,$running,$ended)
+    $unchanged=@($grid.Rows | Where-Object { $_.Tag -eq $scheduled.Name })[0]
+    Require ([object]::ReferenceEquals($scheduledRow,$unchanged) -and $unchanged.Selected) 'Refreshing the queue caused row flicker or lost selection.'
+    Require ($cancelRun.Enabled) 'Scheduled task did not enable cancellation.'
+    # Once both jobs finish, no historical record (including a saved outcome)
+    # can make the Upcoming runs section reappear.
     Apply-PendingList -Items @($failed,$ended)
-    Require ($script:ui.Dashboard.pendingSnapshot.Count -eq 0) 'Finished jobs must not enter the active queue.'
-    Require ($grid.Rows.Count -eq 3) 'Previous runs disappeared when the next run completed.'
-    Require (@($grid.Rows | Where-Object { [string]$_.Tag -ceq $completedName }).Count -eq 1) 'Persisted result was lost after removing the active row.'
-    Require ($removeResult.Enabled) 'Selected finished result lost its removal action after reshuffling.'
+    Require ($grid.Rows.Count -eq 0 -and $script:ui.Dashboard.pendingSnapshot.Count -eq 0) 'Previous runs kept the main queue visible.'
+    Require ($pending.Text -eq 'Upcoming runs (0)') 'Empty queue heading is misleading.'
+    Require (@(Get-CodexRunHistory -Directory $appDir).Count -eq 1) 'Saved completed outcome missing from history.'
     Hide-CodexRunRecord -Directory $appDir -Name $completedName
-    Apply-PendingList -Items @($failed,$ended)
-    Require (@($grid.Rows | Where-Object { [string]$_.Tag -ceq $completedName }).Count -eq 0) 'Hidden saved outcome reappeared on refresh.'
-    Require (@(Get-CodexRunHistory -Directory $appDir).Count -eq 0) 'Hidden run remained in persisted history.'
-    Require (Test-Path -LiteralPath (Join-Path $appDir ($completedName+'.result.json'))) 'Hiding a result deleted its audit evidence.'
     Hide-CodexRunRecord -Directory $appDir -Name $failed.Name
     Apply-PendingList -Items @($failed,$ended)
-    Require ($grid.Rows.Count -eq 1 -and [string]$grid.Rows[0].Tag -ceq $ended.Name) 'Hidden historical Windows task reappeared.'
-    $hidden=Get-HiddenCodexRunNames -Directory $appDir
-    Require ($hidden.Contains($completedName) -and $hidden.Contains($failed.Name)) 'Hidden list did not persist both records.'
-    Write-Host 'Results persist and remain selectable; removing finished rows hides them across refresh while preserving files.'
+    Require ($grid.Rows.Count -eq 0) 'Hidden results appeared in Upcoming runs.'
+    Require ($script:ui.Dashboard.historySnapshot.Count -eq 1) 'Hidden Windows task reappeared in Recent runs.'
+    Require (@(Get-CodexRunHistory -Directory $appDir).Count -eq 0) 'Hidden saved result reappeared in history.'
+    Require (Test-Path -LiteralPath (Join-Path $appDir ($completedName+'.result.json'))) 'Hiding history deleted the result file.'
+    # A previously hidden ID must still be displayed if Task Scheduler says
+    # it is now running (safety: hiding is never an execution control).
+    Hide-CodexRunRecord -Directory $appDir -Name $scheduled.Name
+    Apply-PendingList -Items @($scheduled,$ended)
+    Require ($grid.Rows.Count -eq 1 -and [string]$grid.Rows[0].Tag -ceq $scheduled.Name) 'Hiding a record suppressed an active Windows task.'
+    Write-Host 'Upcoming-only queue, live status, stable refresh, empty layout, and separate history PASS.'
 } finally {
     $grid.Dispose()
     $cancelRun.Dispose()
-    $removeResult.Dispose()
     $pending.Dispose()
     $emptyRuns.Dispose()
     $script:ui.Dashboard.compactToggle.Dispose()

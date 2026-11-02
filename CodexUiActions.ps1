@@ -106,31 +106,6 @@ $recentResults.Add_Click({
     Show-CodexRunHistoryDialog -Owner $form -Directory $appDir -RecentTasks $script:ui.Dashboard.historySnapshot
     Refresh-PendingList
 })
-function Open-SelectedCodexResult {
-    if($grid.SelectedRows.Count -ne 1){return}
-    $name=[string]$grid.SelectedRows[0].Tag
-    if(-not $script:ui.Dashboard.resultIndex.ContainsKey($name)){return}
-    Show-CodexRunHistoryDialog -Owner $form -Directory $appDir -RecentTasks $script:ui.Dashboard.historySnapshot -SelectedName $name
-    Refresh-PendingList
-}
-$removeResult.Add_Click({
-    if($grid.SelectedRows.Count -ne 1){return}
-    $name=[string]$grid.SelectedRows[0].Tag
-    if(-not $script:ui.Dashboard.resultIndex.ContainsKey($name)){return}
-    if([System.Windows.Forms.MessageBox]::Show($form,
-        "Remove '$name' from Runs and Recent results?`n`nThe Windows task and saved Codex logs will not be deleted.",
-        'Remove finished run from lists','YesNo','Question') -ne 'Yes'){return}
-    try {
-        Hide-CodexRunRecord -Directory $appDir -Name $name
-        Refresh-PendingList
-    } catch {
-        [System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Unable to remove run') | Out-Null
-    }
-})
-$grid.Add_CellDoubleClick({
-    param($sender,$eventArgs)
-    if($eventArgs.RowIndex -ge 0){ Open-SelectedCodexResult }
-})
 $openFolder.Add_Click({
     [void](New-Item -Path $appDir -ItemType Directory -Force)
     Start-Process explorer.exe -ArgumentList ('"' + $appDir + '"')

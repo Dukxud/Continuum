@@ -49,7 +49,6 @@ try {
     $cancelRun = New-TestControl panel 185 774 154 31
     $openFolder = New-TestControl panel 352 774 154 31
     $recentResults = New-TestControl panel 520 774 158 31
-    $removeResult = New-TestControl panel 693 774 205 31
     $status = New-TestControl label 18 823 880 25
     $script:ui.Preferences.uiSettings = $null
     $script:ui.Dashboard.pendingSnapshot = @()
@@ -76,7 +75,6 @@ try {
     Require (-not $script:ui.Dashboard.compactRunPanel.Visible) 'An empty queue must not render a run placeholder.'
     Require ($script:ui.Dashboard.activityPanel.Visible) 'Activity strip must remain available in compact mode.'
 
-    $script:ui.Dashboard.displayedRunCount=1
     $script:ui.Dashboard.pendingSnapshot = @([pscustomobject]@{
         Model='test-model'; Name='pending-1'; Repo='C:\work\demo'; Description='test instruction'
         When=(Get-Date).AddHours(2); CreatedAt=$null
@@ -89,11 +87,13 @@ try {
     Require ($grid.Visible) 'The full run list should be restored.'
     Require ($recentResults.Visible) 'Run-history control must be available in normal mode.'
     Require ($script:ui.Dashboard.activityPanel.Visible) 'Activity strip must be available in normal mode.'
-    Require ($removeResult.Visible) 'Remove from lists must be visible alongside the main runs table.'
     $script:ui.Dashboard.pendingSnapshot=@()
-    $script:ui.Dashboard.displayedRunCount=2
     Update-DashboardLayout
-    Require ($grid.Visible -and $removeResult.Visible) 'Finished results must keep main Runs table and removal action visible without an active task.'
+    Require (-not $grid.Visible -and -not $pending.Visible) 'Historical results must not keep Upcoming runs visible.'
+    Require ($recentResults.Visible) 'Recent runs must remain available when the queue is empty.'
+    $script:ui.Dashboard.pendingSnapshot=@([pscustomobject]@{Name='pending-again';Repo='C:\work\demo';When=(Get-Date).AddMinutes(5)})
+    Update-DashboardLayout
+    Require ($grid.Visible -and $pending.Visible) 'Scheduled runs must restore the Upcoming runs table.'
     [void]$grid.Rows.Add('Time','5m','Demo 1')
     [void]$grid.Rows.Add('Time','7m','Demo 2')
     [void]$grid.Rows.Add('Time','9m','Demo 3')

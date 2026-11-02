@@ -29,15 +29,16 @@ test('pending list shows recognizable project and preserves full task identity',
   assert.match(fn, /\$project=if\(\$path/);
   assert.match(fn, /\$row\.Tag=\[string\]\$item\.Name/);
   assert.match(fn, /\$row\.Cells\[4\]\.ToolTipText/);
-  assert.match(fn, /\$pending\.Text="Runs \(/);
-  assert.match(fn, /\$script:ui\.Dashboard\.historySnapshot=\$history/);
+  assert.match(fn, /\$pending\.Text="Upcoming runs \(/);
+  assert.match(source, /Add-Button 'Recent runs'/);
+  assert.doesNotMatch(fn, /\$recent\b|\$resultIndex\b/);
+  assert.match(fn, /\$script:ui\.Dashboard\.historySnapshot=@\(\$Items/);
   assert.match(fn, /\$script:ui\.Dashboard\.pendingSnapshot=\$upcoming/);
-  assert.match(fn, /\$resultIndex\.ContainsKey/);
+  assert.doesNotMatch(fn, /displayedRunCount/);
   assert.match(fn, /\$same=\(\$grid\.Rows\.Count/);
-  assert.match(source, /\$removeResult\.Add_Click/);
-  assert.match(source, /Hide-CodexRunRecord/);
-  assert.doesNotMatch(source, /\$viewResult\b/);
-  assert.match(source, /\$grid\.Add_CellDoubleClick/);
+  assert.doesNotMatch(source, /\$removeResult\b|\$viewResult\b/);
+  assert.match(source, /\$recentResults\.Add_Click/);
+  assert.doesNotMatch(source, /\$grid\.Add_CellDoubleClick/);
   assert.match(fn, /\$emptyRuns\.Visible=\$false/);
   assert.match(fn, /Update-DashboardLayout/);
   assert.doesNotMatch(fn, /Update-Status/);
@@ -60,7 +61,7 @@ test('usage reports remaining and keeps reset as an explicit action', () => {
 
 test('dashboard shares the pending snapshot and renders distinct countdown and quota bars', () => {
   const dash = fs.readFileSync(path.resolve(__dirname, '..', 'CodexDashboard.ps1'), 'utf8');
-  assert.match(source, /Columns\.Add\('Countdown','Time \/ status'\)/);
+  assert.match(source, /Columns\.Add\('Countdown','Time to run'\)/);
   assert.match(source, /\$grid\.RowTemplate\.Height = 54/);
   assert.match(source, /\$script:ui\.Usage\.usageRequestedModel = \$chosen/);
   assert.match(source, /compactMode = \[bool\]\$script:ui\.Dashboard\.compactToggle\.Checked/);

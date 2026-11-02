@@ -38,7 +38,7 @@ try {
     $timer.Add_Tick({
         $dialog=$null
         try {
-            $dialog=@([System.Windows.Forms.Application]::OpenForms | Where-Object { $_.Text -like 'Recent Codex run results*' }) | Select-Object -First 1
+            $dialog=@([System.Windows.Forms.Application]::OpenForms | Where-Object { $_.Text -like 'Recent Codex runs*' }) | Select-Object -First 1
             if(-not $dialog) {
                 if((Get-Date)-gt $script:historyStart.AddSeconds(12)){$script:historyError='History dialog did not open.'}
                 return
@@ -46,7 +46,7 @@ try {
             $split=@($dialog.Controls | Where-Object { $_ -is [System.Windows.Forms.SplitContainer] }) | Select-Object -First 1
             if(-not $split){throw 'History must contain both result list and evidence pane.'}
             $actions=@($split.Panel1.Controls | Where-Object { $_ -is [System.Windows.Forms.Panel] }) | Select-Object -First 1
-            $remove=@($actions.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq 'Remove from lists' }) | Select-Object -First 1
+            $remove=@($actions.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq 'Remove from history' }) | Select-Object -First 1
             if(-not $remove){throw 'History does not offer removal from the list.'}
             if($remove.Top -lt 0 -or $remove.Bottom -gt $actions.Height){throw 'History removal control is clipped.'}
             $grid=@($split.Panel1.Controls | Where-Object { $_ -is [System.Windows.Forms.DataGridView] }) | Select-Object -First 1

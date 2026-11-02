@@ -1,73 +1,39 @@
-# Persistent run projection: active jobs first, followed by the last six
-# finished jobs. Refreshes reconcile by job identity to avoid a flashing list.
+# Upcoming runs only. Past outcomes are displayed in Recent runs.
+# Reconcile scheduled/running row identities to prevent refresh flicker.
 function Apply-PendingList {
     param([object[]]$Items)
+    $upcoming=@($Items | Where-Object { $_.Status -in @('Running','Scheduled') })
+    # Legacy Windows task outcomes remain available to the history dialog;
+    # persisted results are read directly from the outcome store there.
     $hidden=Get-HiddenCodexRunNames -Directory $appDir
-    # Hiding applies only to past runs, never to live or future tasks.
-    $shown=@($Items | Where-Object {
-        $_.Status -in @('Running','Scheduled') -or -not $hidden.Contains([string]$_.Name)
+    $script:ui.Dashboard.historySnapshot=@($Items | Where-Object {
+        $_.Status -notin @('Running','Scheduled') -and -not $hidden.Contains([string]$_.Name)
     })
-    $upcoming=@($shown | Where-Object { $_.Status -in @('Running','Scheduled') })
-    $history=@($shown | Where-Object { $_.Status -notin @('Running','Scheduled') })
-    $known=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach($item in @($upcoming)+@($history)){
-        if($item.Name){[void]$known.Add([string]$item.Name)}
-    }
-    # Persisted outcomes remain visible even if Windows removes the task.
-    if(-not [string]::IsNullOrWhiteSpace([string]$appDir)){
-        foreach($outcome in @(Get-CodexRunHistory -Directory $appDir -Limit 10)){
-            if(-not $known.Add([string]$outcome.Name)){continue}
-            $payload=Join-Path $appDir ($outcome.Name+'.json')
-            $repo='-';$session='-';$description=[string]$outcome.Message
-            if(Test-Path -LiteralPath $payload -PathType Leaf){
-                try {
-                    $job=Get-Content -LiteralPath $payload -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-                    $repo=[string]$job.repo;$session=[string]$job.sessionId
-                    $description=[string]$job.message
-                } catch { }
-            }
-            $history+= [pscustomobject]@{
-                Name=$outcome.Name;When=$outcome.When;Repo=$repo;Session=$session
-                Description=$description;Model='';CreatedAt=$null
-                Status=[string]$outcome.Status
-            }
-        }
-    }
-    $history=@($history | Sort-Object When -Descending)
-    $recent=@($history | Select-Object -First 6)
-    $visible=@($upcoming)+@($recent)
-    $script:ui.Dashboard.historySnapshot=$history
     $script:ui.Dashboard.pendingSnapshot=$upcoming
-    $script:ui.Dashboard.displayedRunCount=$visible.Count
     $pendingIndex=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::OrdinalIgnoreCase)
-    $resultIndex=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach($item in $upcoming){if($item.Name){$pendingIndex[[string]$item.Name]=$item}}
-    foreach($item in $recent){if($item.Name){$resultIndex[[string]$item.Name]=$item}}
     $script:ui.Dashboard.pendingIndex=$pendingIndex
-    $script:ui.Dashboard.resultIndex=$resultIndex
 
     # Keep rows and their selection if the task identities/order are unchanged.
     # Status and countdown values update in place on each two-second refresh.
-    $same=($grid.Rows.Count -eq $visible.Count)
+    $same=($grid.Rows.Count -eq $upcoming.Count)
     if($same){
-        for($i=0;$i -lt $visible.Count;$i++){
-            if([string]$grid.Rows[$i].Tag -cne [string]$visible[$i].Name){$same=$false;break}
+        for($i=0;$i -lt $upcoming.Count;$i++){
+            if([string]$grid.Rows[$i].Tag -cne [string]$upcoming[$i].Name){$same=$false;break}
         }
     }
     $selected=if($grid.SelectedRows.Count -eq 1){[string]$grid.SelectedRows[0].Tag}else{''}
     $grid.SuspendLayout()
     try {
         if(-not $same){$grid.Rows.Clear()}
-        for($i=0;$i -lt $visible.Count;$i++){
-            $item=$visible[$i]
+        for($i=0;$i -lt $upcoming.Count;$i++){
+            $item=$upcoming[$i]
             $path=([string]$item.Repo).TrimEnd([char[]]@('/','\'))
             $project=if($path -and $path -ne '-') {[IO.Path]::GetFileName($path)}else{'Unknown project'}
             $session=if([string]$item.Session -match '^[0-9a-fA-F]{8}-'){([string]$item.Session).Substring(0,8)}else{'-'}
-            $isHistory=$resultIndex.ContainsKey([string]$item.Name)
             $when=$item.When.ToString('MMM dd, h:mm tt')
             $details=[string]$item.Description
-            $runText=if($isHistory){[string]$item.Status}else{''}
-            if(-not $same){$index=$grid.Rows.Add($when,$runText,$project,$details,$session)}
+            if(-not $same){$index=$grid.Rows.Add($when,'',$project,$details,$session)}
             else {$index=$i}
             $row=$grid.Rows[$index]
             $row.Tag=[string]$item.Name
@@ -78,16 +44,10 @@ function Apply-PendingList {
             $row.Cells[2].ToolTipText=[string]$item.Repo
             $row.Cells[3].ToolTipText=$details
             $row.Cells[4].ToolTipText="Session: $($item.Session)`nTask: $($item.Name)"
-            if($isHistory){
-                $row.Cells[1].Value=$runText
-                $row.Cells[1].Tag='history'
-                $row.DefaultCellStyle.BackColor=[System.Drawing.Color]::FromArgb(247,249,252)
-            }else{
-                if($row.Cells[1].Tag -is [string] -and $row.Cells[1].Tag -eq 'history'){
-                    $row.Cells[1].Value=''
-                    $row.Cells[1].Tag=$null
-                }
-                $row.DefaultCellStyle.BackColor=[System.Drawing.Color]::White
+            $row.DefaultCellStyle.BackColor=[System.Drawing.Color]::White
+            if($row.Cells[1].Tag -eq 'history'){
+                $row.Cells[1].Value=''
+                $row.Cells[1].Tag=$null
             }
         }
         if(-not $same){
@@ -106,9 +66,7 @@ function Apply-PendingList {
     $cancelRun.Enabled=($grid.SelectedRows.Count -eq 1 -and
         $pendingIndex.ContainsKey([string]$grid.SelectedRows[0].Tag) -and
         $pendingIndex[[string]$grid.SelectedRows[0].Tag].Status -eq 'Scheduled')
-    $removeResult.Enabled=($grid.SelectedRows.Count -eq 1 -and
-        $resultIndex.ContainsKey([string]$grid.SelectedRows[0].Tag))
-    $pending.Text="Runs ($($upcoming.Count) active, $($recent.Count) recent)"
+    $pending.Text="Upcoming runs ($($upcoming.Count))"
     $emptyRuns.Visible=$false
     Update-DashboardActivity -Items $upcoming -Directory $appDir
     Update-DashboardLayout

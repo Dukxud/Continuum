@@ -6,7 +6,7 @@ function Show-CodexRunHistoryDialog {
           [object[]]$RecentTasks=@(),
           [string]$SelectedName='')
     $dialog=[System.Windows.Forms.Form]::new()
-    $dialog.Text='Recent Codex run results'
+    $dialog.Text='Recent Codex runs'
     $dialog.StartPosition='CenterParent'
     $dialog.ClientSize=[Drawing.Size]::new(960,580)
     $dialog.MinimumSize=[Drawing.Size]::new(760,460)
@@ -43,8 +43,8 @@ function Show-CodexRunHistoryDialog {
     $actionPanel.Dock='Bottom'
     $actionPanel.Height=40
     $removeRecord=[System.Windows.Forms.Button]::new()
-    $removeRecord.Text='Remove from lists'
-    $removeRecord.AccessibleName='Remove selected finished run from lists'
+    $removeRecord.Text='Remove from history'
+    $removeRecord.AccessibleName='Remove selected finished run from history'
     $removeRecord.Size=[Drawing.Size]::new(172,30)
     $removeRecord.Location=[Drawing.Point]::new(8,5)
     $removeRecord.Enabled=$false
@@ -116,7 +116,7 @@ function Show-CodexRunHistoryDialog {
             $selectedRow=$historyGrid.SelectedRows[0]
             $name=[string]$selectedRow.Tag
             if([System.Windows.Forms.MessageBox]::Show($dialog,
-                "Remove '$name' from Runs and Recent results?`n`nThe Windows task and saved Codex logs will not be deleted.",
+                "Remove '$name' from Recent runs?`n`nThe Windows task and saved Codex logs will not be deleted.",
                 'Remove finished run from lists','YesNo','Question') -ne 'Yes'){return}
             try {
                 Hide-CodexRunRecord -Directory $Directory -Name $name
