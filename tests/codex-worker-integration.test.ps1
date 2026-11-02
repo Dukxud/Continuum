@@ -25,7 +25,8 @@ if(process.argv.includes('app-server')){
  });
 }else if(process.argv.includes('exec')){
  if(process.env.CODEX_STUB_MARKER)fs.writeFileSync(process.env.CODEX_STUB_MARKER,'executed');
- if(process.env.CODEX_STUB_EMIT_LIMIT==='1')console.log(JSON.stringify({type:'turn.failed',error:{message:'Usage limit exceeded'}}));
+ if(process.env.CODEX_STUB_EMIT_WRITER==='1')console.log(JSON.stringify({type:'turn.failed',error:{message:'thread-store conflict: thread already has an active writer'}}));
+ else if(process.env.CODEX_STUB_EMIT_LIMIT==='1')console.log(JSON.stringify({type:'turn.failed',error:{message:'Usage limit exceeded'}}));
  else console.log(JSON.stringify({type:'turn.completed'}));
  process.exitCode=Number(process.env.CODEX_STUB_EXIT||0);
 }else{process.exitCode=2;}
@@ -51,7 +52,7 @@ exit /b %errorlevel%
     $settingsDir=Join-Path $temp 'isolated-appdata'
     [void](New-Item -ItemType Directory -Path $settingsDir -Force)
 
-    function Run-CodexStub([int]$expectedExit,[bool]$auto,[string]$activeAccount,[bool]$emitLimit) {
+    function Run-CodexStub([int]$expectedExit,[bool]$auto,[string]$activeAccount,[bool]$emitLimit,[bool]$writerConflict=$false) {
         if(Test-Path $marker){Remove-Item -LiteralPath $marker -Force}
         if(Test-Path $outcomePath){Remove-Item -LiteralPath $outcomePath -Force}
         [pscustomobject]@{
@@ -75,6 +76,7 @@ exit /b %errorlevel%
         $psi.Environment['CODEX_STUB_EXIT']=[string]$expectedExit
         $psi.Environment['CODEX_STUB_ACCOUNT']=$activeAccount
         $psi.Environment['CODEX_STUB_EMIT_LIMIT']=if($emitLimit){'1'}else{'0'}
+        $psi.Environment['CODEX_STUB_EMIT_WRITER']=if($writerConflict){'1'}else{'0'}
         $psi.Environment['CODEX_STUB_MARKER']=$marker
         $proc=[Diagnostics.Process]::Start($psi)
         try{
@@ -87,6 +89,26 @@ exit /b %errorlevel%
             return [pscustomobject]@{ Exit=[int]$proc.ExitCode;Executed=(Test-Path $marker);Output=$output;Errors=$errors }
         }finally{$proc.Dispose()}
     }
+
+    # Parent process holds a real named mutex; a separate scheduled worker
+    # must decline the same session before invoking even a stub Codex command.
+    $held=Enter-CodexSessionRun -SessionId '00000000-0000-0000-0000-000000000001'
+    Require ($null -ne $held) 'Unable to establish the first scheduled writer lock.'
+    try {
+        $blocked=Run-CodexStub 0 $false 'acct-1' $false
+        Require ($blocked.Exit -ne 0 -and -not $blocked.Executed) "Concurrent scheduled worker ran the same session: $($blocked.Output) $($blocked.Errors)"
+        $blockedOutcome=Read-JobOutcome -Path $outcomePath
+        Require ($blockedOutcome.status -eq 'blocked' -and $blockedOutcome.message -match 'already running|already.*active|duplicate execution') 'Overlapping session was not explicitly recorded as blocked.'
+    } finally {
+        $held.ReleaseMutex()
+        $held.Dispose()
+    }
+    # A native Codex process may already have a writer without holding our
+    # scheduler mutex. Its error must still be reported as a distinct block.
+    $external=Run-CodexStub 1 $false 'acct-1' $false $true
+    Require ($external.Exit -ne 0 -and $external.Executed) 'Mock native-writer conflict was not reproduced.'
+    $externalOutcome=Read-JobOutcome -Path $outcomePath
+    Require ($externalOutcome.status -eq 'blocked' -and $externalOutcome.message -match 'active writer') 'Native thread-store conflict was not distinguished from a generic failure.'
 
     $ok=Run-CodexStub 0 $false 'acct-1' $false
     Require ($ok.Exit -eq 0 -and $ok.Executed) "Successful Codex execution must return zero: $($ok.Output) $($ok.Errors)"
