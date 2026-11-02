@@ -30,3 +30,11 @@ After acceptance, squash-merge PR #16 into main and close PR #14 and PR #15 as s
 Before accepting a release, run the isolated worker integration with a real mutex held by another process. The competing worker must return nonzero, must not invoke Codex, and must write a blocked result identifying the duplicate attempt. Verify that releasing the first owner allows a later legitimate job. Simulate native Codex "already has an active writer" and verify it is recorded as blocked rather than silently retrying.
 
 When inspecting preexisting jobs, compare their **pinned runtime** and payload's autoResume field with the candidate. Existing one-time tasks may run old code after a new GUI installation. Never replay a completed or failed Horizon job just to test a scheduler fix, and do not cancel old registrations without reviewing their associated session and work.
+
+## Run-status and appearance-event acceptance
+
+Run a scheduled, non-destructive task while the v1.16 dashboard is open. Within approximately ten seconds, verify its compact card changes from a countdown to **Running now**, without a fabricated percent-complete estimate. After it exits, verify the persisted outcome is shown. When examining an older pinned worker with no result record, verify the app displays **Ended (no result recorded)** rather than claiming completion. No task execution should be inferred merely from `Due now`.
+
+Exercise the Appearance dialog Save and Cancel paths and check that live preview changes are not saved by background form-autosave before explicit Save. Run `aero-appearance-dialog.test.ps1` and require a real nonzero process exit for any Forms-event assertion, rather than trusting a PASS after an unhandled dialog exception.
+
+The WPF dashboard visual test must provide pixel evidence of true fill/track contrast and independently moving reflections. The single-pixel red-channel failure recorded on November 2 remains unresolved until a local retest supplies measured colors. Do not weaken the acceptance threshold just to obtain a green suite.
