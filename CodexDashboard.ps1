@@ -6,6 +6,11 @@ function Get-RunCountdownText {
     param([datetime]$When,[datetime]$Now)
     return Get-CountdownText -DueAt $When -Now $Now
 }
+function Get-RunDisplayText {
+    param($Item,[datetime]$Now)
+    if ($Item.Status -and [string]$Item.Status -ne 'Scheduled') { return [string]$Item.Status }
+    return Get-RunCountdownText $Item.When $Now
+}
 function Get-RunCountdownPercent {
     param([datetime]$When,$CreatedAt,[datetime]$Now)
     return Get-CountdownElapsedPercent -DueAt $When -CreatedAt $CreatedAt -Now $Now
@@ -13,7 +18,8 @@ function Get-RunCountdownPercent {
 
 function Get-DashboardUsageModel {
     if ($script:ui.Dashboard.compactToggle -and $script:ui.Dashboard.compactToggle.Checked -and $script:ui.Dashboard.pendingSnapshot.Count -gt 0) {
-        $nextModel = [string]$script:ui.Dashboard.pendingSnapshot[0].Model
+        $selected = $script:ui.Dashboard.pendingSnapshot[0]
+        $nextModel = if (-not $selected.Status -or $selected.Status -in @('Scheduled','Running')) { [string]$selected.Model } else { '' }
         if ($nextModel -match '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}$') { return $nextModel }
     }
     return Get-SelectedModel
@@ -168,8 +174,8 @@ function Update-DashboardCountdowns {
         if (-not $name -or -not $lookup.ContainsKey($name)) { continue }
         $item=$lookup[$name]
         $cell = $row.Cells[1]
-        $label = Get-RunCountdownText $item.When $now
-        $percent = Get-RunCountdownPercent $item.When $item.CreatedAt $now
+        $label = Get-RunDisplayText $item $now
+        $percent = if (-not $item.Status -or $item.Status -eq 'Scheduled') { Get-RunCountdownPercent $item.When $item.CreatedAt $now } else { $null }
         if ($cell.Value -cne $label -or $cell.Tag -ne $percent) {
             $cell.Value = $label
             $cell.Tag = $percent
@@ -181,12 +187,13 @@ function Update-DashboardCountdowns {
     $next = $script:ui.Dashboard.pendingSnapshot[0]
     $root = ([string]$next.Repo).TrimEnd([char[]]@('/','\'))
     $script:ui.Dashboard.compactRunName.Text = if ($root -and $root -ne '-') { [IO.Path]::GetFileName($root) } else { 'Scheduled Codex run' }
-    $script:ui.Dashboard.compactRunEta.Text = Get-RunCountdownText $next.When $now
+    $script:ui.Dashboard.compactRunHeading.Text = if ($next.Status -eq 'Running') { 'Running now' } elseif (-not $next.Status -or $next.Status -eq 'Scheduled') { 'Next run' } else { 'Recent run' }
+    $script:ui.Dashboard.compactRunEta.Text = Get-RunDisplayText $next $now
     $script:ui.Dashboard.compactRunDetails.Text = [string]$next.Description
     $script:ui.Dashboard.compactRunDate.Text = 'Scheduled ' + $next.When.ToString('ddd MMM d, h:mm tt')
-    $percent = Get-RunCountdownPercent $next.When $next.CreatedAt $now
+    $percent = if (-not $next.Status -or $next.Status -eq 'Scheduled') { Get-RunCountdownPercent $next.When $next.CreatedAt $now } else { $null }
     Set-AeroProgress $script:ui.Dashboard.compactRunTrack $percent
-    $script:ui.Dashboard.compactRunTrack.AccessibleName = $script:ui.Dashboard.compactRunEta.Text + $(if ($null -ne $percent) { ", $percent% elapsed since scheduled" } else { ', schedule creation time unavailable' })
+    $script:ui.Dashboard.compactRunTrack.AccessibleName = $script:ui.Dashboard.compactRunEta.Text + $(if ($null -ne $percent) { ", $percent% of time to scheduled trigger elapsed" } else { ', no execution-progress estimate' })
 }
 
 function Update-DashboardLayout {

@@ -33,3 +33,12 @@ $script:ui.Dashboard.compactToggle.Checked = $false
 $script:ui.Dashboard.pendingSnapshot = @([pscustomobject]@{ Model = 'queued-model' })
 Require ((Get-DashboardUsageModel) -eq 'form-model') 'Full mode must use the selected form model.'
 Write-Host 'Countdown format, clamping, legacy fallback, and model targeting passed.'
+
+# Execution status must not be inferred from countdown expiration.
+$run = [pscustomobject]@{When=$now.AddMinutes(-5);Status='Running'}
+Require ((Get-RunDisplayText $run $now) -eq 'Running') 'A running worker must not display Due now.'
+$run.Status='Ended (no result recorded)'
+Require ((Get-RunDisplayText $run $now) -eq 'Ended (no result recorded)') 'An unverified worker exit must remain visible.'
+$run.Status='Scheduled'
+$run.When=$now.AddMinutes(3)
+Require ((Get-RunDisplayText $run $now) -eq '3m 0s') 'Scheduled work still needs an accurate countdown.'

@@ -76,6 +76,11 @@ $refreshRuns.Add_Click({ try { Refresh-PendingList } catch { [System.Windows.For
 $cancelRun.Add_Click({
     if ($grid.SelectedRows.Count -ne 1) { [System.Windows.Forms.MessageBox]::Show('Select an upcoming task first.','No selection') | Out-Null; return }
     $name = [string]$grid.SelectedRows[0].Tag
+    if (-not $script:ui.Dashboard.pendingIndex.ContainsKey($name) -or
+        $script:ui.Dashboard.pendingIndex[$name].Status -notin @($null,'Scheduled')) {
+        [System.Windows.Forms.MessageBox]::Show('Only future scheduled tasks can be cancelled here; an already-running worker is not stopped by unregistering its task.','Cannot cancel active/history') | Out-Null
+        return
+    }
     if ([System.Windows.Forms.MessageBox]::Show("Cancel and remove the one-time task '$name'?",'Cancel scheduled run','YesNo','Question') -ne 'Yes') { return }
     $taskRemoved = $false
     try {
@@ -134,7 +139,10 @@ $schedule.Add_Click({
         }
         # A GUI catalog snapshot can age before the scheduled task starts;
         # the runner independently revalidates the model and effort.
-        $overlaps = @($script:ui.Dashboard.pendingSnapshot | Where-Object { $_.Repo -ne '-' -and $_.Repo.TrimEnd([char[]]@('/','\')) -ieq $root.TrimEnd([char[]]@('/','\')) })
+        $overlaps = @($script:ui.Dashboard.pendingSnapshot | Where-Object { $_.Status -in @('Running','Scheduled') -and $_.Repo -ne '-' -and $_.Repo.TrimEnd([char[]]@('/','\')) -ieq $root.TrimEnd([char[]]@('/','\')) })
+        if (@($overlaps | Where-Object { $_.Status -eq 'Running' -and $_.Session -ceq $sessionId }).Count -gt 0) {
+            throw 'This conversation is already running in a scheduled Codex worker. Review that result before scheduling another continuation.'
+        }
         if ($overlaps.Count -gt 0) {
             $answer = [System.Windows.Forms.MessageBox]::Show("There are already $($overlaps.Count) upcoming task(s) targeting this repository. Creating another may cause concurrent work if times overlap. Continue?",'Existing scheduled work','YesNo','Warning')
             if ($answer -ne 'Yes') { return }

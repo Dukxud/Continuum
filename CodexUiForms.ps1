@@ -207,7 +207,16 @@ $emptyRuns.ForeColor = [System.Drawing.Color]::DimGray
 $emptyRuns.TextAlign = 'MiddleCenter'
 $emptyRuns.Dock = 'Fill'
 $grid.Controls.Add($emptyRuns)
-$grid.Add_SelectionChanged({ $cancelRun.Enabled = ($grid.SelectedRows.Count -eq 1) })
+$grid.Add_SelectionChanged({
+    $cancelRun.Enabled = $false
+    if ($grid.SelectedRows.Count -eq 1) {
+        $key = [string]$grid.SelectedRows[0].Tag
+        if ($key -and $script:ui.Dashboard.pendingIndex.ContainsKey($key)) {
+            $item = $script:ui.Dashboard.pendingIndex[$key]
+            $cancelRun.Enabled = (-not $item.Status -or $item.Status -eq 'Scheduled')
+        }
+    }
+})
 
 $refreshRuns = Add-Button 'Refresh runs' 18 774 154
 $cancelRun = Add-Button 'Cancel selected' 185 774 154

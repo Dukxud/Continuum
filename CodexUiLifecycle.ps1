@@ -1,5 +1,10 @@
 Initialize-Dashboard
 
+$runStatusRefresh = New-Object System.Windows.Forms.Timer
+$runStatusRefresh.Interval = 10000
+$runStatusRefresh.Add_Tick({
+    try { Refresh-PendingList } catch { Update-Status "Run status refresh failed: $($_.Exception.Message)" }
+})
 $autoRefresh = New-Object System.Windows.Forms.Timer
 $autoRefresh.Interval = 60000
 $autoRefresh.Add_Tick({
@@ -15,6 +20,7 @@ $form.Add_Shown({
     try { Refresh-SessionList; Refresh-PendingList } catch { Update-Status "Startup warning: $($_.Exception.Message)" }
     Request-UsageRefresh
     $autoRefresh.Start()
+    $runStatusRefresh.Start()
     $dataPoll.Start()
 })
 $form.Add_FormClosing({
@@ -26,6 +32,7 @@ $form.Add_FormClosing({
 $form.Add_FormClosed({
     $script:ui.Dashboard.countdownTimer.Stop()
     $autoRefresh.Stop()
+    $runStatusRefresh.Stop()
     $usagePoll.Stop()
     $dataPoll.Stop()
     foreach ($job in @($script:ui.Async.dataJobs.Values)) {
@@ -40,6 +47,7 @@ $form.Add_FormClosed({
 })
 [void]$form.ShowDialog()
 $autoRefresh.Dispose()
+$runStatusRefresh.Dispose()
 $script:ui.Dashboard.countdownTimer.Dispose()
 $script:ui.Preferences.settingsTimer.Dispose()
 $usagePoll.Dispose()

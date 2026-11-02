@@ -21,7 +21,7 @@ function Apply-PendingList {
     }
     $grid.ClearSelection()
     $cancelRun.Enabled = $false
-    $pending.Text = "Upcoming runs ($($Items.Count))"
+    $pending.Text = "Scheduled and recent runs ($($Items.Count))"
     $emptyRuns.Visible = $false
     Update-DashboardLayout
     Update-DashboardCountdowns
