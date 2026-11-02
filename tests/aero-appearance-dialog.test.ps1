@@ -66,6 +66,7 @@ $timer.Add_Tick({
     # The real WinForms/WebView2 bars change BEFORE Save is pressed.
     Require ($script:aeroAppearance['quota'] -eq 'cyan' -and $script:aeroAppearance['time'] -eq 'violet') 'Color selection did not preview immediately.'
     Require ($script:aeroAppearance['shimmer'] -eq 145 -and $script:aeroAppearance['speed'] -eq 190) 'Shimmer controls did not preview immediately.'
+    Require ($script:appearanceBeforeDraft['quota'] -eq 'green' -and $script:appearanceBeforeDraft['time'] -eq 'blue') 'Autosave must retain the prior appearance until Save.'
     Require ($previewBars[0].Tag.Color -eq 'cyan' -and $previewBars[1].Tag.Color -eq 'violet') 'Live preview colors did not change.'
     Require ($script:saves -eq 0) 'Draft appearance changes must not persist until Save.'
     $save = @($dialog.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq 'Save and close' }) | Select-Object -First 1
@@ -81,6 +82,7 @@ try {
     Require ($script:aeroAppearance['shimmer'] -eq 145 -and $script:aeroAppearance['speed'] -eq 190) 'Shimmer controls not saved.'
     Require (-not $script:aeroAppearance['aero']) 'Aero switch not saved.'
     Require ($script:saves -eq 1) 'Appearance should request one settings save.'
+    Require ($null -eq $script:appearanceBeforeDraft) 'Saved appearance must close draft persistence gate.'
 
     $folder = Join-Path ([IO.Path]::GetTempPath()) ('codex-bar-preferences-' + [guid]::NewGuid().ToString('N'))
     try {
