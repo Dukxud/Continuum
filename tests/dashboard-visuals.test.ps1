@@ -33,6 +33,13 @@ try {
     $tFill = Get-Pixel $t0 48 10
     $qTrack = Get-Pixel $q0 350 10
     $tTrack = Get-Pixel $t0 350 10
+    Write-Host ("WPF pixel evidence: usage-fill=R{0}/G{1}/B{2}; usage-track=R{3}/G{4}/B{5}; time-fill=R{6}/G{7}/B{8}; time-track=R{9}/G{10}/B{11}" -f $qFill.R,$qFill.G,$qFill.B,$qTrack.R,$qTrack.G,$qTrack.B,$tFill.R,$tFill.G,$tFill.B,$tTrack.R,$tTrack.G,$tTrack.B)
+    $scan=@()
+    foreach($x in @(20,45,70,95,120,145,170,195,220)) {
+        $p=Get-Pixel $t0 $x 12
+        $scan+=("x$x=$($p.R)/$($p.G)/$($p.B)")
+    }
+    Write-Host ("WPF time-fill sweep y12: " + ($scan -join ', '))
     Require ($qFill.G -gt $qFill.R) 'Usage bar must actually render green.'
     Require ($tFill.B -gt $tFill.R) 'Time bar must actually render blue.'
     Require ($qFill.R -lt $qTrack.R -or $qFill.G -gt $qTrack.G) 'Usage fill must look different from the unfilled track.'
