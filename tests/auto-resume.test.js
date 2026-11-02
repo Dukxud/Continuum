@@ -27,7 +27,11 @@ test('successful Codex executions never enter retry analysis and failures return
  assert.match(ps,/return 1\s+\} finally/);
 });
 
-test('account binding is checked before every automatic worker run',()=>{
- assert.match(ps,/if \(\$auto\) \{\s+\$state = Read-UsageState \$model/);
- assert.match(ps,/if \(-not \$state\.accountId -or \$job\.accountId -cne \$state\.accountId\)/);
+test('every unattended worker run verifies a canonical workspace identity',()=>{
+ assert.match(ui,/Test-CanonicalWorkspaceIdentity \$accountId/);
+ assert.match(ps,/Test-CanonicalWorkspaceIdentity \(\[string\]\$job.accountId\)/);
+ assert.match(ps,/\$state = Read-UsageState \$model/);
+ assert.match(ps,/Test-CanonicalWorkspaceIdentity \(\[string\]\$state.accountId\)/);
+ assert.match(ps,/\$job.accountId -cne \[string\]\$state.accountId/);
+ assert.doesNotMatch(ps,/if \(\$auto\) \{\s+\$state = Read-UsageState \$model/);
 });
