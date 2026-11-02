@@ -1,5 +1,6 @@
 # Live WebGL2 renderer from the assembled reusable kit, with no Codex adapter.
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root=Split-Path -Parent $PSScriptRoot
@@ -67,3 +68,4 @@ try {
     if($form){$form.Close();$form.Dispose()}
     if(Test-Path -LiteralPath $temp){Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue}
 }
+Assert-NoUnhandledWinFormsErrors

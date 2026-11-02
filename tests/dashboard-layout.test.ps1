@@ -1,5 +1,6 @@
 # Runtime Windows Forms smoke test: catch overlapped / hidden compact controls.
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexUiState.ps1')
@@ -108,3 +109,4 @@ try {
     if ($script:ui.Dashboard.countdownTimer) { $script:ui.Dashboard.countdownTimer.Dispose() }
     $form.Dispose()
 }
+Assert-NoUnhandledWinFormsErrors

@@ -1,5 +1,6 @@
 # Verify actual WPF composition animation while the progress percentage is unchanged.
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexFlowingBar.ps1')
@@ -42,3 +43,4 @@ try {
     Require ($null -ne $custom.Child.Template.FindName('FlowGlint',$custom.Child)) 'Custom-color fallback must retain moving glossy animation.'
     Write-Host "WPF animated flow confirmed: glint moved from $start to $end at fixed 57%."
 } finally { $form.Close(); $form.Dispose() }
+Assert-NoUnhandledWinFormsErrors

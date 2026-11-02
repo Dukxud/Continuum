@@ -1,6 +1,7 @@
 # Render the actual WPF controls: green and blue filled segments, pale tracks,
 # and compositor-driven animation while percentages do not change.
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexFlowingBar.ps1')
@@ -74,3 +75,4 @@ try {
     Require ($quota.Child.Value -eq 60 -and $time.Child.Value -eq 60) 'Animation must not alter real progress.'
     Write-Host "WPF compositor renders colored bars and moving shine: usage=$qChanged, time=$tChanged"
 } finally { $form.Close();$form.Dispose() }
+Assert-NoUnhandledWinFormsErrors

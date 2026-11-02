@@ -1,6 +1,7 @@
 # Simulate an unrelated Windows program that copies *only* components/.
 # A component is reusable only if it works without the Codex UI or worker files.
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 $root=Split-Path -Parent $PSScriptRoot
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('unrelated-app-' + [guid]::NewGuid().ToString('N'))
 try {
@@ -72,3 +73,4 @@ try {
 }finally{
     if(Test-Path $temp){Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue}
 }
+Assert-NoUnhandledWinFormsErrors

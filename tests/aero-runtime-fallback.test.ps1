@@ -1,5 +1,6 @@
 # Regression: browser renderer termination must leave a functional WPF bar.
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root=Split-Path -Parent $PSScriptRoot
@@ -67,3 +68,4 @@ try{
     $form.Close();$form.Dispose()
     if($script:aeroHealthTimer){$script:aeroHealthTimer.Stop();$script:aeroHealthTimer.Dispose()}
 }
+Assert-NoUnhandledWinFormsErrors

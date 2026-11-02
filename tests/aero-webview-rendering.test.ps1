@@ -1,5 +1,6 @@
 # Test the actual owner-approved Aero v3 renderer hosted inside WinForms on Windows.
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent $PSScriptRoot
@@ -173,3 +174,4 @@ try {
         Remove-Item -LiteralPath $testUserData -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
+Assert-NoUnhandledWinFormsErrors

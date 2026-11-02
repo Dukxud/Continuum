@@ -1,5 +1,6 @@
 # Exercise actual result-history dialog through the WinForms message loop.
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
 Add-Type -AssemblyName System.Drawing -ErrorAction Stop
 $root=Split-Path -Parent $PSScriptRoot
@@ -52,3 +53,4 @@ try {
     $owner.Dispose()
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }
+Assert-NoUnhandledWinFormsErrors

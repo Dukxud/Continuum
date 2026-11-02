@@ -73,3 +73,7 @@ Execution visibility was also deficient: the compact dashboard displayed `Due no
 ## Cancellation is not process termination
 
 The WinForms dashboard refreshes asynchronously, so its remembered row status can become stale while a task is about to fire. The generic OneTimeTasks removal API now offers a conservative `-OnlyBeforeStart` guard: it rereads Windows task state, requires one future trigger at least 90 seconds away, and refuses to label a task cancelled if the task has actually executed. The UI uses this guarded operation and does not write a cancellation result or delete the payload when the guard rejects. Plain removal remains available for explicit maintenance. This mitigates, but cannot mathematically eliminate, a race with an external Task Scheduler administrator; the guard avoids the common near-trigger window. Code has not yet been run on Windows in this pass.
+
+## Test-harness failure propagation
+
+The prior Appearance test returned PASS even though Windows Forms displayed an unhandled event exception. A shared test-only WinFormsEventGuard is now imported by nine in-process graphical tests. It registers the application thread-exception event and converts any reported callback failure into an explicit nonzero process result at teardown. The Appearance callback also reports its own assertions. Separate launched-process tests retain direct launcher visibility and process-exit checks. The guard requires a local Windows run to establish it works.

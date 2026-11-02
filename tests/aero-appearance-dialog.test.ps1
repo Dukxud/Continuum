@@ -1,5 +1,6 @@
 # Verify that appearance controls actually open, save, restore and cancel.
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent $PSScriptRoot
@@ -132,3 +133,4 @@ try {
     $owner.Close()
     $owner.Dispose()
 }
+Assert-NoUnhandledWinFormsErrors
