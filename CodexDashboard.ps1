@@ -100,6 +100,45 @@ function Initialize-Dashboard {
     $script:ui.Dashboard.countdownTimer.Interval = 1000
     $script:ui.Dashboard.countdownTimer.Add_Tick({ Update-DashboardCountdowns })
 
+    # One modest activity strip belongs to both layouts. The spinner means
+    # Windows confirms a Running task; it is not an execution percentage.
+    $activity=[System.Windows.Forms.Panel]::new()
+    $activity.Size=[System.Drawing.Size]::new(880,29)
+    $activity.BackColor=[System.Drawing.Color]::FromArgb(240,245,251)
+    $form.Controls.Add($activity)
+    $script:ui.Dashboard.activityPanel=$activity
+    $indicator=[System.Windows.Forms.Panel]::new()
+    $indicator.Size=[System.Drawing.Size]::new(26,26)
+    $indicator.Location=[System.Drawing.Point]::new(4,1)
+    $indicator.Visible=$false
+    $indicator.Add_Paint({
+        param($sender,$e)
+        $e.Graphics.SmoothingMode=[System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        for($i=0;$i -lt 8;$i++){
+            $age=($script:ui.Dashboard.activityFrame-$i+8)%8
+            $alpha=[int](42+213*(8-$age)/8)
+            $angle=$i*[math]::PI/4.0
+            $x=[single](11+8*[math]::Cos($angle))
+            $y=[single](11+8*[math]::Sin($angle))
+            $brush=[System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb($alpha,48,100,173))
+            try {$e.Graphics.FillEllipse($brush,$x,$y,[single]4,[single]4)}
+            finally {$brush.Dispose()}
+        }
+    })
+    $activity.Controls.Add($indicator)
+    $script:ui.Dashboard.activitySpinner=$indicator
+    $label=New-DashboardLabel $activity 'No recorded runs yet.' 33 2 820 25
+    $label.TextAlign='MiddleLeft'
+    $label.ForeColor=[System.Drawing.Color]::FromArgb(48,69,91)
+    $script:ui.Dashboard.activityLabel=$label
+    $activityTimer=[System.Windows.Forms.Timer]::new()
+    $activityTimer.Interval=110
+    $activityTimer.Add_Tick({
+        $script:ui.Dashboard.activityFrame=($script:ui.Dashboard.activityFrame+1)%8
+        $script:ui.Dashboard.activitySpinner.Invalidate()
+    })
+    $script:ui.Dashboard.activityTimer=$activityTimer
+
     # Standard view displays the time label in the native grid, with a real
     # WPF progress control below it. The WPF compositor animates without timers.
     $script:ui.Dashboard.runBarHosts = [System.Collections.Generic.List[System.Windows.Forms.Control]]::new()
@@ -196,6 +235,49 @@ function Update-DashboardCountdowns {
     $script:ui.Dashboard.compactRunTrack.AccessibleName = $script:ui.Dashboard.compactRunEta.Text + $(if ($null -ne $percent) { ", $percent% of time to scheduled trigger elapsed" } else { ', no execution-progress estimate' })
 }
 
+
+function Update-DashboardActivity {
+    param([object[]]$Items,[string]$Directory)
+    $indicator=$script:ui.Dashboard.activitySpinner
+    $label=$script:ui.Dashboard.activityLabel
+    $timer=$script:ui.Dashboard.activityTimer
+    $running=@($Items | Where-Object { $_.Status -eq 'Running' })
+    if($running.Count -gt 0){
+        $target=$running[0]
+        $repo=[string]$target.Repo
+        $project=if($repo -and $repo -ne '-') {[IO.Path]::GetFileName($repo.TrimEnd([char[]]@('/','\')))} else {'scheduled continuation'}
+        $label.Text='Codex running: '+$project+' — execution in progress'
+        $label.AccessibleName=$label.Text
+        $indicator.Visible=$true
+        $timer.Start()
+        return
+    }
+    $timer.Stop()
+    $indicator.Visible=$false
+    $latest=@(Get-CodexRunHistory -Directory $Directory -Limit 1)
+    if($latest.Count -eq 0){
+        $label.Text='No recorded runs yet. Use Recent results to inspect past runs.'
+        $label.AccessibleName=$label.Text
+        return
+    }
+    $result=$latest[0]
+    $key=[string]$result.Name+'|'+$result.When.ToString('o')
+    if($script:ui.Dashboard.latestResultKey -cne $key){
+        $evidence=Get-CodexRunEvidence -Directory $Directory -Name ([string]$result.Name)
+        $preview=([string]$evidence.Response -replace '[\r\n\t]+',' ').Trim()
+        if($preview -eq 'No final Codex response was recorded for this run.' -and $result.Message){
+            $preview=[string]$result.Message
+        }
+        $script:ui.Dashboard.latestResultPreview=$preview
+        $script:ui.Dashboard.latestResultKey=$key
+    }
+    $summary='Latest: '+([string]$result.Status).ToUpperInvariant()+' — '+[string]$result.Name
+    $preview=[string]$script:ui.Dashboard.latestResultPreview
+    if($preview){$summary+=' — '+$preview}
+    $label.Text=$summary
+    $label.AccessibleName=$summary
+}
+
 function Update-DashboardLayout {
     $compact = $script:ui.Dashboard.compactToggle.Checked
     foreach ($control in $script:ui.Dashboard.dashboardStandardOnly) { $control.Visible = -not $compact }
@@ -228,9 +310,12 @@ function Update-DashboardLayout {
         $openFolder.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 352 } else { 18 }),$(if ($hasRuns) { 774 } else { 523 }))
         $recentResults.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 520 } else { 185 }),$(if ($hasRuns) { 774 } else { 523 }))
         $recentResults.Visible = $true
-        $status.Location = [System.Drawing.Point]::new(18,$(if ($hasRuns) { 823 } else { 575 }))
-        $form.MinimumSize = [System.Drawing.Size]::new(940,$(if ($hasRuns) { 875 } else { 625 }))
-        $form.ClientSize = [System.Drawing.Size]::new(920,$(if ($hasRuns) { 865 } else { 615 }))
+        $script:ui.Dashboard.activityPanel.Location = [System.Drawing.Point]::new(18,$(if ($hasRuns) { 817 } else { 574 }))
+        $script:ui.Dashboard.activityPanel.Size = [System.Drawing.Size]::new(880,29)
+        $script:ui.Dashboard.activityLabel.Width = 840
+        $status.Location = [System.Drawing.Point]::new(18,$(if ($hasRuns) { 853 } else { 610 }))
+        $form.MinimumSize = [System.Drawing.Size]::new(940,$(if ($hasRuns) { 933 } else { 690 }))
+        $form.ClientSize = [System.Drawing.Size]::new(920,$(if ($hasRuns) { 922 } else { 680 }))
         Sync-DashboardRunBars
         return
     }
@@ -278,8 +363,11 @@ function Update-DashboardLayout {
         $height = $cardTop + 18
     }
     $form.MinimumSize = [System.Drawing.Size]::new(480,150)
-    # Reserve space below the final card for appearance customization.
-    $form.ClientSize = [System.Drawing.Size]::new(464,[math]::Max(166,$height+40))
+    # Keep live activity and latest result visible even in compact mode.
+    $script:ui.Dashboard.activityPanel.Location = [System.Drawing.Point]::new(18,$height)
+    $script:ui.Dashboard.activityPanel.Size = [System.Drawing.Size]::new(428,29)
+    $script:ui.Dashboard.activityLabel.Width = 388
+    $form.ClientSize = [System.Drawing.Size]::new(464,[math]::Max(166,$height+78))
     $script:ui.Dashboard.appearanceButton.Location = [System.Drawing.Point]::new(306,$form.ClientSize.Height-37)
     $recentResults.Location = [System.Drawing.Point]::new(150,$form.ClientSize.Height-37)
     $recentResults.Visible = $true

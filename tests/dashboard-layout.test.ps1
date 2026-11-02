@@ -73,6 +73,7 @@ try {
     Require ($script:ui.Dashboard.compactToggle.Left -gt $heading.Right) 'The compact-mode switch must not overlap the heading.'
     Require ($script:ui.Dashboard.compactToggle.Right -le $form.ClientSize.Width) 'Compact-mode switch must not be clipped.'
     Require (-not $script:ui.Dashboard.compactRunPanel.Visible) 'An empty queue must not render a run placeholder.'
+    Require ($script:ui.Dashboard.activityPanel.Visible) 'Activity strip must remain available in compact mode.'
 
     $script:ui.Dashboard.pendingSnapshot = @([pscustomobject]@{
         Model='test-model'; Name='pending-1'; Repo='C:\work\demo'; Description='test instruction'
@@ -85,6 +86,7 @@ try {
     Require ($script:ui.Dashboard.compactToggle.Visible) 'The switch must remain visible when returning to full mode.'
     Require ($grid.Visible) 'The full run list should be restored.'
     Require ($recentResults.Visible) 'Run-history control must be available in normal mode.'
+    Require ($script:ui.Dashboard.activityPanel.Visible) 'Activity strip must be available in normal mode.'
     [void]$grid.Rows.Add('Time','5m','Demo 1')
     [void]$grid.Rows.Add('Time','7m','Demo 2')
     [void]$grid.Rows.Add('Time','9m','Demo 3')
@@ -107,6 +109,7 @@ try {
     Write-Host 'Visible switch, empty state, and per-run WPF bar lifecycle passed.'
 } finally {
     if ($script:ui.Dashboard.countdownTimer) { $script:ui.Dashboard.countdownTimer.Dispose() }
+    if ($script:ui.Dashboard.activityTimer) { $script:ui.Dashboard.activityTimer.Dispose() }
     $form.Dispose()
 }
 Assert-NoUnhandledWinFormsErrors

@@ -14,6 +14,7 @@ $pending=[System.Windows.Forms.Label]::new()
 $emptyRuns=[System.Windows.Forms.Label]::new()
 function Update-DashboardLayout {}
 function Update-DashboardCountdowns {}
+function Update-DashboardActivity { param([object[]]$Items,[string]$Directory) }
 function Request-UsageRefresh {}
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexUiPending.ps1')
 function Require($check,[string]$message){if(-not $check){throw $message}}

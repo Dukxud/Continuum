@@ -26,6 +26,7 @@ function Apply-PendingList {
     $cancelRun.Enabled = $false
     $pending.Text = "Upcoming runs ($($upcoming.Count))"
     $emptyRuns.Visible = $false
+    Update-DashboardActivity -Items $upcoming -Directory $appDir
     Update-DashboardLayout
     Update-DashboardCountdowns
     if ($script:ui.Dashboard.compactToggle.Checked -and (Get-DashboardUsageModel) -ne [string]$script:ui.Usage.usageRequestedModel) { Request-UsageRefresh }
