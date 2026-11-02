@@ -172,7 +172,7 @@ $separator2.Location = [System.Drawing.Point]::new(18,512)
 $separator2.Size = [System.Drawing.Size]::new(880,2)
 $form.Controls.Add($separator2)
 
-$pending = Add-Label 'Upcoming runs' 18 527 400
+$pending = Add-Label 'Runs' 18 527 400
 $pending.Font = [System.Drawing.Font]::new('Segoe UI',12,[System.Drawing.FontStyle]::Bold)
 $pending.Height = 30
 
@@ -189,7 +189,7 @@ $grid.RowHeadersVisible = $false
 $grid.AutoSizeColumnsMode = 'Fill'
 $grid.BackgroundColor = [System.Drawing.Color]::White
 [void]$grid.Columns.Add('When','Scheduled (local)')
-[void]$grid.Columns.Add('Countdown','Time to run')
+[void]$grid.Columns.Add('Countdown','Time / status')
 [void]$grid.Columns.Add('Project','Project')
 [void]$grid.Columns.Add('Details','Model / access / instruction')
 [void]$grid.Columns.Add('Session','Session')
@@ -202,18 +202,22 @@ $grid.RowTemplate.Height = 54
 $grid.ShowCellToolTips = $true
 $form.Controls.Add($grid)
 $emptyRuns = New-Object System.Windows.Forms.Label
-$emptyRuns.Text = 'No upcoming runs'
+$emptyRuns.Text = 'No runs recorded'
 $emptyRuns.ForeColor = [System.Drawing.Color]::DimGray
 $emptyRuns.TextAlign = 'MiddleCenter'
 $emptyRuns.Dock = 'Fill'
 $grid.Controls.Add($emptyRuns)
 $grid.Add_SelectionChanged({
     $cancelRun.Enabled = $false
+    $viewResult.Enabled = $false
     if ($grid.SelectedRows.Count -eq 1) {
         $key = [string]$grid.SelectedRows[0].Tag
         if ($key -and $script:ui.Dashboard.pendingIndex.ContainsKey($key)) {
             $item = $script:ui.Dashboard.pendingIndex[$key]
             $cancelRun.Enabled = (-not $item.Status -or $item.Status -eq 'Scheduled')
+        }
+        if ($key -and $script:ui.Dashboard.resultIndex.ContainsKey($key)) {
+            $viewResult.Enabled = $true
         }
     }
 })
@@ -223,6 +227,8 @@ $cancelRun = Add-Button 'Cancel selected' 185 774 154
 $cancelRun.Enabled = $false
 $openFolder = Add-Button 'Open logs folder' 352 774 154
 $recentResults = Add-Button 'Recent results' 520 774 158
+$viewResult = Add-Button 'View selected result' 693 774 205
+$viewResult.Enabled = $false
 $status = Add-Label 'Ready. Keep Windows awake and signed in for scheduled runs.' 18 823 880
 $status.ForeColor = [System.Drawing.Color]::DimGray
 $status.AutoEllipsis = $true

@@ -53,6 +53,9 @@ try {
             }
             $next=@($grid.Rows | Where-Object { [string]$_.Cells['Status'].Value -eq 'deferred' })[0].Cells['NextJob'].Value
             if($next -ne 'CodexResume-20260101-1200-abcdef03'){throw 'History did not display the follow-up task.'}
+            if($grid.SelectedRows.Count -ne 1 -or [string]$grid.SelectedRows[0].Tag -ne 'CodexResume-20260101-1000-abcdef01'){
+                throw 'Open selected result must honor the chosen completed run.'
+            }
             $completed=@($grid.Rows | Where-Object { [string]$_.Cells['Status'].Value -eq 'completed' })[0]
             $grid.ClearSelection()
             $grid.CurrentCell=$completed.Cells[0]
@@ -72,7 +75,7 @@ try {
         }
     })
     $timer.Start()
-    Show-CodexRunHistoryDialog -Owner $owner -Directory $temp -RecentTasks @($legacyTask)
+    Show-CodexRunHistoryDialog -Owner $owner -Directory $temp -RecentTasks @($legacyTask) -SelectedName 'CodexResume-20260101-1000-abcdef01'
     if($script:historyError){throw $script:historyError}
     if(-not $script:historySeen){throw 'The history dialog did not render its persisted outcomes.'}
     Write-Host 'WinForms history dialog renders completed, deferred, unreadable and follow-up task PASS.'

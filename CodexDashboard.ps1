@@ -181,6 +181,8 @@ function Sync-DashboardRunBars {
         $last=[math]::Min($grid.Rows.Count-1,$first + [math]::Max(0,$grid.DisplayedRowCount($true)))
         for($rowIndex=$first;$rowIndex -le $last;$rowIndex++){
             if(-not $grid.Rows[$rowIndex].Visible){continue}
+            # Completed runs show a result, never a countdown bar.
+            if($grid.Rows[$rowIndex].Cells[1].Tag -eq 'history'){continue}
             $cell=$grid.GetCellDisplayRectangle(1,$rowIndex,$true)
             if($cell.Width -gt 32 -and $cell.Height -ge 22){
                 $visible.Add([pscustomobject]@{ Row=$rowIndex; Cell=$cell })
@@ -305,11 +307,12 @@ function Update-DashboardLayout {
             $usageCards[$i].Panel.Visible = $true
             $usageCards[$i].Panel.Location = [System.Drawing.Point]::new($(if ($i -eq 0) { 18 } else { 470 }),358)
         }
-        $hasRuns = $script:ui.Dashboard.pendingSnapshot.Count -gt 0
-        foreach ($control in @($separator2,$pending,$grid,$refreshRuns,$cancelRun)) { $control.Visible = $hasRuns }
+        $hasRuns = $script:ui.Dashboard.displayedRunCount -gt 0
+        foreach ($control in @($separator2,$pending,$grid,$refreshRuns,$cancelRun,$viewResult)) { $control.Visible = $hasRuns }
         $openFolder.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 352 } else { 18 }),$(if ($hasRuns) { 774 } else { 523 }))
         $recentResults.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 520 } else { 185 }),$(if ($hasRuns) { 774 } else { 523 }))
         $recentResults.Visible = $true
+        $viewResult.Location = [System.Drawing.Point]::new(693,774)
         $script:ui.Dashboard.activityPanel.Location = [System.Drawing.Point]::new(18,$(if ($hasRuns) { 817 } else { 574 }))
         $script:ui.Dashboard.activityPanel.Size = [System.Drawing.Size]::new(880,29)
         $script:ui.Dashboard.activityLabel.Width = 840

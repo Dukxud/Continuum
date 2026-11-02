@@ -3,7 +3,8 @@ function Show-CodexRunHistoryDialog {
     [CmdletBinding()]
     param([Parameter(Mandatory)][System.Windows.Forms.Form]$Owner,
           [Parameter(Mandatory)][string]$Directory,
-          [object[]]$RecentTasks=@())
+          [object[]]$RecentTasks=@(),
+          [string]$SelectedName='')
     $dialog=[System.Windows.Forms.Form]::new()
     $dialog.Text='Recent Codex run results'
     $dialog.StartPosition='CenterParent'
@@ -91,9 +92,15 @@ function Show-CodexRunHistoryDialog {
             $dialog.Text+=' (no results yet)'
         } else {
             $grid.ClearSelection()
-            $grid.CurrentCell=$grid.Rows[0].Cells[0]
-            $grid.Rows[0].Selected=$true
-            $evidence=Get-CodexRunEvidence -Directory $Directory -Name ([string]$grid.Rows[0].Tag)
+            $selectedRow=$grid.Rows[0]
+            if($SelectedName){
+                foreach($candidate in $grid.Rows){
+                    if([string]$candidate.Tag -ceq $SelectedName){$selectedRow=$candidate;break}
+                }
+            }
+            $grid.CurrentCell=$selectedRow.Cells[0]
+            $selectedRow.Selected=$true
+            $evidence=Get-CodexRunEvidence -Directory $Directory -Name ([string]$selectedRow.Tag)
             $responseBox.Text=[string]$evidence.Response
             $logBox.Text=[string]$evidence.Transcript
         }

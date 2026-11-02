@@ -32,7 +32,7 @@ function New-CodexUiState {
             activityPanel=$null; activityLabel=$null; activitySpinner=$null; activityTimer=$null
             activityFrame=0; latestResultKey=''; latestResultPreview=''
             fullTitleFont=$null; pendingSnapshot=@(); historySnapshot=@()
-            pendingIndex=@{}; runBarHosts=$null
+            pendingIndex=@{};resultIndex=@{};displayedRunCount=0; runBarHosts=$null
         }
     }
     # One constructor owns every initial value; GUI modules do not reset

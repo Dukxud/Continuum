@@ -103,6 +103,17 @@ $cancelRun.Add_Click({
     }
 })
 $recentResults.Add_Click({ Show-CodexRunHistoryDialog -Owner $form -Directory $appDir -RecentTasks $script:ui.Dashboard.historySnapshot })
+function Open-SelectedCodexResult {
+    if($grid.SelectedRows.Count -ne 1){return}
+    $name=[string]$grid.SelectedRows[0].Tag
+    if(-not $script:ui.Dashboard.resultIndex.ContainsKey($name)){return}
+    Show-CodexRunHistoryDialog -Owner $form -Directory $appDir -RecentTasks $script:ui.Dashboard.historySnapshot -SelectedName $name
+}
+$viewResult.Add_Click({ Open-SelectedCodexResult })
+$grid.Add_CellDoubleClick({
+    param($sender,$eventArgs)
+    if($eventArgs.RowIndex -ge 0){ Open-SelectedCodexResult }
+})
 $openFolder.Add_Click({
     [void](New-Item -Path $appDir -ItemType Directory -Force)
     Start-Process explorer.exe -ArgumentList ('"' + $appDir + '"')

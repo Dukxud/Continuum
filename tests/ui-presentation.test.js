@@ -26,13 +26,17 @@ test('model and effort are grouped and schedule action is distinct', () => {
 
 test('pending list shows recognizable project and preserves full task identity', () => {
   const fn = namedFunction('Apply-PendingList');
-  assert.match(fn, /\$project = if \(\$path/);
-  assert.match(fn, /\$row\.Tag = \$item\.Name/);
+  assert.match(fn, /\$project=if\(\$path/);
+  assert.match(fn, /\$row\.Tag=\[string\]\$item\.Name/);
   assert.match(fn, /\$row\.Cells\[4\]\.ToolTipText/);
-  assert.match(fn, /\$pending\.Text = "Upcoming runs/);
-  assert.match(fn, /\$script:ui\.Dashboard\.historySnapshot = /);
-  assert.match(fn, /\$script:ui\.Dashboard\.pendingSnapshot = \$upcoming/);
-  assert.match(fn, /\$emptyRuns\.Visible = \$false/);
+  assert.match(fn, /\$pending\.Text="Runs \(/);
+  assert.match(fn, /\$script:ui\.Dashboard\.historySnapshot=\$history/);
+  assert.match(fn, /\$script:ui\.Dashboard\.pendingSnapshot=\$upcoming/);
+  assert.match(fn, /\$resultIndex\.ContainsKey/);
+  assert.match(fn, /\$same=\(\$grid\.Rows\.Count/);
+  assert.match(source, /\$viewResult\.Add_Click/);
+  assert.match(source, /\$grid\.Add_CellDoubleClick/);
+  assert.match(fn, /\$emptyRuns\.Visible=\$false/);
   assert.match(fn, /Update-DashboardLayout/);
   assert.doesNotMatch(fn, /Update-Status/);
   assert.match(source, /\$cancelRun\.Enabled = \$false/);
@@ -54,7 +58,7 @@ test('usage reports remaining and keeps reset as an explicit action', () => {
 
 test('dashboard shares the pending snapshot and renders distinct countdown and quota bars', () => {
   const dash = fs.readFileSync(path.resolve(__dirname, '..', 'CodexDashboard.ps1'), 'utf8');
-  assert.match(source, /Columns\.Add\('Countdown','Time to run'\)/);
+  assert.match(source, /Columns\.Add\('Countdown','Time \/ status'\)/);
   assert.match(source, /\$grid\.RowTemplate\.Height = 54/);
   assert.match(source, /\$script:ui\.Usage\.usageRequestedModel = \$chosen/);
   assert.match(source, /compactMode = \[bool\]\$script:ui\.Dashboard\.compactToggle\.Checked/);
