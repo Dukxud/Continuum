@@ -18,10 +18,37 @@ function Get-AeroProgressViewPrivateState {
     return $state
 }
 
+# A renderer report is read asynchronously from the browser itself. This
+# avoids depending on one-time page-to-host event delivery or blocking WinForms.
+function Complete-AeroProgressEngineProbe {
+    param($State)
+    $task=$State.EngineProbe
+    if(-not $task -or -not $task.IsCompleted) { return }
+    $State.EngineProbe=$null
+    try {
+        # Safe: the task has completed; never wait for browser work on the UI thread.
+        $report=$task.GetAwaiter().GetResult() | ConvertFrom-Json -ErrorAction Stop
+        if(-not $report -or [string]$report.engine -notin @('webgl2','native-only')) {
+            throw 'Browser page did not return a recognized renderer engine.'
+        }
+        $State.Engine=[string]$report.engine
+        $State.ShaderError=[string]$report.error
+        if($State.Engine -eq 'native-only') {
+            $reason=if($State.ShaderError){$State.ShaderError}else{'WebGL2 is unavailable.'}
+            $State.Failure="Aero Liquid renderer unavailable: $reason"
+        }
+    } catch {
+        $State.Engine='native-only'
+        $State.ShaderError=$_.Exception.Message
+        $State.Failure="Aero Liquid renderer status failed: $($_.Exception.Message)"
+    }
+}
+
 function Get-AeroProgressViewStatus {
     [CmdletBinding()]
     param([Parameter(Mandatory)][System.Windows.Forms.Control]$View)
     $state = Get-AeroProgressViewPrivateState -View $View
+    Complete-AeroProgressEngineProbe -State $state
     return [pscustomobject]@{
         Ready = [bool]$state.Ready
         Failure = $state.Failure
@@ -106,7 +133,7 @@ function New-AeroProgressView {
     $view.AccessibleName = $AccessibleName
     $viewState = [pscustomobject]@{
         Ready = $false; State = $null; Failure = $null
-        Engine = 'pending'; ShaderError = $null
+        Engine = 'pending'; ShaderError = $null; EngineProbe = $null
         Color = $Color; AllowedUri = $support.AssetUri.AbsoluteUri
     }
     $script:viewStates.Add($view,$viewState)
@@ -125,22 +152,7 @@ function New-AeroProgressView {
             return
         }
         $viewState.Failure = $null
-        # A loaded browser is not proof of an active optical shader.
-        # The bundled page reports WebGL2 readiness and shader errors.
-        $control.CoreWebView2.Add_WebMessageReceived({
-            param($source,$messageEvent)
-            try {
-                $message=$messageEvent.WebMessageAsJson | ConvertFrom-Json -ErrorAction Stop
-                if([string]$message.type -eq 'ready'){
-                    $viewState.Engine=[string]$message.engine
-                    $viewState.ShaderError=[string]$message.error
-                }
-            } catch {
-                $viewState.ShaderError="Aero renderer handshake invalid: $($_.Exception.Message)"
-            }
-        }.GetNewClosure())
         $settings = $control.CoreWebView2.Settings
-        $settings.IsWebMessageEnabled = $true
         $settings.AreDefaultContextMenusEnabled = $false
         $settings.AreDevToolsEnabled = $false
         $settings.AreBrowserAcceleratorKeysEnabled = $false
@@ -171,11 +183,15 @@ function New-AeroProgressView {
         if ($eventArgs.IsSuccess -and -not $control.IsDisposed) {
             $viewState.Ready = $true
             $viewState.Failure = $null
-            # Navigation completion is the first point at which the bundled
-            # page is guaranteed to have installed its message listener.
-            # Request a fresh renderer report rather than relying solely on
-            # the page's one-time startup notification.
-            $control.CoreWebView2.PostWebMessageAsJson('{"type":"probe"}')
+            # Navigation completed: query the actual WebGL engine using the
+            # same proven asynchronous API used by the rendering tests.
+            try {
+                $viewState.EngineProbe=$control.CoreWebView2.ExecuteScriptAsync(
+                    '({engine:window.aeroBarProof ? window.aeroBarProof.getEngine() : "pending",error:window.aeroBarProof ? window.aeroBarProof.getError() : "Renderer page not initialized"})')
+            } catch {
+                $viewState.Engine='native-only'
+                $viewState.Failure="Aero Liquid renderer query failed: $($_.Exception.Message)"
+            }
             if ($null -ne $viewState.State) {
                 $control.CoreWebView2.PostWebMessageAsJson(
                     ($viewState.State | ConvertTo-Json -Compress -Depth 4))

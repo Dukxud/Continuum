@@ -325,10 +325,7 @@ if(window.chrome?.webview){
  window.chrome.webview.addEventListener('message',event=>{
   const data=event.data;
   if(data && data.type==='set')apply(data);
-  if(data && data.type==='probe')window.chrome.webview.postMessage({
-   type:'ready',engine:window.aeroBarProof.getEngine(),error:window.aeroBarProof.getError()
   });
- });
 }
 function tick(now){
  if(!last)last=now;const dt=Math.min(.15,Math.max(0,(now-last)*.001));last=now;
@@ -348,7 +345,6 @@ window.aeroBarProof={
  set:(next,color)=>apply({value:next,color}),setAppearance:apply,render:()=>{paintNative();drawOptics();}
 };
 ready=true;
-if(window.chrome?.webview)window.chrome.webview.postMessage({type:'ready',engine:window.aeroBarProof.getEngine(),error:window.aeroBarProof.getError()});
-requestAnimationFrame(tick);
+ requestAnimationFrame(tick);
 })();
 </script></body></html>

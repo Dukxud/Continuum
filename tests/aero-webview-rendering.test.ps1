@@ -89,7 +89,7 @@ try {
         (Get-AeroProgressViewStatus -View $quota).Engine -eq 'webgl2' -and
         (Get-AeroProgressViewStatus -View $run).Engine -eq 'webgl2'
     }
-    Require (-not (Get-AeroProgressViewStatus -View $quota).ShaderError) 'Aero handshake reported a shader error.'
+    Require (-not (Get-AeroProgressViewStatus -View $quota).ShaderError) 'Aero renderer query reported a shader error.'
 
     # The original CI only tested that percentages changed. It did not
     # prove animation continued at a CONSTANT percentage.

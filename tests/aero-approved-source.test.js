@@ -53,8 +53,13 @@ test('isolated WebView2 page is local and its host API is syntactically valid',(
   assert.match(production,/connect-src 'none'/);
   assert.match(source[1],/window\.chrome\.webview\.addEventListener\('message'/);
   assert.match(source[1],/window\.aeroBarProof/);
-  assert.match(source[1],/error:window\.aeroBarProof\.getError\(\)/);
-  assert.match(source[1],/data\.type==='probe'/,'Page must answer a post-navigation engine probe.');
+  // Engine reporting is an asynchronous host-side JavaScript evaluation.
+  // The page no longer requires a fragile browser-to-PowerShell handshake.
+  const host=fs.readFileSync(path.join(root,'components','AeroProgress','AeroProgress.psm1'),'utf8');
+  assert.match(host,/EngineProbe=\$control\.CoreWebView2\.ExecuteScriptAsync/);
+  assert.match(host,/Complete-AeroProgressEngineProbe -State \$state/);
+  assert.doesNotMatch(host,/Add_WebMessageReceived/);
+  assert.doesNotMatch(source[1],/data\.type==='probe'/);
   assert.match(source[1],/requestAnimationFrame\(tick\)/);
   assert.equal((production.match(/getContext\('webgl2'/g)||[]).length,1);
   assert.match(source[1],/function updateCustomSprite/);
