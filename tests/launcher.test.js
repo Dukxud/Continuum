@@ -14,6 +14,7 @@ test('launchers rely only on the Windows provided script host', () => {
   assert.match(gui, /shell\.Run\(command,\s*0,\s*False\)/);
   assert.match(runner, /shell\.Run\(command,\s*0,\s*True\)/);
   assert.match(runner, /WScript\.Quit status/);
+  assert.match(runner, /errorPath = files\.GetParentFolderName\(jobFile\)/, 'Runner startup diagnostics must follow its job payload, not ambient LOCALAPPDATA.');
   for(const launcher of [gui,runner]) {
     assert.match(launcher,/pwsh = files\.BuildPath\(shell\.ExpandEnvironmentStrings\("%ProgramFiles%"\), "PowerShell\\7\\pwsh\.exe"\)/);
     assert.match(launcher,/command = Chr\(34\) & pwsh & Chr\(34\)/);

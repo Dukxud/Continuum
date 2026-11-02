@@ -123,6 +123,12 @@ exit /b %errorlevel%
     Require ($ok.Exit -eq 0 -and $ok.Executed) "Successful Codex execution must return zero: $($ok.Output) $($ok.Errors)"
     $outcome=Read-JobOutcome -Path $outcomePath
     Require ($outcome.status -eq "completed" -and $outcome.exitCode -eq 0) "Successful run must report completed outcome."
+    # Child processes inherit a different LOCALAPPDATA. Event output and
+    # retries must still live beside the immutable job payload, not there.
+    $expectedEvents=Join-Path $temp 'job.jsonl'
+    $wrongEvents=Join-Path (Join-Path $settingsDir 'CodexResumeScheduler') 'job.jsonl'
+    Require (Test-Path -LiteralPath $expectedEvents -PathType Leaf) 'Worker wrote execution events outside its job directory.'
+    Require (-not (Test-Path -LiteralPath $wrongEvents)) 'Worker leaked events into the inherited profile directory.'
     $failed=Run-CodexStub 17 $false 'acct-1' $false
     Require ($failed.Exit -eq 17 -and $failed.Executed) "CLI exit 17 must be preserved, not reported as success: $($failed.Output) $($failed.Errors)"
     $outcome=Read-JobOutcome -Path $outcomePath

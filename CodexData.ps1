@@ -21,7 +21,10 @@ function Get-RecentCliSessions {
             try {
                 $line = Get-Content -LiteralPath $item.FullName -TotalCount 1 -ErrorAction Stop
                 $meta = ($line | ConvertFrom-Json).payload
-                if ($meta.source -ne 'cli' -or $meta.id -notmatch $sessionIdPattern) { continue }
+                # Both interactive CLI and non-interactive exec sessions can
+                # be resumed by the scheduled "codex exec resume <id>" worker.
+                # Do not include IDE, subagent or unknown session sources.
+                if ($meta.source -notin @('cli','exec') -or $meta.id -notmatch $sessionIdPattern) { continue }
                 if (-not $seen.Add([string]$meta.id)) { continue }
                 $name = if ($meta.cwd) { Split-Path -Leaf ([string]$meta.cwd) } else { 'CLI session' }
                 $sessions += [pscustomobject]@{

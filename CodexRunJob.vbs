@@ -19,7 +19,8 @@ On Error Resume Next
 status = shell.Run(command, 0, True)
 If Err.Number <> 0 Then
     Dim errorPath, errFile
-    errorPath = shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\CodexResumeScheduler"
+    ' Launcher diagnostics must remain with the scheduled job, including QA.
+    errorPath = files.GetParentFolderName(jobFile)
     If Not files.FolderExists(errorPath) Then files.CreateFolder(errorPath)
     Set errFile = files.OpenTextFile(files.BuildPath(errorPath, "runner-launch-errors.log"), 8, True)
     errFile.WriteLine Now & " " & Err.Description

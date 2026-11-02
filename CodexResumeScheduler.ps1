@@ -33,7 +33,14 @@ $script:appSourcePath = $PSCommandPath
 
 . (Join-Path $PSScriptRoot 'CodexRunEngine.ps1')
 if ($RunJob) {
-    exit (Invoke-CodexScheduledJob -JobFile $JobFile -AppDirectory $appDir -RuntimeDirectory $PSScriptRoot)
+    # A scheduled worker inherits the machine's real LOCALAPPDATA, not the
+    # GUI's isolated environment. Its immutable job-file path is authoritative
+    # for outcomes, events, and any retry job it registers.
+    if ([string]::IsNullOrWhiteSpace($JobFile) -or -not [IO.Path]::IsPathFullyQualified($JobFile)) {
+        throw 'Scheduled job file path must be absolute.'
+    }
+    $jobDirectory = Split-Path -Parent ([IO.Path]::GetFullPath($JobFile))
+    exit (Invoke-CodexScheduledJob -JobFile $JobFile -AppDirectory $jobDirectory -RuntimeDirectory $PSScriptRoot)
 }
 . (Join-Path $PSScriptRoot 'CodexData.ps1')
 . (Join-Path $PSScriptRoot 'CodexUiState.ps1')
