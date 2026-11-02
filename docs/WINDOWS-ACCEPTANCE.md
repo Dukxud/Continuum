@@ -24,3 +24,9 @@ Record the exact Git commit SHA and mark each item PASS, FAIL, or NOT TESTED. Pr
 Do not merge PR #16 until all relevant behavior has been verified on the same candidate commit and no critical security or functionality defect remains. A preview may remain unsigned; a production release must not be published until separately authorized, signed and verified.
 
 After acceptance, squash-merge PR #16 into main and close PR #14 and PR #15 as superseded. Do not publish a production release as part of that merge.
+
+## Same-conversation execution safety
+
+Before accepting a release, run the isolated worker integration with a real mutex held by another process. The competing worker must return nonzero, must not invoke Codex, and must write a blocked result identifying the duplicate attempt. Verify that releasing the first owner allows a later legitimate job. Simulate native Codex "already has an active writer" and verify it is recorded as blocked rather than silently retrying.
+
+When inspecting preexisting jobs, compare their **pinned runtime** and payload's autoResume field with the candidate. Existing one-time tasks may run old code after a new GUI installation. Never replay a completed or failed Horizon job just to test a scheduler fix, and do not cancel old registrations without reviewing their associated session and work.

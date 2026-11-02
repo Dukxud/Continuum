@@ -171,3 +171,9 @@ The production-release safety guard is already installed on main. The v1.16 PR i
 AeroProgress now stores WebView2 state privately, without reading or overwriting Control.Tag. Consumers query Get-AeroProgressViewStatus instead. The Scheduler's quota/time Tag data belongs to its own adapter. SettingsStore is for replaceable preferences, not Weight Trajectory measurements.
 
 **Do not merge until direct Windows acceptance on BLACK-PUDDLE is complete.** Follow docs/WINDOWS-ACCEPTANCE.md and docs/RELEASE-POLICY.md. PRs #14 and #15 are superseded by PR #16; they should not be merged independently. After acceptance, squash-merge #16 and close the older PRs. No CI tests were run for these changes.
+
+### Overlapping scheduled conversations
+
+Multiple one-time task triggers can fire while an earlier continuation is still working on the same Codex thread. The v1.16 worker uses a cross-process, per-conversation Windows mutex to prevent a second **Scheduler** worker from launching concurrently. An overlapping attempt is recorded as blocked (not silently queued or retried). Codex's own active-writer error is also recorded distinctly when the writer belongs to an interactive Codex process outside the Scheduler mutex. The operator decides whether another continuation is still needed.
+
+An already registered job runs its **pinned worker snapshot**, not whichever Scheduler GUI version is open. The interface countdown is not execution status. Prior versions may neither produce result JSON nor auto-retry if their saved autoResume flag is false.
