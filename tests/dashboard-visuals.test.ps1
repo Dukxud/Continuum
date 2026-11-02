@@ -43,7 +43,19 @@ try {
     Require ($qFill.G -gt $qFill.R) 'Usage bar must actually render green.'
     Require ($tFill.B -gt $tFill.R) 'Time bar must actually render blue.'
     Require ($qFill.R -lt $qTrack.R -or $qFill.G -gt $qTrack.G) 'Usage fill must look different from the unfilled track.'
-    Require ([math]::Abs($tFill.R-$tTrack.R) -gt 25) 'Time fill must look different from the pale unfilled track.'
+    # A moving glint can temporarily wash out one pixel. Test sustained
+    # material contrast at multiple distinct positions, not animation phase.
+    $timeContrastSamples=0
+    $quotaGreenSamples=0
+    foreach($x in @(100,125,150,175,200)) {
+        $tSample=Get-Pixel $t0 $x 12
+        $qSample=Get-Pixel $q0 $x 12
+        if([math]::Abs($tSample.R-$tTrack.R) -gt 25) { $timeContrastSamples++ }
+        if($qSample.G -gt $qSample.R -and [math]::Abs($qSample.R-$qTrack.R) -gt 25) { $quotaGreenSamples++ }
+    }
+    Require ($timeContrastSamples -ge 4) "Time fill must differ from pale track at 4 of 5 positions ($timeContrastSamples)."
+    Require ($quotaGreenSamples -ge 4) "Usage fill must be visibly green at 4 of 5 positions ($quotaGreenSamples)."
+
     for ($i=0;$i -lt 16;$i++){[System.Windows.Forms.Application]::DoEvents();Start-Sleep -Milliseconds 35}
     $q1 = Get-RenderedPixels $quota
     $t1 = Get-RenderedPixels $time
