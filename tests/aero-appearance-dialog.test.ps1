@@ -21,7 +21,9 @@ $timer = [System.Windows.Forms.Timer]::new()
 $timer.Interval = 120
 $script:attempts = 0
 $script:appearanceTestPhase = 'save'
+$script:appearanceTimerFailure = $null
 $timer.Add_Tick({
+    try {
     # A modal Forms event pump can reenter the same timer while controls update.
     $timer.Stop()
     $script:attempts++
@@ -72,10 +74,18 @@ $timer.Add_Tick({
     $save = @($dialog.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq 'Save and close' }) | Select-Object -First 1
     Require ($null -ne $save) 'Save and close button missing.'
     $save.PerformClick()
+    } catch {
+        $script:appearanceTimerFailure = $_.Exception.ToString()
+        $timer.Stop()
+        foreach ($window in @([System.Windows.Forms.Application]::OpenForms)) {
+            if ($window.Text -eq 'Customize progress bars') { $window.Close() }
+        }
+    }
 })
 try {
     $timer.Start()
     Show-AeroAppearanceDialog $owner
+    if ($script:appearanceTimerFailure) { throw "Appearance Save callback failed: $script:appearanceTimerFailure" }
     Require ($script:aeroAppearance['quota'] -eq 'cyan') 'Chosen quota color was not applied.'
     Require ($script:aeroAppearance['time'] -eq 'violet') 'Chosen countdown color was not applied.'
     Require ($script:aeroAppearance['finish'] -eq 2 -and $script:aeroAppearance['lighting'] -eq 1) 'Material or studio not saved.'
@@ -100,6 +110,7 @@ try {
     $script:appearanceTestPhase = 'cancel'
     $timer.Start()
     Show-AeroAppearanceDialog $owner
+    if ($script:appearanceTimerFailure) { throw "Appearance Cancel callback failed: $script:appearanceTimerFailure" }
     Require ($script:aeroAppearance['quota'] -eq 'cyan') 'Cancel did not restore original color.'
     Require ($script:saves -eq 1) 'Cancel unexpectedly saved draft changes.'
 
