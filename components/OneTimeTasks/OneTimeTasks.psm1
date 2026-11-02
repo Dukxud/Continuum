@@ -74,7 +74,7 @@ function Remove-OneTimeTask {
             throw "Task '$Name' is too close to its trigger for safe cancellation; inspect its run status."
         }
         $info = Get-ScheduledTaskInfo -TaskName $Name -TaskPath $current.TaskPath -ErrorAction Stop
-        if ([datetime]$info.LastRunTime -ge $when.AddYears(-1)) {
+        if (([datetime]$info.LastRunTime).Year -ge 2000) {
             throw "Task '$Name' has execution history; do not overwrite a real run with a cancellation outcome."
         }
     }

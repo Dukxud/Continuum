@@ -24,9 +24,11 @@ try {
         if($script:badRead){return [pscustomobject]@{Actions=@([pscustomobject]@{Execute='unexpected.exe';Arguments='';WorkingDirectory=$temp});Triggers=$task.Triggers;Principal=$task.Principal;State='Ready'}}
         return $task
     }
+    $script:pretendPreviouslyExecuted=$false
     function global:Get-ScheduledTaskInfo {
         param($TaskName,$TaskPath)
-        return [pscustomobject]@{LastRunTime=[datetime]'1999-11-30';LastTaskResult=267011}
+        $last=if($script:pretendPreviouslyExecuted){Get-Date}else{[datetime]'1999-11-30'}
+        return [pscustomobject]@{LastRunTime=$last;LastTaskResult=267011}
     }
     function global:Unregister-ScheduledTask {param($TaskName,[switch]$Confirm) [void]$script:tasks.Remove($TaskName)}
     function global:Disable-ScheduledTask {param($TaskName) $script:tasks[$TaskName].State='Disabled'}
@@ -43,6 +45,23 @@ try {
     if(-not $unsafeWasRejected -or -not $script:tasks.ContainsKey($name)) {throw 'A disabled task must not be reported as safely cancelled before execution.'}
     Remove-OneTimeTask -Name $name
     if($script:tasks.Count -ne 0){throw 'Standalone removal failed.'}
+    # A task that Windows already ran is not safe to call cancelled, even
+    # if Task Scheduler has returned it to its Ready state.
+    $already=Register-OneTimeTask -Name 'Already-Ran-Example' -At (Get-Date).AddHours(2) -Executable (Get-Command pwsh.exe).Source -Arguments 'abc' -WorkingDirectory $temp
+    $script:pretendPreviouslyExecuted=$true
+    $refused=$false
+    try { Remove-OneTimeTask -Name $already -OnlyBeforeStart } catch { $refused=$true }
+    if(-not $refused -or -not $script:tasks.ContainsKey($already)){throw 'A previously executed task must not be labelled cancelled.'}
+    $script:pretendPreviouslyExecuted=$false
+    Remove-OneTimeTask -Name $already
+
+    # The OS trigger could fire between a stale UI snapshot and a click.
+    $near=Register-OneTimeTask -Name 'Near-Trigger-Example' -At (Get-Date).AddSeconds(45) -Executable (Get-Command pwsh.exe).Source -Arguments 'abc' -WorkingDirectory $temp
+    $refused=$false
+    try { Remove-OneTimeTask -Name $near -OnlyBeforeStart } catch { $refused=$true }
+    if(-not $refused -or -not $script:tasks.ContainsKey($near)){throw 'A near-trigger task must refuse safe cancellation.'}
+    Remove-OneTimeTask -Name $near
+
     $utcFuture=[DateTimeOffset]::UtcNow.AddHours(3).UtcDateTime
     $utcJob=Register-OneTimeTask -Name 'Utc-Example' -At $utcFuture -Executable (Get-Command pwsh.exe).Source -Arguments 'abc' -WorkingDirectory $temp
     $triggerTime=([datetime]$script:tasks[$utcJob].Triggers[0].StartBoundary).ToString('yyyy-MM-dd HH:mm')
