@@ -54,6 +54,7 @@ test('isolated WebView2 page is local and its host API is syntactically valid',(
   assert.match(source[1],/window\.chrome\.webview\.addEventListener\('message'/);
   assert.match(source[1],/window\.aeroBarProof/);
   assert.match(source[1],/error:window\.aeroBarProof\.getError\(\)/);
+  assert.match(source[1],/data\.type==='probe'/,'Page must answer a post-navigation engine probe.');
   assert.match(source[1],/requestAnimationFrame\(tick\)/);
   assert.equal((production.match(/getContext\('webgl2'/g)||[]).length,1);
   assert.match(source[1],/function updateCustomSprite/);

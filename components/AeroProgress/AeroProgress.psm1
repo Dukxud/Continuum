@@ -140,6 +140,7 @@ function New-AeroProgressView {
             }
         }.GetNewClosure())
         $settings = $control.CoreWebView2.Settings
+        $settings.IsWebMessageEnabled = $true
         $settings.AreDefaultContextMenusEnabled = $false
         $settings.AreDevToolsEnabled = $false
         $settings.AreBrowserAcceleratorKeysEnabled = $false
@@ -170,6 +171,11 @@ function New-AeroProgressView {
         if ($eventArgs.IsSuccess -and -not $control.IsDisposed) {
             $viewState.Ready = $true
             $viewState.Failure = $null
+            # Navigation completion is the first point at which the bundled
+            # page is guaranteed to have installed its message listener.
+            # Request a fresh renderer report rather than relying solely on
+            # the page's one-time startup notification.
+            $control.CoreWebView2.PostWebMessageAsJson('{"type":"probe"}')
             if ($null -ne $viewState.State) {
                 $control.CoreWebView2.PostWebMessageAsJson(
                     ($viewState.State | ConvertTo-Json -Compress -Depth 4))

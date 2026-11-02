@@ -11,7 +11,7 @@ function Require($ok,[string]$what) { if (-not $ok) { throw $what } }
 function PumpUntil([scriptblock]$condition,[int]$seconds=25) {
     $deadline = (Get-Date).AddSeconds($seconds)
     while (-not (& $condition)) {
-        if ((Get-Date) -gt $deadline) { throw "Timed out awaiting WebView2 rendering: $script:aeroError; quotaReady=$((Get-AeroProgressViewStatus -View $quota).Ready); runReady=$((Get-AeroProgressViewStatus -View $run).Ready); quotaCore=$($null -ne $quota.CoreWebView2); runCore=$($null -ne $run.CoreWebView2); quotaFailure=$((Get-AeroProgressViewStatus -View $quota).Failure); runFailure=$((Get-AeroProgressViewStatus -View $run).Failure)" }
+        if ((Get-Date) -gt $deadline) { throw "Timed out awaiting WebView2 rendering: $script:aeroError; quotaReady=$((Get-AeroProgressViewStatus -View $quota).Ready); runReady=$((Get-AeroProgressViewStatus -View $run).Ready); quotaCore=$($null -ne $quota.CoreWebView2); runCore=$($null -ne $run.CoreWebView2); quotaFailure=$((Get-AeroProgressViewStatus -View $quota).Failure); runFailure=$((Get-AeroProgressViewStatus -View $run).Failure); quotaEngine=$((Get-AeroProgressViewStatus -View $quota).Engine); runEngine=$((Get-AeroProgressViewStatus -View $run).Engine); quotaShaderError=$((Get-AeroProgressViewStatus -View $quota).ShaderError); runShaderError=$((Get-AeroProgressViewStatus -View $run).ShaderError)" }
         [System.Windows.Forms.Application]::DoEvents()
         Start-Sleep -Milliseconds 50
     }

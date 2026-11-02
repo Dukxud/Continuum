@@ -325,6 +325,9 @@ if(window.chrome?.webview){
  window.chrome.webview.addEventListener('message',event=>{
   const data=event.data;
   if(data && data.type==='set')apply(data);
+  if(data && data.type==='probe')window.chrome.webview.postMessage({
+   type:'ready',engine:window.aeroBarProof.getEngine(),error:window.aeroBarProof.getError()
+  });
  });
 }
 function tick(now){
