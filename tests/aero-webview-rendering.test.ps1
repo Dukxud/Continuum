@@ -109,7 +109,10 @@ try {
     $second = Join-Path $captures 'shimmer-frame-b.png'
     [void](Snapshot $quota $first)
     $strongMotion = 0
-    foreach($i in 1..7) {
+    # Staggered starts plus a fully offscreen reset may place the reflection
+    # outside the fill for several seconds. Observe a whole optical cycle,
+    # not just the first few frames, to avoid a timing-dependent false failure.
+    foreach($i in 1..23) {
         Start-Sleep -Milliseconds 370
         [System.Windows.Forms.Application]::DoEvents()
         [void](Snapshot $quota $second)
