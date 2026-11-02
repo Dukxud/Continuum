@@ -90,6 +90,13 @@ try {
         (Get-AeroProgressViewStatus -View $run).Engine -eq 'webgl2'
     }
     Require (-not (Get-AeroProgressViewStatus -View $quota).ShaderError) 'Aero renderer query reported a shader error.'
+    # Every browser view owns an independent optical phase and easing envelope.
+    $quotaMotion=Evaluate $quota 'window.aeroBarProof.getMotion()'
+    $runMotion=Evaluate $run 'window.aeroBarProof.getMotion()'
+    Require ($quotaMotion.startOffset -ge 0 -and $quotaMotion.startOffset -lt (1/.135)) 'Quota stagger is invalid.'
+    Require ($runMotion.startOffset -ge 0 -and $runMotion.startOffset -lt (1/.135)) 'Run stagger is invalid.'
+    Require ([math]::Abs([double]$quotaMotion.startOffset-[double]$runMotion.startOffset) -gt .000001) 'Independent bars share an optical start phase.'
+    Require ($quotaMotion.shimmerReveal -ge 0 -and $quotaMotion.shimmerReveal -le 1) 'Startup shimmer envelope is outside bounds.'
 
     # The original CI only tested that percentages changed. It did not
     # prove animation continued at a CONSTANT percentage.

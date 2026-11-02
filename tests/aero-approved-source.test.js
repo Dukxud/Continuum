@@ -22,9 +22,11 @@ test('production uses exact owner-approved vertex shader and corrected optical f
   const augmented=script(production,'hybridfrag');
   const stripped=augmented
     .replace('uDepth,uCompact,uShimmer;','uDepth,uCompact;')
-    .replace(/ \/\/ A wide, softly reflected studio light[\s\S]*?\*uShimmer;\r?\n/, '');
+    .replace(/ \/\/ A wide, softly reflected studio light[\s\S]*?\*uShimmer\*sweepEnvelope;\r?\n/, '');
   assert.equal(stripped,approved);
   assert.match(augmented,/specularPatch/);
+  assert.match(augmented,/float sweepEnvelope=smoothstep/);
+  assert.match(augmented,/float glint=G\(bentX,/);
   assert.match(production,/getFrames:\(\)=>frames/);
   assert.match(production,/getSettings:\(\)=>/);
   assert.ok(!production.includes('hybrid&&aero)'));
@@ -53,6 +55,10 @@ test('isolated WebView2 page is local and its host API is syntactically valid',(
   assert.match(production,/connect-src 'none'/);
   assert.match(source[1],/window\.chrome\.webview\.addEventListener\('message'/);
   assert.match(source[1],/window\.aeroBarProof/);
+  assert.match(source[1],/const startOffset=Math\.random\(\)\/0\.135/);
+  assert.match(source[1],/phase=startOffset/);
+  assert.match(source[1],/shimmerReveal\+dt\/\.65/);
+  assert.match(source[1],/getMotion:\(\)=>/);
   // Engine reporting is an asynchronous host-side JavaScript evaluation.
   // The page no longer requires a fragile browser-to-PowerShell handshake.
   const host=fs.readFileSync(path.join(root,'components','AeroProgress','AeroProgress.psm1'),'utf8');
