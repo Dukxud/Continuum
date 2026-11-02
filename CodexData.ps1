@@ -121,19 +121,49 @@ function Find-SessionRepository {
     return $null
 }
 
+# Resolve what Windows actually knows, not what a countdown suggests.
+# A zero Task Scheduler exit code without a worker outcome does NOT prove
+# Codex completed the requested continuation.
+function Get-CodexTaskDisplayState {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][datetime]$When,
+        [Parameter(Mandatory)][string]$TaskState,
+        $TaskInfo = $null,
+        $Outcome = $null,
+        [datetime]$Now = (Get-Date)
+    )
+    if ($TaskState -eq 'Running') { return 'Running' }
+    if ($Outcome -and $Outcome.status -in @('completed','failed','blocked','deferred','cancelled')) {
+        return ([string]$Outcome.status).Substring(0,1).ToUpperInvariant() + ([string]$Outcome.status).Substring(1)
+    }
+    if ($When -gt $Now) { return 'Scheduled' }
+    if ($TaskInfo) {
+        $lastRun = [datetime]$TaskInfo.LastRunTime
+        if ($lastRun.Year -ge 2000 -and $lastRun -ge $When.AddMinutes(-2)) {
+            if ([long]$TaskInfo.LastTaskResult -eq 0) { return 'Ended (no result recorded)' }
+            return "Failed (task exit $([long]$TaskInfo.LastTaskResult))"
+        }
+    }
+    return 'Overdue (execution unconfirmed)'
+}
+
 function Get-UpcomingCodexTasks {
     param([Parameter(Mandatory)][string]$AppDirectory)
     $items = @()
-    # Query our task prefixes rather than enumerate every Windows scheduled task.
+    $now = Get-Date
+    $recentSince = $now.AddHours(-48)
+    # Only enumerate the Scheduler's named Windows tasks. Retain live and
+    # recent executions so the interface can explain what happened.
     $tasks = @(Get-ScheduledTask -TaskName 'CodexResume-*' -ErrorAction SilentlyContinue) +
              @(Get-ScheduledTask -TaskName 'BP*-Codex-*' -ErrorAction SilentlyContinue)
     foreach ($task in $tasks) {
         if ($task.TaskName -notmatch '^(CodexResume-|BP\d+-Codex-(?:Resume|Test)$)') { continue }
-        if ($task.State -eq 'Disabled' -or $task.State -eq 'Running') { continue }
+        if ($task.State -eq 'Disabled') { continue }
         $trig = @($task.Triggers | Where-Object { $_.StartBoundary }) | Select-Object -First 1
         if (-not $trig) { continue }
         try { $when = [datetime]$trig.StartBoundary } catch { continue }
-        if ($when -le (Get-Date)) { continue }
+        if ($when -lt $recentSince -and $task.State -ne 'Running') { continue }
         $name = [string]$task.TaskName
         $json = Join-Path $AppDirectory ($name + '.json')
         $description = 'Existing scheduled task'
@@ -151,7 +181,7 @@ function Get-UpcomingCodexTasks {
                 if ([string]$job.createdAt -match '^\d{9,12}$') { $createdAt = [long]$job.createdAt }
             } catch { $description = 'Scheduled task (job data unreadable)' }
         } elseif ($name -match '^BP\d+-Codex-') {
-            # Surface existing BPxx tasks without modifying their definitions.
+            # Older manually registered BP tasks remain visible, read-only.
             $repo = [string]$task.Actions[0].WorkingDirectory
             $match = [regex]::Match([string]$task.Actions[0].Arguments, '-File\s+"([^"]+)"')
             if ($match.Success -and (Test-Path -LiteralPath $match.Groups[1].Value -PathType Leaf)) {
@@ -166,10 +196,29 @@ function Get-UpcomingCodexTasks {
                 } catch { }
             }
         }
-        $items += [pscustomobject]@{ Name = $name; When = $when; Repo = $repo; Session = $session;
-            Description = $description; Model = $model; CreatedAt = $createdAt }
+        $taskInfo = $null
+        if ($when -le $now -and $task.State -ne 'Running') {
+            try {
+                $taskInfo = Get-ScheduledTaskInfo -TaskName $name -TaskPath $task.TaskPath -ErrorAction Stop
+            } catch { }
+        }
+        $outcome = $null
+        $resultPath = Join-Path $AppDirectory ($name + '.result.json')
+        if (Test-Path -LiteralPath $resultPath -PathType Leaf) {
+            try { $outcome = Read-JobOutcome -Path $resultPath } catch { }
+        }
+        $runState = Get-CodexTaskDisplayState -When $when -TaskState ([string]$task.State) -TaskInfo $taskInfo -Outcome $outcome -Now $now
+        $items += [pscustomobject]@{
+            Name = $name; When = $when; Repo = $repo; Session = $session
+            Description = $description; Model = $model; CreatedAt = $createdAt
+            Status = $runState
+        }
     }
-    return ($items | Sort-Object When)
+    # Active work must be shown FIRST; next scheduled jobs precede history.
+    $active = @($items | Where-Object Status -eq 'Running' | Sort-Object When -Descending)
+    $future = @($items | Where-Object Status -eq 'Scheduled' | Sort-Object When)
+    $recent = @($items | Where-Object { $_.Status -notin @('Running','Scheduled') } | Sort-Object When -Descending)
+    return @($active) + @($future) + @($recent)
 }
 
 function Read-SessionModel {
