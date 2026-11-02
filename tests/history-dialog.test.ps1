@@ -29,6 +29,11 @@ try {
         Name='BP101-Codex-Test';When=(Get-Date).AddMinutes(-30)
         Status='Failed (task exit 1)';Description='Old Windows registration'
     }
+    $matchingTask=[pscustomobject]@{
+        Name='CodexResume-20260101-1000-abcdef01';When=(Get-Date).AddMinutes(-10)
+        Status='Completed';Repo='C:\source\BP105-Scheduler-QA'
+        Description='gpt-6.1-sol / low | read-only';Session='01a19dcb-aa2d-7632-b490-a5ae1b19e37e'
+    }
     $owner.Show()
     $timer.Add_Tick({
         $dialog=$null
@@ -47,11 +52,35 @@ try {
             $transcript=@($tabs.TabPages[1].Controls | Where-Object { $_ -is [System.Windows.Forms.TextBox] }) | Select-Object -First 1
             if(-not $response.ReadOnly -or -not $transcript.ReadOnly){throw 'Evidence must be read-only.'}
             if(-not $grid -or $grid.Rows.Count -ne 4){throw 'History must render persisted outcomes and old Windows task records.'}
+            # Verified outcome fields must never inherit project/model/session
+            # data from the Windows task record.
+            $completeRow=@($grid.Rows | Where-Object { [string]$_.Cells['Status'].Value -eq 'completed' })[0]
+            if([string]$completeRow.Cells['ExitCode'].Value -cne '0' -or
+               [string]$completeRow.Cells['Attempt'].Value -cne '0' -or
+               [string]$completeRow.Cells['NextJob'].Value -cne '' -or
+               [string]$completeRow.Cells['Message'].Value -cne 'Complete.'){
+                throw 'History columns do not match the saved worker outcome.'
+            }
+            if([string]$completeRow.Cells['When'].Value -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$'){
+                throw 'History time is formatted for the wrong table.'
+            }
+            $legacyRow=@($grid.Rows | Where-Object { [string]$_.Cells['Status'].Value -like 'Failed (task*' })[0]
+            if([string]$legacyRow.Cells['ExitCode'].Value -cne '' -or
+               [string]$legacyRow.Cells['Attempt'].Value -cne '' -or
+               [string]$legacyRow.Cells['NextJob'].Value -cne ''){
+                throw 'Unverified legacy task metadata was displayed as verified outcome data.'
+            }
             $statuses=@($grid.Rows | ForEach-Object { [string]$_.Cells['Status'].Value })
             foreach($status in @('completed','deferred','unreadable','Failed (task exit 1)')){
                 if($statuses -notcontains $status){throw "History omitted status $status"}
             }
-            $next=@($grid.Rows | Where-Object { [string]$_.Cells['Status'].Value -eq 'deferred' })[0].Cells['NextJob'].Value
+            $deferredRow=@($grid.Rows | Where-Object { [string]$_.Cells['Status'].Value -eq 'deferred' })[0]
+            if([string]$deferredRow.Cells['ExitCode'].Value -cne '17' -or
+               [string]$deferredRow.Cells['Attempt'].Value -cne '1' -or
+               [string]$deferredRow.Cells['Message'].Value -cne 'Rescheduled.'){
+                throw 'Deferred result details were shifted into the wrong columns.'
+            }
+            $next=$deferredRow.Cells['NextJob'].Value
             if($next -ne 'CodexResume-20260101-1200-abcdef03'){throw 'History did not display the follow-up task.'}
             if($grid.SelectedRows.Count -ne 1 -or [string]$grid.SelectedRows[0].Tag -ne 'CodexResume-20260101-1000-abcdef01'){
                 throw 'Open selected result must honor the chosen completed run.'
@@ -75,7 +104,7 @@ try {
         }
     })
     $timer.Start()
-    Show-CodexRunHistoryDialog -Owner $owner -Directory $temp -RecentTasks @($legacyTask) -SelectedName 'CodexResume-20260101-1000-abcdef01'
+    Show-CodexRunHistoryDialog -Owner $owner -Directory $temp -RecentTasks @($legacyTask,$matchingTask) -SelectedName 'CodexResume-20260101-1000-abcdef01'
     if($script:historyError){throw $script:historyError}
     if(-not $script:historySeen){throw 'The history dialog did not render its persisted outcomes.'}
     Write-Host 'WinForms history dialog renders completed, deferred, unreadable and follow-up task PASS.'
