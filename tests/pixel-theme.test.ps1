@@ -29,7 +29,9 @@ try {
         $bitmap=[System.Drawing.Bitmap]::new($control.Width,$control.Height)
         try {
             $control.DrawToBitmap($bitmap,[System.Drawing.Rectangle]::new(0,0,$control.Width,$control.Height))
-            Require ($bitmap.GetPixel(2,17).ToArgb() -ne $bitmap.GetPixel(30,17).ToArgb()) 'Pixel art rail was not painted.'
+            Require ($bitmap.GetPixel(2,8).ToArgb() -ne $bitmap.GetPixel(30,8).ToArgb()) 'Pixel edge accent was not painted.'
+            Require ($bitmap.GetPixel(50,8).ToArgb() -ne $bitmap.GetPixel(50,$control.Height-12).ToArgb()) 'Raised field must have real lighting depth.'
+            Require ($bitmap.GetPixel($control.Width-8,4).ToArgb() -ne $bitmap.GetPixel($control.Width-24,4).ToArgb()) 'Corner socket detail was not painted.'
         }finally{$bitmap.Dispose()}
     }
     Require ($button.Left -gt $panel.Left -and $button.Right -lt $panel.Right) 'Action is not contained in its field group.'

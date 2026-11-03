@@ -8,23 +8,51 @@ function Set-PixelSurfaceStyle {
         param($sender,$e)
         $w=$sender.ClientSize.Width
         $h=$sender.ClientSize.Height
-        if($w -lt 8 -or $h -lt 8){return}
-        $e.Graphics.SmoothingMode=[System.Drawing.Drawing2D.SmoothingMode]::None
-        $line=[System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(92,$highlight))
+        if($w -lt 18 -or $h -lt 18){return}
+        $graphics=$e.Graphics
+        $graphics.SmoothingMode=[System.Drawing.Drawing2D.SmoothingMode]::None
+
+        # Light-catching top plane and a darker bottom edge make a shallow
+        # raised surface; crisp pixels are reserved for its perimeter.
+        $gradient=[System.Drawing.Drawing2D.LinearGradientBrush]::new(
+            [System.Drawing.Rectangle]::new(0,0,$w,$h),
+            [System.Windows.Forms.ControlPaint]::Light($background,[float].30),
+            $background,[float]90)
+        $border=[System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(124,$highlight))
+        $topLine=[System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(185,[System.Drawing.Color]::White))
+        $bottomLine=[System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(65,$highlight))
         $rail=[System.Drawing.SolidBrush]::new($highlight)
-        $stitch=[System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(42,$highlight))
+        $quiet=[System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(78,$highlight))
         $cutout=[System.Drawing.SolidBrush]::new($background)
-        try {
-            $e.Graphics.DrawRectangle($line,0,0,$w-1,$h-1)
-            $e.Graphics.FillRectangle($rail,0,0,4,$h)
-            for($y=7;$y -lt $h-3;$y+=12){$e.Graphics.FillRectangle($cutout,0,$y,4,4)}
-            for($x=16;$x -lt $w-15;$x+=24){
-                $e.Graphics.FillRectangle($stitch,$x,2,4,3)
-                $e.Graphics.FillRectangle($stitch,$x+8,$h-5,3,3)
+        try{
+            $graphics.FillRectangle($gradient,0,0,$w,$h)
+            $graphics.DrawRectangle($border,0,0,$w-1,$h-1)
+            $graphics.DrawLine($topLine,5,2,$w-16,2)
+            $graphics.DrawLine($bottomLine,5,$h-3,$w-12,$h-3)
+
+            # Stepped edge notch, like a tiny 8-bit socket.
+            $graphics.FillRectangle($rail,0,0,4,$h)
+            for($y=12;$y -lt $h-5;$y+=22){
+                $graphics.FillRectangle($cutout,0,$y,4,5)
+                $graphics.FillRectangle($quiet,5,$y+1,3,3)
             }
-            $e.Graphics.FillRectangle($rail,$w-9,2,4,4)
-            $e.Graphics.FillRectangle($stitch,$w-14,7,4,4)
-        }finally{$line.Dispose();$rail.Dispose();$stitch.Dispose();$cutout.Dispose()}
+            $graphics.FillRectangle($rail,8,0,13,2)
+            $graphics.FillRectangle($rail,$w-10,2,6,4)
+            $graphics.FillRectangle($quiet,$w-15,7,5,4)
+            # A few intentional pixel markers replace the old dotted border.
+            for($x=27;$x -lt $w-20;$x+=116){
+                $graphics.FillRectangle($quiet,$x,$h-5,4,2)
+                $graphics.FillRectangle($quiet,$x+6,$h-5,2,2)
+            }
+        }finally{
+            $gradient.Dispose()
+            $border.Dispose()
+            $topLine.Dispose()
+            $bottomLine.Dispose()
+            $rail.Dispose()
+            $quiet.Dispose()
+            $cutout.Dispose()
+        }
     }.GetNewClosure())
 }
 
@@ -54,6 +82,17 @@ function Set-PixelAction {
     $Button.BackColor=$color
     $Button.ForeColor=[System.Drawing.Color]::White
     $Button.Cursor=[System.Windows.Forms.Cursors]::Hand
+    $Button.Add_Paint({
+        param($sender,$e)
+        if(-not $sender.Enabled -or $sender.Width -lt 16 -or $sender.Height -lt 12){return}
+        $shine=[System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(100,[System.Drawing.Color]::White))
+        $corner=[System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(130,[System.Drawing.Color]::White))
+        try{
+            $e.Graphics.DrawLine($shine,4,2,$sender.Width-5,2)
+            $e.Graphics.FillRectangle($corner,3,$sender.Height-7,3,3)
+            $e.Graphics.FillRectangle($corner,$sender.Width-7,4,3,3)
+        }finally{$shine.Dispose();$corner.Dispose()}
+    })
 }
 
 function Initialize-SchedulerPixelTheme {
