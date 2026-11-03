@@ -165,3 +165,16 @@ test('pixel-art control groups and associated actions ship in the production app
  assert.ok(lifecycle.includes('Set-PixelAction -Button $script:ui.Dashboard.appearanceButton'));
  assert.ok(pack.includes("'CodexUiPixelTheme.ps1'"));
 });
+
+test('secondary actions use a restrained blue palette with no violet and clear disabled states',()=>{
+ const theme=fs.readFileSync(path.resolve(__dirname,'..','CodexUiPixelTheme.ps1'),'utf8');
+ const lifecycle=fs.readFileSync(path.resolve(__dirname,'..','CodexUiLifecycle.ps1'),'utf8');
+ assert.doesNotMatch(theme,/#785AC5|#F1ECFF/i,'Violet UI accents were retained');
+ assert.match(theme,/Now='#516F98';Reset='#516F98'/);
+ assert.match(theme,/Schedule='#2277A1'/);
+ assert.match(theme,/Name='RunTime';Y=148;Height=44;Fill='#EDF3FA';Accent='#516F98'/);
+ assert.match(lifecycle,/appearanceButton -Accent '#516F98'/);
+ assert.match(theme,/\$Button\.Add_EnabledChanged\(\$updateState\)/);
+ assert.match(theme,/\$disabledFill=\[System\.Drawing\.ColorTranslator\]::FromHtml\('#DDE4EE'\)/);
+ assert.match(theme,/Primary:\(\$key -eq 'Schedule'\)/);
+});

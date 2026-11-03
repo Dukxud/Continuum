@@ -18,7 +18,7 @@ try {
     Set-PixelAction -Button $button -Accent '#168E87'
     Require (-not $button.Enabled) 'Styling re-enabled an unavailable action.'
     Require ($button.FlatStyle -eq [System.Windows.Forms.FlatStyle]::Flat) 'Theme action did not use its matching surface.'
-    Require ($button.BackColor.ToArgb() -eq ([System.Drawing.ColorTranslator]::FromHtml('#168E87')).ToArgb()) 'Theme action accent mismatch.'
+    Require ($button.BackColor.ToArgb() -eq ([System.Drawing.ColorTranslator]::FromHtml('#DDE4EE')).ToArgb()) 'Disabled action must have a quiet neutral fill.'
     $card=[System.Windows.Forms.Panel]::new()
     $card.Bounds=[System.Drawing.Rectangle]::new(12,90,430,85)
     $form.Controls.Add($card)
@@ -30,9 +30,11 @@ try {
     $button.PerformClick()
     Require ($script:pixelTestClicks -eq 0) 'Disabled button incorrectly invoked its action.'
     $button.Enabled=$true
+    Require ($button.BackColor.ToArgb() -eq ([System.Drawing.ColorTranslator]::FromHtml('#168E87')).ToArgb()) 'Enabling the action did not restore its accent.'
     $button.PerformClick()
     Require ($script:pixelTestClicks -eq 1) 'Themed button failed to invoke its original click action.'
     $button.Enabled=$false
+    Require ($button.BackColor.ToArgb() -eq ([System.Drawing.ColorTranslator]::FromHtml('#DDE4EE')).ToArgb()) 'Disabled action regained a distracting bright fill.'
     $button.PerformClick()
     Require ($script:pixelTestClicks -eq 1) 'Re-disabled button invoked an extra action.'
     foreach($control in @($panel,$card)){

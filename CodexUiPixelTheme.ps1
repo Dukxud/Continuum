@@ -71,28 +71,50 @@ function Add-PixelBackplate {
 }
 
 function Set-PixelAction {
-    param([System.Windows.Forms.Button]$Button,[string]$Accent)
+    param([System.Windows.Forms.Button]$Button,[string]$Accent,[switch]$Primary)
     $color=[System.Drawing.ColorTranslator]::FromHtml($Accent)
+    $disabledFill=[System.Drawing.ColorTranslator]::FromHtml('#DDE4EE')
+    $disabledInk=[System.Drawing.ColorTranslator]::FromHtml('#52647C')
+    $disabledOutline=[System.Drawing.ColorTranslator]::FromHtml('#B8C6D8')
     $Button.UseVisualStyleBackColor=$false
     $Button.FlatStyle=[System.Windows.Forms.FlatStyle]::Flat
     $Button.FlatAppearance.BorderSize=1
-    $Button.FlatAppearance.BorderColor=[System.Windows.Forms.ControlPaint]::Dark($color)
     $Button.FlatAppearance.MouseOverBackColor=[System.Windows.Forms.ControlPaint]::Light($color)
     $Button.FlatAppearance.MouseDownBackColor=[System.Windows.Forms.ControlPaint]::Dark($color)
-    $Button.BackColor=$color
-    $Button.ForeColor=[System.Drawing.Color]::White
     $Button.Cursor=[System.Windows.Forms.Cursors]::Hand
+
+    # Keep unavailable shortcuts visibly inactive, then restore the intended
+    # accent automatically when scheduling eligibility changes.
+    $updateState={
+        param($sender,$eventArgs)
+        if($sender.Enabled){
+            $sender.BackColor=$color
+            $sender.ForeColor=[System.Drawing.Color]::White
+            $sender.FlatAppearance.BorderColor=[System.Windows.Forms.ControlPaint]::Dark($color)
+        }else{
+            $sender.BackColor=$disabledFill
+            $sender.ForeColor=$disabledInk
+            $sender.FlatAppearance.BorderColor=$disabledOutline
+        }
+    }.GetNewClosure()
+    $Button.Add_EnabledChanged($updateState)
+    & $updateState $Button $null
+
+    # The primary scheduling action has a stronger edge highlight. Utility
+    # actions keep a quieter bevel so they do not compete with it.
+    $glow=if($Primary){100}else{52}
+    $pixelLight=if($Primary){130}else{74}
     $Button.Add_Paint({
         param($sender,$e)
         if(-not $sender.Enabled -or $sender.Width -lt 16 -or $sender.Height -lt 12){return}
-        $shine=[System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(100,[System.Drawing.Color]::White))
-        $corner=[System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(130,[System.Drawing.Color]::White))
+        $shine=[System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb($glow,[System.Drawing.Color]::White))
+        $corner=[System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb($pixelLight,[System.Drawing.Color]::White))
         try{
             $e.Graphics.DrawLine($shine,4,2,$sender.Width-5,2)
             $e.Graphics.FillRectangle($corner,3,$sender.Height-7,3,3)
             $e.Graphics.FillRectangle($corner,$sender.Width-7,4,3,3)
         }finally{$shine.Dispose();$corner.Dispose()}
-    })
+    }.GetNewClosure())
 }
 
 function Initialize-SchedulerPixelTheme {
@@ -110,7 +132,7 @@ function Initialize-SchedulerPixelTheme {
     $bands=@(
         @{Name='Conversation';Y=54;Height=46;Fill='#E8F1FF';Accent='#547FD2'}
         @{Name='Repository';Y=102;Height=44;Fill='#E6F8F3';Accent='#168E87'}
-        @{Name='RunTime';Y=148;Height=44;Fill='#F1ECFF';Accent='#785AC5'}
+        @{Name='RunTime';Y=148;Height=44;Fill='#EDF3FA';Accent='#516F98'}
         @{Name='Options';Y=194;Height=40;Fill='#FFF3E4';Accent='#C98737'}
         @{Name='Instruction';Y=238;Height=71;Fill='#E8F5FC';Accent='#2887B5'}
     )
@@ -121,7 +143,7 @@ function Initialize-SchedulerPixelTheme {
     # opaque default-label rectangles cutting through the pixel texture.
     $labelBands=@{
         'Conversation'='#E8F1FF';'Repository root'='#E6F8F3'
-        'Run at (local)'='#F1ECFF';'Model'='#FFF3E4'
+        'Run at (local)'='#EDF3FA';'Model'='#FFF3E4'
         'Reasoning'='#FFF3E4';'Access'='#FFF3E4'
         'Instruction'='#E8F5FC'
     }
@@ -132,11 +154,11 @@ function Initialize-SchedulerPixelTheme {
         }
     }
     $colors=@{
-        Browse='#168E87';Minus='#785AC5';Plus='#785AC5'
-        Now='#785AC5';Reset='#785AC5';Schedule='#2887B5'
-        Cancel='#B86265';Logs='#547FD2';Recent='#466BAA'
+        Browse='#168E87';Minus='#516F98';Plus='#516F98'
+        Now='#516F98';Reset='#516F98';Schedule='#2277A1'
+        Cancel='#B86265';Logs='#52749B';Recent='#466BAA'
     }
-    foreach($key in $colors.Keys){Set-PixelAction -Button $Actions[$key] -Accent $colors[$key]}
+    foreach($key in $colors.Keys){Set-PixelAction -Button $Actions[$key] -Accent $colors[$key] -Primary:($key -eq 'Schedule')}
     $Actions['Browse'].AccessibleName='Browse for the repository root'
     $Actions['Schedule'].AccessibleName='Schedule the instruction in this field'
     Set-PixelSurfaceStyle -Panel $UsageCards[0].Panel -Fill '#E7F8F2' -Accent '#219A74'
