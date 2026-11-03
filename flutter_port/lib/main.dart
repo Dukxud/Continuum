@@ -222,17 +222,23 @@ class _SchedulerHomeState extends State<SchedulerHome> {
                 stringField(m, 'name'), overflow: TextOverflow.ellipsis))).toList(),
             onChanged: state.selectModel)),
           SizedBox(width: width, child: DropdownButtonFormField<String>(
+            isExpanded: true,
             value: efforts.contains(state.effort) ? state.effort : null,
             decoration: const InputDecoration(labelText: 'Reasoning'),
-            items: efforts.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+            items: efforts.map((e) => DropdownMenuItem(value: e,
+              child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
             onChanged: (value) { if (value != null) state.edit(reasoning: value); })),
           SizedBox(width: width, child: DropdownButtonFormField<String>(
+            isExpanded: true,
             value: state.access,
             decoration: const InputDecoration(labelText: 'Access'),
             items: const [
-              DropdownMenuItem(value: 'workspace-write', child: Text('Workspace write')),
-              DropdownMenuItem(value: 'read-only', child: Text('Read-only')),
-              DropdownMenuItem(value: 'yolo', child: Text('Unrestricted')),
+              DropdownMenuItem(value: 'workspace-write', child: Text('Workspace write',
+                overflow: TextOverflow.ellipsis)),
+              DropdownMenuItem(value: 'read-only', child: Text('Read-only',
+                overflow: TextOverflow.ellipsis)),
+              DropdownMenuItem(value: 'yolo', child: Text('Unrestricted',
+                overflow: TextOverflow.ellipsis)),
             ],
             onChanged: (value) { if (value != null) state.edit(accessMode: value); })),
         ]);
@@ -300,11 +306,13 @@ class _SchedulerHomeState extends State<SchedulerHome> {
         borderRadius: BorderRadius.circular(7)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Expanded(child: Text(title,
+          Expanded(child: Text(title, overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontWeight: FontWeight.w700, color: ink))),
-          Text(remaining == null ? 'Unavailable' :
+          const SizedBox(width: 8),
+          Flexible(child: Text(remaining == null ? 'Unavailable' :
               remaining.toStringAsFixed(1) + '% remaining',
-            style: const TextStyle(fontWeight: FontWeight.w700, color: ink)),
+            overflow: TextOverflow.ellipsis, textAlign: TextAlign.end,
+            style: const TextStyle(fontWeight: FontWeight.w700, color: ink))),
         ]),
         const SizedBox(height: 12),
         AeroLiquidBar(amount: remaining, tint: Color(state.appearance['quota']!)),
@@ -354,18 +362,22 @@ class _SchedulerHomeState extends State<SchedulerHome> {
     final project = segments.isEmpty ? 'Unknown project' : segments.last;
     final date = dateField(run, 'When');
     if (compact) {
-      return Container(padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: surface, border: Border.all(color: edge),
-          borderRadius: BorderRadius.circular(7)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(project, style: const TextStyle(color: ink, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 5),
-          Text(stringField(run, 'Description'), maxLines: 1,
-            overflow: TextOverflow.ellipsis, style: const TextStyle(color: slate)),
-          Text(timeLabel(date), style: const TextStyle(color: slate, fontSize: 12)),
-          const SizedBox(height: 12),
-          runCountdown(run),
-        ]));
+      return InkWell(
+        onTap: () => setState(() => selectedRun = selectedRun == name ? null : name),
+        child: Container(padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: selectedRun == name ? const Color(0xffdbe9f8) : surface,
+            border: Border.all(color: edge),
+            borderRadius: BorderRadius.circular(7)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(project, style: const TextStyle(color: ink, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 5),
+            Text(stringField(run, 'Description'), maxLines: 1,
+              overflow: TextOverflow.ellipsis, style: const TextStyle(color: slate)),
+            Text(timeLabel(date), style: const TextStyle(color: slate, fontSize: 12)),
+            const SizedBox(height: 12),
+            runCountdown(run),
+          ])));
     }
     return InkWell(onTap: () => setState(() => selectedRun = selectedRun == name ? null : name),
       child: Container(color: selectedRun == name ? const Color(0xffdbe9f8) : null,
@@ -390,7 +402,13 @@ class _SchedulerHomeState extends State<SchedulerHome> {
     final runs = state.upcoming;
     if (runs.isEmpty) return const SizedBox.shrink();
     return section('UPCOMING RUNS (' + runs.length.toString() + ')',
-      Column(children: [
+      LayoutBuilder(builder: (context, constraints) => Column(children: [
+        if (constraints.maxWidth < 850) ...[
+          for (final run in runs) ...[
+            runItem(run, compact: true),
+            const SizedBox(height: 7),
+          ],
+        ] else ...[
         const Row(children: [
           SizedBox(width: 140, child: Text('SCHEDULED', style: TextStyle(fontSize: 10, color: slate))),
           SizedBox(width: 217, child: Text('TIME TO RUN', style: TextStyle(fontSize: 10, color: slate))),
@@ -402,6 +420,7 @@ class _SchedulerHomeState extends State<SchedulerHome> {
         SizedBox(height: math.min(4, runs.length) * 58.0,
           child: Scrollbar(child: ListView.builder(itemCount: runs.length, itemExtent: 58,
             itemBuilder: (context, index) => runItem(runs[index])))),
+        ],
         const Divider(),
         Align(alignment: Alignment.centerLeft, child: OutlinedButton.icon(
           onPressed: selectedRun == null || state.busy ? null : () async {
@@ -418,7 +437,7 @@ class _SchedulerHomeState extends State<SchedulerHome> {
             } catch (e) { toast('Cancellation failed: $e'); }
           },
           icon: const Icon(Icons.close, size: 17), label: const Text('Cancel selected'))),
-      ]));
+      ])));
   }
 
   Future<void> historyDialog() async {
@@ -562,21 +581,39 @@ class _SchedulerHomeState extends State<SchedulerHome> {
       constraints: const BoxConstraints(maxWidth: 1110),
       child: SingleChildScrollView(padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Icon(Icons.window, color: accent, size: 28),
-            const SizedBox(width: 10),
-            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('CODEX RESUME SCHEDULER',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 21, color: ink)),
-              Text('Flutter review · Windows bridge to tested v1.16 worker',
-                style: TextStyle(fontSize: 11, color: slate)),
-            ])),
-            OutlinedButton(onPressed: appearanceDialog, child: const Text('Appearance...')),
-            const SizedBox(width: 10),
-            Text(state.compact ? 'Compact ON' : 'Compact OFF',
-              style: const TextStyle(color: slate, fontSize: 12)),
-            Switch(value: state.compact, onChanged: (value) => state.edit(compactMode: value)),
-          ]),
+          LayoutBuilder(builder: (context, constraints) {
+            final heading = Row(children: [
+              const Icon(Icons.window, color: accent, size: 28),
+              const SizedBox(width: 10),
+              const Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('CODEX RESUME SCHEDULER',
+                  style: TextStyle(fontWeight: FontWeight.w900,
+                    fontSize: 21, color: ink)),
+                Text('Flutter review · Windows bridge to tested v1.16 worker',
+                  style: TextStyle(fontSize: 11, color: slate)),
+              ])),
+            ]);
+            final controls = [
+              OutlinedButton(onPressed: appearanceDialog,
+                child: const Text('Appearance...')),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(state.compact ? 'Compact ON' : 'Compact OFF',
+                  style: const TextStyle(color: slate, fontSize: 12)),
+                Switch(value: state.compact,
+                  onChanged: (v) => state.edit(compactMode: v)),
+              ]),
+            ];
+            return constraints.maxWidth < 700
+              ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  heading, const SizedBox(height: 8),
+                  Wrap(spacing: 12, runSpacing: 6, children: controls),
+                ])
+              : Row(children: [
+                  Expanded(child: heading), const SizedBox(width: 12),
+                  ...controls,
+                ]);
+          }),
           const SizedBox(height: 16),
           if (state.error != null)
             Container(margin: const EdgeInsets.only(bottom: 12),
