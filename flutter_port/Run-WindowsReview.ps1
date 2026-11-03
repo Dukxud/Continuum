@@ -20,6 +20,8 @@ try{
     if($LASTEXITCODE -ne 0){throw 'Flutter Windows runner generation failed.'}
     & $flutter.Source pub get
     if($LASTEXITCODE -ne 0){throw 'Flutter dependencies failed.'}
+    & $flutter.Source analyze --no-fatal-infos --no-fatal-warnings
+    if($LASTEXITCODE -ne 0){throw 'Dart analyzer found errors; preview was not launched.'}
     & $flutter.Source test
     if($LASTEXITCODE -ne 0){throw 'Flutter test failed; preview was not started.'}
     if($TestsOnly){Write-Host 'Flutter tests passed; review launch skipped.' -ForegroundColor Green;return}
