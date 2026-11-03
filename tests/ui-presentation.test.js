@@ -177,4 +177,5 @@ test('secondary actions use a restrained blue palette with no violet and clear d
  assert.match(theme,/\$Button\.Add_EnabledChanged\(\$updateState\)/);
  assert.match(theme,/\$disabledFill=\[System\.Drawing\.ColorTranslator\]::FromHtml\('#DDE4EE'\)/);
  assert.match(theme,/Primary:\(\$key -eq 'Schedule'\)/);
+ assert.match(theme,/MouseOverBackColor=\[System\.Windows\.Forms\.ControlPaint\]::Dark\(\$color,\[float\]\.10\)/);
 });

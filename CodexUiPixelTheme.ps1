@@ -79,8 +79,8 @@ function Set-PixelAction {
     $Button.UseVisualStyleBackColor=$false
     $Button.FlatStyle=[System.Windows.Forms.FlatStyle]::Flat
     $Button.FlatAppearance.BorderSize=1
-    $Button.FlatAppearance.MouseOverBackColor=[System.Windows.Forms.ControlPaint]::Light($color)
-    $Button.FlatAppearance.MouseDownBackColor=[System.Windows.Forms.ControlPaint]::Dark($color)
+    $Button.FlatAppearance.MouseOverBackColor=[System.Windows.Forms.ControlPaint]::Dark($color,[float].10)
+    $Button.FlatAppearance.MouseDownBackColor=[System.Windows.Forms.ControlPaint]::Dark($color,[float].24)
     $Button.Cursor=[System.Windows.Forms.Cursors]::Hand
 
     # Keep unavailable shortcuts visibly inactive, then restore the intended
