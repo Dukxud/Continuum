@@ -84,7 +84,7 @@ test('production preserves captured Windows v1.8 bar pixels and compositor',()=>
   const fragment=script(production,'hybridfrag');
   assert.match(fragment,/colorSurface\(norm,vec3\(world,zz\+\.35\),2\.\*zz,world,front,1\.-fullTip\)/);
   for(const term of ['collar','capGlow','pFront']){
-    assert.match(fragment,new RegExp('float '+term+'=capPresence\\\\*G\\\\('),term+' must be gated by the cap shape');
+    assert.ok(fragment.includes('float '+term+'=capPresence*G('),term+' must be gated by the cap shape');
   }
   assert.match(production,/if\(value===1\)\{visual=1;velocity=0;lastNative=-1;\}/);
   assert.match(production,/function softenOutline\(canvas\)/);
