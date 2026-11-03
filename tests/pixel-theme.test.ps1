@@ -23,8 +23,18 @@ try {
     $card.Bounds=[System.Drawing.Rectangle]::new(12,90,430,85)
     $form.Controls.Add($card)
     Set-PixelSurfaceStyle -Panel $card -Fill '#E7F8F2' -Accent '#219A74'
+    $script:pixelTestClicks=0
+    $button.Add_Click({$script:pixelTestClicks++})
     $form.Show()
     [System.Windows.Forms.Application]::DoEvents()
+    $button.PerformClick()
+    Require ($script:pixelTestClicks -eq 0) 'Disabled button incorrectly invoked its action.'
+    $button.Enabled=$true
+    $button.PerformClick()
+    Require ($script:pixelTestClicks -eq 1) 'Themed button failed to invoke its original click action.'
+    $button.Enabled=$false
+    $button.PerformClick()
+    Require ($script:pixelTestClicks -eq 1) 'Re-disabled button invoked an extra action.'
     foreach($control in @($panel,$card)){
         $bitmap=[System.Drawing.Bitmap]::new($control.Width,$control.Height)
         try {
