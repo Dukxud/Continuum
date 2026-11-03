@@ -1,14 +1,26 @@
-# Manual verification only. A merge or PR update must not start automated CI.
+# Explicit manual verification only: no push/PR/schedule trigger, no retries.
+# Record at most 2 manually selected CI attempts per candidate; then investigate.
 # Production releases are deliberately disabled until separately authorized
 # after trusted signing and target-Windows acceptance.
-name: Tests (manual only)
+name: Tests (manual, bounded)
 on:
   workflow_dispatch:
+    inputs:
+      validation_attempt:
+        description: "Manual validation attempt (maximum two per candidate)"
+        type: choice
+        required: true
+        default: '1'
+        options: ['1', '2']
 permissions:
   contents: read
+concurrency:
+  group: scheduler-manual-validation-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   validate:
     runs-on: windows-latest
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -16,68 +28,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: PowerShell 7 syntax
+      - name: Complete single-pass acceptance (PowerShell, JavaScript, WinForms, WebView2)
         shell: pwsh
-        run: |
-          foreach ($source in Get-ChildItem -Path . -Recurse -Include '*.ps1','*.psm1','*.psd1' -File) {
-            $tokens = $null
-            $errors = $null
-            $ast = [System.Management.Automation.Language.Parser]::ParseFile($source.FullName, [ref]$tokens, [ref]$errors)
-            if ($errors.Count) { $errors | Out-String | Write-Error; exit 1 }
-            # The PowerShell $Host automatic variable is read-only. Assigning it
-            # broke a real recovery path; reject the bug statically everywhere.
-            $reserved = @($ast.FindAll({
-              param($node)
-              $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
-              $node.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
-              $node.Left.VariablePath.UserPath -ieq 'host'
-            }, $true))
-            if ($reserved.Count) { throw "Reserved Host assignment in $($source.FullName)" }
-          }
-      - name: Prepare signed Microsoft WebView2 SDK
-        shell: pwsh
-        run: ./scripts/Prepare-AeroWebView2.ps1
-      - name: Standalone AeroProgress API and signed-release gate
-        shell: pwsh
-        run: pwsh -NoProfile -STA -File ./tests/aero-component-contract.test.ps1
-      - name: Verify both release ZIP inventories
-        shell: pwsh
-        run: pwsh -NoProfile -File ./tests/release-bundle-integrity.test.ps1
-      - name: Codex usage tests
-        run: node --test tests/*.test.js
-      - name: Appearance dialog and saved preferences
-        shell: pwsh
-        run: pwsh -NoProfile -STA -File ./tests/aero-appearance-dialog.test.ps1
-      - name: Independent reusable component tests
-        shell: pwsh
-        run: pwsh -NoProfile -File ./tests/reusable-components.test.ps1
-      - name: Independently exercise Windows Task Scheduler adapter
-        shell: pwsh
-        run: pwsh -NoProfile -File ./tests/independent-onetime-task.test.ps1
-      - name: Inspect persisted run history and job-file pollution
-        shell: pwsh
-        run: pwsh -NoProfile -File ./tests/codex-job-history.test.ps1
-      - name: Live packaged AeroProgress in an unrelated application
-        shell: pwsh
-        run: pwsh -NoProfile -STA -File ./tests/standalone-aero-consumer.test.ps1
-      - name: Real WinForms persisted job-history dialog
-        shell: pwsh
-        run: pwsh -NoProfile -STA -File ./tests/history-dialog.test.ps1
-      - name: Prove standalone components in a separate application
-        shell: pwsh
-        run: pwsh -NoProfile -STA -File ./tests/second-application-reuse.test.ps1
-      - name: Real worker failure exit-code propagation
-        shell: pwsh
-        run: pwsh -NoProfile -File ./tests/worker-exit-status.test.ps1
-      - name: Full scheduled worker with isolated Codex mock
-        shell: pwsh
-        run: pwsh -NoProfile -File ./tests/codex-worker-integration.test.ps1
-      - name: Actual Aero v3 Windows rendering
-        shell: pwsh
-        run: pwsh -NoProfile -STA -File ./tests/aero-webview-rendering.test.ps1
-      - name: WebView2 crash recovery to WPF
-        shell: pwsh
-        run: pwsh -NoProfile -STA -File ./tests/aero-runtime-fallback.test.ps1
+        run: pwsh -NoProfile -STA -File ./scripts/Invoke-LocalAcceptance.ps1 -ExpectedCommit $env:GITHUB_SHA
       - name: Upload Aero Windows rendering evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -85,48 +38,6 @@ jobs:
           name: aero-webview-windows-screenshots
           path: AeroScreenshots/*.png
           if-no-files-found: ignore
-      - name: Repository ambiguity checks
-        shell: pwsh
-        run: ./tests/repository-detection.test.ps1
-      - name: Scheduled retry behavior
-        shell: pwsh
-        run: ./tests/scheduler-retry.test.ps1
-      - name: Isolated model catalog controller and stale-authority checks
-        shell: pwsh
-        run: pwsh -NoProfile -STA -File ./tests/model-catalog-controller.test.ps1
-      - name: Model and access persistence checks
-        shell: pwsh
-        run: ./tests/model-and-session.test.ps1
-      - name: Background refresh wiring
-        shell: pwsh
-        run: ./tests/background-refresh.test.ps1
-      - name: UI draft persistence
-        shell: pwsh
-        run: ./tests/settings-persistence.test.ps1
-      - name: Dashboard countdown calculations
-        shell: pwsh
-        run: ./tests/dashboard-countdown.test.ps1
-      - name: WPF moving shine animation
-        shell: pwsh
-        run: pwsh -NoProfile -STA -File ./tests/wpf-flow-animation.test.ps1
-      - name: Production WPF usage values
-        shell: pwsh
-        run: pwsh -NoProfile -STA -File ./tests/usage-progress-values.test.ps1
-      - name: Dashboard bar rendering
-        shell: pwsh
-        run: pwsh -NoProfile -STA -File ./tests/dashboard-visuals.test.ps1
-      - name: Dashboard window layout
-        shell: pwsh
-        run: pwsh -NoProfile -STA -File ./tests/dashboard-layout.test.ps1
-      - name: Hidden script host launcher behavior
-        shell: pwsh
-        run: ./tests/script-host-launcher.test.ps1
-      - name: Complete GUI startup smoke test
-        shell: pwsh
-        run: ./tests/full-gui-startup.test.ps1
-      - name: Shipped launcher GUI visibility
-        shell: pwsh
-        run: ./tests/real-vbs-gui-visibility.test.ps1
       - name: Assemble versioned review ZIP
         if: github.ref != 'refs/heads/main'
         shell: pwsh

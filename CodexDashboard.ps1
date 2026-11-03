@@ -128,7 +128,7 @@ function Initialize-Dashboard {
     $script:ui.Dashboard.compactToggle.Add_CheckedChanged({
         Update-DashboardLayout
         Queue-FormStateSave
-        if ((Get-DashboardUsageModel) -ne [string]$script:ui.Usage.usageRequestedModel) { Request-UsageRefresh }
+        if ((Get-DashboardUsageModel) -ne [string]$script:ui.Usage.usageRequestedModel) { Request-SystemRefresh -Scope ModelChanged }
     })
 }
 

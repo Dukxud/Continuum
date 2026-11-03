@@ -6,7 +6,7 @@ function New-CodexUiState {
     $state=[pscustomobject]@{
         Selection = @{
             loadingSessions=$false
-            models=@(); modelCatalogLoaded=$false
+            models=@()
             preferredEffort=''; preferredModelId=''; preferredSessionId=''
             preferredSessionModel=''; repoSelectionSessionId=''
             selectionGeneration=0; selectionJobGeneration=0; selectionOriginalModel=''
@@ -16,7 +16,7 @@ function New-CodexUiState {
         Usage = @{
             usageSnapshot=$null; usageRequestedModel=''; usageSnapshotRequestedModel=''
             usageReadFailed=$false; usageProcess=$null; usageStarted=[datetime]::MinValue
-            usageRefreshQueued=$false; usageChecked=[datetime]::MinValue
+            usageRefreshQueued=$false
         }
         Preferences = @{
             uiSettings=$null; savedDraft=$null; settingsReady=$false

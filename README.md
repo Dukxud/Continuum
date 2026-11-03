@@ -29,12 +29,12 @@ The modular GUI dispatches saved-conversation discovery, repository lookup, and 
 
 **Concurrent sessions:** the previous process-based open-session detector was removed because it could not reliably identify an independently opened interactive Codex conversation. Before scheduling a continuation, close any other Codex window that might be using that conversation.
 
-## Customize progress bars (v1.12.2)
+## Customize progress bars
 
-Click **Appearance...** in the scheduler (standard or compact). The dialog now contains **two actual animated bars** (usage at 68%, countdown at 75%). Every change is previewed immediately in the dialog and the open application. **Cancel restores all previous settings** without writing them. **Save and close** makes the choices persistent.
+Click **Appearance...** in standard or compact mode. The dialog contains **four live animated bar previews** (5-hour, weekly, countdown, and indeterminate working). Changes preview immediately in the dialog and open application. **Cancel restores all previous settings** without writing them. **Save and close** makes the choices persistent.
 
 The dialog controls:
-- **Usage-bar color** and **countdown color** independently: Windows green, Aero sapphire, cyan, violet, amber, ruby red. Each dropdown has real color swatches. Click **Choose...** to open the native Windows color picker for any RGB color; your chosen hexadecimal colors survive restart.
+- **5-hour, weekly, countdown, and working colors** independently: Windows green, Aero sapphire, cyan, violet, amber, ruby red. Each dropdown has real color swatches. Click **Choose...** to open the native Windows color picker for any RGB color; your chosen hexadecimal colors survive restart.
 - **Liquid material:** optical glass, mirror enamel, iridescent pearl.
 - **Reflections:** product studio, Aero daylight, neon showroom.
 - **Shimmer intensity:** 0–200%; **shimmer speed:** 25–300%.
@@ -160,7 +160,7 @@ The standalone component kit is exercised by a **second unrelated Windows applic
 
 ### Current development validation status
 
-The v1.16 source-level pass corrected Browse queue ownership, native WPF appearance updates, generic progress state ownership, implicit data-reader paths, and post-registration status reporting. The PR remains a draft. No CI was run for those corrections. See docs/ADVERSARIAL-SOURCE-REVIEW.md for evidence and remaining target-device acceptance.
+PR #16 remains a draft. The current candidate consolidates refresh, enforces a single scheduling-eligibility rule, and retains one-shot execution. Acceptance on the exact reviewed commit is required; historical findings remain in docs/ADVERSARIAL-SOURCE-REVIEW.md.
 
 ## Consolidated merge status
 

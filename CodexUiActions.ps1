@@ -161,6 +161,13 @@ $schedule.Add_Click({
         $effort = [string]$effortBox.SelectedItem
         if ($effort -notmatch '^[a-zA-Z][a-zA-Z0-9_-]{0,40}$') { throw 'Select a valid reasoning effort.' }
         Assert-ModelEffortSupported $script:ui.Selection.models $model $effort
+        # Recheck the sole eligibility policy at the task-registration
+        # boundary; a stale usage response must not be authorized by a
+        # previously enabled button.
+        Update-SchedulingEligibility
+        if (-not $schedule.Enabled) {
+            throw 'Current usage and verified workspace identity are required for the selected model. Automatic refresh will retry.'
+        }
         $accountId = [string]$script:ui.Usage.usageSnapshot.accountId
         if (-not (Test-CanonicalWorkspaceIdentity $accountId)) {
             throw 'Selected workspace identity is unverified. Automatic usage refresh will retry; schedule when usage is available.'

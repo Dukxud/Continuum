@@ -1,4 +1,4 @@
-# Adversarial source review — v1.16 development branch
+# Historical adversarial source review — v1.16 development branch
 
 ## Scope and verification
 

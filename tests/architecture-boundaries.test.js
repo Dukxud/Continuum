@@ -118,6 +118,37 @@ test('model catalog and async jobs have single state-owning controllers',()=>{
  assert.match(asyncDispatcher,/\$script:ui\.Async\.dataJobs/);
 });
 
+test('one scheduling-eligibility owner enforces fresh model and workspace authority',()=>{
+ const selection=read('CodexUiSelection.ps1');
+ const usage=read('CodexUiUsage.ps1');
+ const dashboard=read('CodexDashboard.ps1');
+ const actions=read('CodexUiActions.ps1');
+ assert.match(selection,/function Update-SchedulingEligibility/);
+ assert.match(selection,/usageReadFailed/);
+ assert.match(selection,/usageSnapshotRequestedModel/);
+ assert.match(selection,/Test-CanonicalWorkspaceIdentity/);
+ assert.match(usage,/Update-SchedulingEligibility/);
+ assert.match(usage,/\$script:ui\.Usage\.usageSnapshot = \$null/);
+ assert.doesNotMatch(usage,/\$schedule\.Enabled\s*=/);
+ assert.doesNotMatch(actions,/\$schedule\.Enabled\s*=/);
+ assert.match(actions,/Update-SchedulingEligibility\s*\n\s*if \(-not \$schedule\.Enabled\)/);
+ assert.match(dashboard,/Request-SystemRefresh -Scope ModelChanged/);
+ assert.doesNotMatch(dashboard,/Request-UsageRefresh/);
+});
+
+test('manual CI uses the complete local acceptance inventory without retries',()=>{
+ const workflow=read('.github/workflows/test.yml');
+ const harness=read('scripts/Invoke-LocalAcceptance.ps1');
+ assert.match(workflow,/workflow_dispatch:/);
+ assert.doesNotMatch(workflow,/^\s+(?:push|pull_request|schedule):/m);
+ assert.match(workflow,/validation_attempt:/);
+ assert.match(workflow,/timeout-minutes: 35/);
+ assert.match(workflow,/Invoke-LocalAcceptance\.ps1 -ExpectedCommit \$env:GITHUB_SHA/);
+ assert.doesNotMatch(workflow,/tests\/[\w.-]+\.test\.ps1/,'workflow must not maintain a separate partial test list');
+ assert.match(harness,/git -C \$root ls-files -- tests/);
+ assert.match(harness,/Test inventory mismatch/);
+});
+
 test('all scheduled executions must bind to a verified selected workspace',()=>{
  const ui=read('CodexUiActions.ps1'), worker=read('CodexRunEngine.ps1');
  assert.match(ui,/Test-CanonicalWorkspaceIdentity \$accountId/);

@@ -65,7 +65,6 @@ function Apply-UsageSnapshot {
     $script:ui.Usage.usageSnapshot = $Snapshot
     $script:ui.Usage.usageSnapshotRequestedModel = $script:ui.Usage.usageRequestedModel
     $script:ui.Usage.usageReadFailed = $false
-    $script:ui.Usage.usageChecked = Get-Date
     Apply-CodexModelCatalog -Snapshot $Snapshot
     $windows = @($Snapshot.windows | Where-Object { $null -ne $_ })
     Render-UsageCard $usageCards[0] $(if ($windows.Count -ge 1) { $windows[0] } else { $null }) 'Primary window'
@@ -87,12 +86,15 @@ function Apply-UsageSnapshot {
         $reset = [DateTimeOffset]::FromUnixTimeSeconds([long]$Snapshot.recommendedResetAt).LocalDateTime
         $useReset.Enabled = ($reset.AddMinutes(2) -gt (Get-Date))
     }
+    Update-SchedulingEligibility
     Update-DashboardLayout
 }
 
 function Set-UsageUnavailable {
     param([string]$Reason)
     $script:ui.Usage.usageReadFailed = $true
+    $script:ui.Usage.usageSnapshot = $null
+    $script:ui.Usage.usageSnapshotRequestedModel = ''
     foreach ($card in $usageCards) {
         $card.Remaining.Text = 'Unavailable'
         Set-AeroProgress $card.Bar $null
@@ -101,7 +103,7 @@ function Set-UsageUnavailable {
         $usageHints.SetToolTip($card.Reset,$Reason)
     }
     $useReset.Enabled = $false
-    $schedule.Enabled = $false
+    Update-SchedulingEligibility
     Update-DashboardLayout
 }
 

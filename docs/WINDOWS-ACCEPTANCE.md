@@ -1,6 +1,6 @@
 # Manual Windows acceptance gate — v1.16
 
-This checklist is for BLACK-PUDDLE, against the exact current PR #16 commit. It is NOT a CI run. No automated CI validation is being requested or claimed.
+This checklist is for the exact PR #16 commit on BLACK-PUDDLE. Local execution is not a GitHub Actions run; both use the same acceptance script.
 
 Record the exact Git commit SHA and mark each item PASS, FAIL, or NOT TESTED. Preserve specific error messages and screenshots for failures. NOT TESTED is not PASS.
 
@@ -51,6 +51,12 @@ The WPF dashboard visual test must provide pixel evidence of true fill/track con
 
 ## One complete local suite
 
-Run the repository's scripts/Invoke-LocalAcceptance.ps1 with its -ExpectedCommit parameter against the latest PR #16 head from the isolated QA checkout. It checks PowerShell syntax and reserved-variable assignments, prepares missing pinned WebView2 SDK dependencies, and runs all *.test.ps1/*.test.js files in a single invocation. It records individual logs and fails if any file fails. An initial SDK preparation requires network access to NuGet. This is local Windows acceptance, not GitHub CI.
+Run `scripts/Invoke-LocalAcceptance.ps1 -ExpectedCommit <exact commit SHA>` once in the isolated QA checkout. Manual GitHub Actions invokes this identical script, not a separately maintained test list. It verifies tracked source and exact test inventory, parses PowerShell, stages pinned WebView2 dependencies if missing, and runs each `.test.ps1`/`.test.js` once. Test failures are recorded, not automatically rerun. An initial SDK preparation requires network access to NuGet.
 
 In addition to synthetic coverage, manually inspect v1.16's running-status card and Appearance Save/Cancel. Do not replay old Horizon continuations, and do not merge the PR before both the suite and targeted operational behavior are accepted.
+
+## Bounded CI validation policy
+
+GitHub Actions is **manual dispatch only** (no push, pull-request, schedule, or self-trigger). The operator explicitly chooses validation attempt **1** or **2** for the candidate; do not dispatch more than two attempts against the same commit. Each run has a 35-minute timeout and no internal test retry. After two failures, stop and inspect recorded evidence before changing the code. Never modify tests merely to obtain green without preserving behavioral checks. Local validation is one run per exact candidate commit unless new evidence justifies another explicit run.
+
+A failed quota read must disable Schedule even if a cached model catalog is valid; selecting another model or effort cannot re-enable it until a current, model-matched quota snapshot has a verified workspace identity. Compact-mode model changes must use the central refresh coordinator.

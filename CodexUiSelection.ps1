@@ -3,6 +3,25 @@ function Get-SelectedModel {
     if ($modelBox.SelectedItem -and $modelBox.SelectedItem.Id) { return [string]$modelBox.SelectedItem.Id }
     return ''
 }
+# Single authority for enabling a new schedule. A valid catalog alone is
+# insufficient: quota/account data must be current and bound to the selected
+# model. Worker preflight independently repeats its security checks.
+function Update-SchedulingEligibility {
+    $model=Get-SelectedModel
+    $catalogEntry=@($script:ui.Selection.models | Where-Object { $_.id -ceq $model }) | Select-Object -First 1
+    $effort=[string]$effortBox.SelectedItem
+    $supported=($catalogEntry -and $effort -and
+        @($catalogEntry.efforts | Where-Object { $_ -is [string] -and $_ -ne 'ultra' }) -ccontains $effort)
+    $usage=$script:ui.Usage
+    $snapshot=$usage.usageSnapshot
+    $requested=[string]$usage.usageSnapshotRequestedModel
+    $modelMatches=($requested -ceq $model -or
+        (-not $requested -and [string]$snapshot.model -ceq $model))
+    $verified=($snapshot -and -not $usage.usageReadFailed -and $modelMatches -and
+        (Test-CanonicalWorkspaceIdentity ([string]$snapshot.accountId)))
+    $schedule.Enabled=[bool]($supported -and $verified)
+}
+
 function Select-AvailableEfforts {
     $model = Get-SelectedModel
     $entry = @($script:ui.Selection.models | Where-Object { $_.id -ceq $model }) | Select-Object -First 1
@@ -15,7 +34,7 @@ function Select-AvailableEfforts {
         elseif ($effortBox.Items.Contains([string]$entry.defaultEffort)) { $effortBox.SelectedItem = [string]$entry.defaultEffort }
         elseif ($effortBox.Items.Count -gt 0) { $effortBox.SelectedIndex = 0 }
     }
-    $schedule.Enabled = ($null -ne $entry -and $effortBox.SelectedIndex -ge 0)
+    Update-SchedulingEligibility
 }
 
 function Request-SelectionLookup {
@@ -125,7 +144,7 @@ function Apply-CodexModelCatalog {
         if ($models.Count -eq 0) {
             $modelBox.SelectedIndex = -1
             $effortBox.Items.Clear()
-            $schedule.Enabled = $false
+            Update-SchedulingEligibility
             return
         }
         $selected = @($models | Where-Object { $_.id -eq $previous }) | Select-Object -First 1

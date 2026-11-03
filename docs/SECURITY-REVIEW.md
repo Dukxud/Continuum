@@ -58,7 +58,7 @@ Run `scripts/Get-SchedulerSecurityDiagnostics.ps1` locally (read-only), and obta
 ## Added v1.16.0 review controls
 
 - One-time scheduled runners are content-addressed, copied once, and verified against saved SHA-256 metadata at execution. Existing tasks are never silently updated to another version.
-- Codex execution failures return nonzero process exit codes; Windows Script Host forwards them to Task Scheduler. Success explicitly blocks retry analysis.
+- Codex execution failures return nonzero process exit codes; Windows Script Host forwards them to Task Scheduler. New workers never register automatic retries; failures retain their real exit codes.
 - Every unattended run checks canonical selected-workspace identity at scheduling and immediately before executing, on every one-time run. Missing, contradictory, or changed identity blocks execution; no retry setting can bypass this requirement.
 - WebView2-to-WPF recovered bars now follow scrolling and resizing, and both controls are disposed together. The existing visual regression suite remains necessary.
 - Generic Task Scheduler, settings, countdown and runtime modules are independently packaged and can be imported without Codex. The package's PowerShell scripts remain unsigned in preview artifacts.

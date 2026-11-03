@@ -66,7 +66,19 @@ try {
     }
     Write-Host 'PASS — WebView2 SDK dependencies available' -ForegroundColor Green
     $tests = @(Get-ChildItem -LiteralPath (Join-Path $root 'tests') -File | Where-Object { $_.Name -match '\.test\.(ps1|js)$' } | Sort-Object Name)
-    if ($tests.Count -lt 36) { throw "Test discovery incomplete: $($tests.Count) files (expected at least 36)." }
+    # Git-tracked test inventory is authoritative in both local and manual CI.
+    # Do not silently pass after an antivirus deletion or stale workflow list.
+    $expected = @(& git -C $root ls-files -- tests | Where-Object {
+        $_ -match '^tests/[^/]+\.test\.(?:ps1|js)$'
+    } | ForEach-Object { [IO.Path]::GetFileName($_) } | Sort-Object)
+    if ($LASTEXITCODE -ne 0 -or $expected.Count -eq 0) { throw 'Could not discover the tracked test inventory.' }
+    $actual = @($tests | ForEach-Object Name)
+    $missing = @($expected | Where-Object { $actual -cnotcontains $_ })
+    $extra = @($actual | Where-Object { $expected -cnotcontains $_ })
+    if ($missing.Count -gt 0 -or $extra.Count -gt 0) {
+        throw "Test inventory mismatch. Missing: $($missing -join ', '); Unexpected: $($extra -join ', ')"
+    }
+    Write-Host "PASS — tracked test inventory: $($expected.Count) exact files" -ForegroundColor Green
     $results = [System.Collections.Generic.List[object]]::new()
     foreach ($test in $tests) {
         $log = Join-Path $logRoot ($test.Name + '.log')

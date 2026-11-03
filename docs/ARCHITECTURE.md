@@ -18,7 +18,7 @@ There are two layers:
 
 **Application-specific adapters**:
 - CodexResumeScheduler.ps1 — thin entrypoint: worker mode or GUI mode.
-- CodexRunEngine.ps1 — Codex model/catalog validation, CLI session continuation, usage-based retry, pinned runtime contract.
+- CodexRunEngine.ps1 — Codex model/catalog validation, one-shot CLI session continuation, quota preflight, and pinned runtime contract.
 - CodexData.ps1 — local session, Git, pending task and UI-settings facade.
 - CodexUsage.js — official App Server protocol reads for account identity, model catalog, and quota preflight.
 - CodexUiForms.ps1 — WinForms layout through reusable WindowShell primitives.
@@ -42,8 +42,8 @@ There are two layers:
 2. **Discovery**: CodexUiRefresh owns one refresh coordinator for sessions, Windows tasks and Codex quota. It asynchronously dispatches separate readers and coalesces duplicates; task-state checks run every two seconds while full refreshes run every minute, after focus resumes, or after scheduling. CodexUsage.js communicates through the documented App Server handshake. UI state is updated on the WinForms thread.
 3. **Scheduling**: CodexUiActions validates model, reasoning effort, Git root, branch, access and requested time. Every scheduled run requires a trustworthy selected-workspace identity. It calls RuntimeBundle to snapshot its exact worker dependencies, writes task metadata containing that fingerprint, and uses OneTimeTasks to register and re-read the task definition.
 4. **Worker launch**: Task Scheduler invokes the exact saved CodexRunJob.vbs inside the fingerprinted runtime, which launches the thin entrypoint in job mode. The worker checks the saved fingerprint **before** executing Codex and then verifies the repository, branch, model and effort.
-5. **Codex execution**: The worker launches one saved Codex session and writes a transcript plus JSONL events. It returns 0 only for a successful CLI execution or a verified deferral that registered a new retry; a CLI failure or a refused retry is nonzero.
-6. **Retry**: Only a failed CLI execution with a genuine usage-limit error can be reconsidered. Fresh App Server data must identify the applicable quota, future reset, ordinary usage permission and matching active account. Retry preserves the original parameters and runtime fingerprint. Four reschedules maximum.
+5. **Codex execution**: The worker rechecks the canonical workspace identity and quota, launches the saved session at most once, and writes a transcript plus JSONL events. Only successful CLI execution returns 0; blocked or failed runs return nonzero.
+6. **One-shot contract**: New workers never schedule retries. Previously scheduled tasks keep their own pinned runtime and may retain older retry behavior; historical deferred outcomes remain readable.
 7. **Rendering**: AeroProgress owns the WebView2 view; CodexAeroBar is the host adapter that translates quota/countdown colors and recovers a failed view with WPF. The dashboard positions the *visible surface* on every scroll, resize, refresh and countdown tick, then destroys the view and fallback together.
 
 ## Reuse contract
@@ -54,7 +54,7 @@ The copied runtime is content-addressed to prevent accidental later updates. It 
 
 ## Verification boundaries
 
-Static tests cover protocol normalization, ambiguous quotas, malformed settings, retry decisions, module contracts and manifest integrity. Windows integration tests launch the VBS entrypoint, WinForms/WPF and WebView2 controls, verify screenshots/animation and check the actual worker's exit code. They do not prove live Codex CLI execution, Task Scheduler reliability on BLACK-PUDDLE, account switching, or antivirus outcomes; those require end-to-end validation on the target device.
+Static tests cover protocol normalization, ambiguous quotas, malformed settings, single-execution behavior, module contracts and manifest integrity. Windows integration tests launch the VBS entrypoint, WinForms/WPF and WebView2 controls, verify screenshots/animation and check the actual worker's exit code. They do not prove live Codex CLI execution, Task Scheduler reliability on BLACK-PUDDLE, account switching, or antivirus outcomes; those require end-to-end validation on the target device.
 
 ## Upgrade behavior
 
@@ -64,7 +64,7 @@ New tasks use a separate fingerprinted runtime folder. Older tasks retain their 
 
 The standalone worker no longer imports CodexData or references UI globals; its Git and account checks are explicit imports. The UI has a declared state owner grouped by responsibility rather than dozens of unowned script variables. ProgressHost owns the primary/fallback lifecycle, and the dashboard allocates one bar per **visible row**, never per queued task. `account/read.workspaceRouting.chatgptAccountId` provides experimental, workspace-specific identity if a rate-limit account ID is absent. Both paths use the same canonical hash, and contradictory IDs fail closed. Email-only identity is never accepted; two workspaces sharing an email must not be conflated.
 
-A queued retry is persisted as `deferred`, not `completed`. Removing an upcoming task unregisters it and records `cancelled`, while logs are retained for audit. Existing work may still be interrupted by Windows sign-out or sleeping, and real hardware/antivirus behavior remains outside CI.
+Historical retry records remain `deferred`, not `completed`; current jobs do not create deferred follow-up tasks. Removing an upcoming task unregisters it and records `cancelled`, while logs are retained for audit. Existing work may still be interrupted by Windows sign-out or sleeping, and real hardware/antivirus behavior remains outside CI.
 
 ## v1.16 adversarial acceptance
 
@@ -80,9 +80,9 @@ The second-app test exercises all ten component imports, while separate acceptan
 
 `CodexUiState.ps1` constructs the application-only context. The context is deliberately **not** a reusable module. It carries only state needed to coordinate application-specific controllers; consumers of the ten `components/` modules never import it.
 
-- **Selection** owns selected conversations, repository alternatives, model catalog and effort control. `CodexUiSelection.ps1` is the sole model-catalog reconciler; usage only calls `Apply-CodexModelCatalog` instead of mutating selection fields directly. An empty catalog clears stale model and effort controls and blocks scheduling.
+- **Selection** owns conversations, repository alternatives, model catalog, efforts, and the single Schedule-button eligibility policy. Eligibility requires a supported model/effort plus a current, matching quota snapshot with verified workspace identity. Usage reports freshness to the selection controller; it never independently enables the button. An empty catalog or failed usage read blocks scheduling.
 - **Usage** owns the short-lived query process, quota snapshots, and refresh state, through `CodexUiUsage.ps1`.
-- **Async** owns coalesced background jobs and queued requests. `CodexUiRefresh.ps1` handles dispatch, not domain-specific result rendering.
+- **Async** owns coalesced background jobs and queued requests. `CodexUiRefresh.ps1` is the only user-facing refresh coordinator; scoped task/model changes delegate to asynchronous readers without duplicate timers or direct UI calls.
 - **Dashboard** owns visual controls, the pending run snapshot and its keyed index. `CodexUiPending.ps1` publishes the index and `CodexDashboard.ps1` renders only visible progress bars.
 - **Preferences** owns saved drafts and appearance configuration; event actions and lifecycle compose these controllers, rather than becoming reusable infrastructure.
 
@@ -94,7 +94,7 @@ One-time task creation normalizes explicitly UTC timestamps to local Windows tri
 
 Browse invalidation now targets the Async controller's work queue. The native WPF fallback path registers owned bars and supports in-place palette changes through a named template fill, while the reusable FlowingProgress module stores values without modifying caller Tag data. CodexData now receives the application directory explicitly, and scheduling acknowledges validated registration independently of later preference or refresh errors.
 
-No CI or Windows execution was used for this latest pass. Runtime validation of the changes remains necessary before merging. See ADVERSARIAL-SOURCE-REVIEW.md.
+Historical source-only reviews are archived in ADVERSARIAL-SOURCE-REVIEW.md. Current acceptance is tracked separately: both manual GitHub Actions and BLACK-PUDDLE execute the same complete test inventory through `scripts/Invoke-LocalAcceptance.ps1`.
 
 ## Adopter-interface hardening and release boundary
 
