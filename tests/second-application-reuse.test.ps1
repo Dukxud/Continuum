@@ -42,6 +42,8 @@ try {
     $form=New-DesktopWindow -Title 'Completely Unrelated Application' -Width 440 -Height 180
     try {
         $title=Add-DesktopLabel -Parent $form -Text 'Unrelated' -X 8 -Y 8 -Width 200
+        $dynamicAlert=Add-DesktopLabel -Parent $form -Text '' -X 8 -Y 112 -Width 200
+        Require ($dynamicAlert.Parent -eq $form -and $dynamicAlert.Text -ceq '') 'Reusable label factory must accept an initially empty warning label.'
         $button=Add-DesktopButton -Parent $form -Text 'Example' -X 8 -Y 36
         Require ($title.Parent -eq $form -and $button.Parent -eq $form) 'Desktop window shell has hidden application dependencies.'
         $gloss=New-FlowingProgressView -Parent $form -X 270 -Y 40 -Width 130 -Height 17 -Colors @{BaseTop='#ED9CFF';BaseBottom='#552099';Track='#ECE8FF';Outline='#CCC2DE'} -AccessibleName 'Unrelated application progress'

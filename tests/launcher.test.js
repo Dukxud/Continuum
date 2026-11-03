@@ -25,11 +25,11 @@ test('launchers rely only on the Windows provided script host', () => {
   assert.equal(fs.existsSync(path.join(root, 'CodexLauncher.cs')), false);
 });
 
-test('scheduled jobs and retries use the installed Windows Script Host wrapper', () => {
+test('single-run registration uses the installed Windows Script Host wrapper', () => {
   const engine = fs.readFileSync(path.join(root, 'CodexRunEngine.ps1'), 'utf8');
   const actions = fs.readFileSync(path.join(root, 'CodexUiActions.ps1'), 'utf8');
   assert.match(engine, /CodexRunJob\.vbs/);
-  assert.match(engine, /Register-OneTimeTask/);
+  assert.doesNotMatch(engine, /Register-OneTimeTask|Schedule-LimitRetry/);
   assert.match(actions, /Register-OneTimeTask/);
   assert.match(engine, /Start-Transcript/);
   assert.doesNotMatch(engine + actions, /CodexScheduler\.exe|-NoExit/);

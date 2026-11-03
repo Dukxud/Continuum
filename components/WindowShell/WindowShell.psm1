@@ -26,7 +26,7 @@ function New-DesktopWindow {
 function Add-DesktopLabel {
     [CmdletBinding()]
     param([Parameter(Mandatory)][System.Windows.Forms.Control]$Parent,
-          [Parameter(Mandatory)][string]$Text,
+          [Parameter(Mandatory)][AllowEmptyString()][string]$Text,
           [int]$X,[int]$Y,[int]$Width=130,[int]$Height=25)
     $label=[System.Windows.Forms.Label]::new()
     $label.Text=$Text

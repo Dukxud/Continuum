@@ -89,18 +89,6 @@ function summarizeRateLimits(result, now = Math.floor(Date.now()/1000), model = 
     canAttempt, blockedReason: !isBlocked && ordinaryUsageAllowed !== true ? 'Backend usage permission unavailable.' :
       isBlocked && recommendedResetAt === null ? 'Usage restricted; no reliable applicable reset time.' : null };
 }
-function isLimitErrorLine(line) {
-  let s = line;
-  try {
-    const event = JSON.parse(line);
-    if (event.type === 'error' || event.type === 'turn.failed') s = event.message || event.error?.message || '';
-    else return false; // Never mistake a user message or model output for an error.
-  } catch {
-    if (!/^\s*(?:ERROR\b|Error:|■\s*You.ve hit your usage limit)/i.test(line)) return false;
-  }
-  return /(?:usage limit|rate.limit|quota exceeded|too many requests)/i.test(s) &&
-    !/(?:invalid model|unsupported effort)/i.test(s);
-}
 function readCodexState(cliJs, { model = null, timeoutMs = 18000, catalog = true, modelsOnly = false, threadId = null } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [cliJs, 'app-server', '--listen', 'stdio://'], { stdio:['pipe','pipe','pipe'], windowsHide:true });
@@ -188,4 +176,4 @@ async function main() {
   process.stdout.write(JSON.stringify(state)+'\n');
 }
 if(require.main===module) main().catch(e=>{process.stdout.write(JSON.stringify({ok:false,error:e.message})+'\n');process.exitCode=1;});
-module.exports={describeWindow,normalizeModels,selectBucket,summarizeRateLimits,isLimitErrorLine,readCodexState,readRateLimits,normalizeThreadRead,readThreadDirectory,identifyAccount};
+module.exports={describeWindow,normalizeModels,selectBucket,summarizeRateLimits,readCodexState,readRateLimits,normalizeThreadRead,readThreadDirectory,identifyAccount};

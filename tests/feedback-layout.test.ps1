@@ -4,6 +4,7 @@ $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 Add-Type -AssemblyName System.Windows.Forms
 $root=Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $root 'components/WindowShell/WindowShell.psm1') -Force -ErrorAction Stop
 . (Join-Path $root 'CodexUiState.ps1')
 function Require($ok,[string]$message){if(-not $ok){throw $message}}
 $forms=Get-Content -LiteralPath (Join-Path $root 'CodexUiForms.ps1') -Raw
@@ -24,10 +25,9 @@ foreach($fn in @('Update-Status','Clear-SchedulerAlert')){
 }
 $script:ui=New-CodexUiState
 $form=[System.Windows.Forms.Form]::new()
-$status=[System.Windows.Forms.Label]::new()
-$status.Text=''
+$status=Add-DesktopLabel -Parent $form -Text '' -X 8 -Y 8 -Width 300
 $status.Visible=$false
-$form.Controls.Add($status)
+Require ($status.Text -ceq '') 'Actual warning label creation rejected empty text.'
 try {
     $form.Show()
     Update-Status 'Conversations updated'

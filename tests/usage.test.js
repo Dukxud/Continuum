@@ -1,7 +1,6 @@
 'use strict';
 const test=require('node:test');const assert=require('node:assert/strict');const path=require('node:path');
-const {summarizeRateLimits,describeWindow,normalizeModels,readCodexState,isLimitErrorLine,identifyAccount}=require('../CodexUsage.js');
-const {decide,failureSeen}=require('../CodexRetry.js');
+const {summarizeRateLimits,describeWindow,normalizeModels,readCodexState,identifyAccount}=require('../CodexUsage.js');
 const now=1793000000;const win=(used,delta,duration=300)=>({usedPercent:used,resetsAt:now+delta,windowDurationMins:duration});
 const bucket=(used,delta,model,duration=300)=>({normalModelSlug:model,primary:win(used,delta,duration)});
 test('multiple active 5-hour and weekly windows use last blocking reset',()=>{
@@ -35,20 +34,6 @@ test('app-server discovery and rate limits work using same handshake',async()=>{
  assert.equal(v.models.length,2);assert.equal(v.models[0].id,'gpt-6-astra');
  assert.equal(v.recommendationKind,'exhausted-window');
 });
-test('only actual structured limit errors trigger retry analysis',()=>{
- assert.equal(isLimitErrorLine(JSON.stringify({type:'user',message:'usage limit'})),false);
- assert.equal(isLimitErrorLine(JSON.stringify({type:'turn.failed',error:{message:'Usage limit exceeded'}})),true);
- assert.equal(failureSeen('ERROR: You have hit your usage limit'),true);
- assert.equal(failureSeen('ERROR: unsupported model'),false);
-});
-test('retries only with actual error and verified future reset',()=>{
- const snapshot=summarizeRateLimits({ordinaryUsageAllowed:false,rateLimits:{primary:win(100,600)}},now,'any');
- const error='{"type":"turn.failed","error":{"message":"Usage limit exceeded"}}';
- assert.equal(decide(error,snapshot,now).runAt,now+720);
- assert.equal(decide(error,snapshot,now,0).kind,'not-limit'); // even a stale error event cannot retry a successful command
- assert.equal(decide('complete',snapshot,now).kind,'not-limit');
- assert.equal(decide(error,{...snapshot,selectionVerified:false},now).kind,'unknown');
-});
 test('quota percentages are remaining and bounded',()=>{
  assert.equal(describeWindow({usedPercent:75},'Primary').remainingPercent,25);
  assert.equal(describeWindow({usedPercent:111},'Primary').remainingPercent,0);
@@ -65,12 +50,6 @@ test('unknown backend payload fails safely and never synthesizes a reset',()=>{
 test('workspace-credit and spend-control blockers are not treated as timed usage resets',()=>{
  const v=summarizeRateLimits({ordinaryUsageAllowed:false,rateLimits:{primary:win(100,600),rateLimitReachedType:'workspace_member_usage_limit_reached'}},now,'model');
  assert.equal(v.recommendedResetAt,null);
-});
-
-test('retry assessment includes the freshly verified account identity',()=>{
- const snapshot=summarizeRateLimits({accountId:'account-abc',ordinaryUsageAllowed:false,rateLimits:{primary:win(100,600)}},now,'model');
- const error='{"type":"turn.failed","error":{"message":"Usage limit exceeded"}}';
- assert.equal(decide(error,snapshot,now,17).accountId,'account-abc');
 });
 
 test('workspace account ID is canonical across rate limits and routing sources',()=>{
