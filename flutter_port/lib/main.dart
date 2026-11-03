@@ -321,7 +321,7 @@ class _SchedulerHomeState extends State<SchedulerHome> {
     }
   }
 
-  Widget quotaCard(Map<String, dynamic>? window, String fallback) {
+  Widget quotaCard(Map<String, dynamic>? window, String fallback, String kind) {
     final state = controller!;
     final raw = field(window, 'remainingPercent');
     final remaining = raw is num ? raw.toDouble() : null;
@@ -344,7 +344,7 @@ class _SchedulerHomeState extends State<SchedulerHome> {
             style: const TextStyle(fontWeight: FontWeight.w700, color: ink))),
         ]),
         const SizedBox(height: 12),
-        AeroLiquidBar(amount: remaining, tint: Color(state.appearance['quota']!)),
+        AeroLiquidBar(amount: remaining, appearance: state.appearance, kind: kind),
         const SizedBox(height: 10),
         Text(reset == null ? 'Reset time unavailable' : 'Resets ' + timeLabel(reset),
           style: const TextStyle(color: slate, fontSize: 12)),
@@ -353,8 +353,8 @@ class _SchedulerHomeState extends State<SchedulerHome> {
 
   Widget quotas() {
     final windows = recordList(field(controller!.quota, 'windows'));
-    final first = quotaCard(windows.isNotEmpty ? windows[0] : null, 'Primary window');
-    final second = quotaCard(windows.length > 1 ? windows[1] : null, 'Secondary window');
+    final first = quotaCard(windows.isNotEmpty ? windows[0] : null, 'Primary window', 'quota');
+    final second = quotaCard(windows.length > 1 ? windows[1] : null, 'Secondary window', 'weekly');
     return LayoutBuilder(builder: (context, constraints) => constraints.maxWidth < 590
       ? Column(children: [first, const SizedBox(height: 10), second])
       : Row(children: [
@@ -380,7 +380,7 @@ class _SchedulerHomeState extends State<SchedulerHome> {
         style: const TextStyle(color: ink, fontSize: 12, fontWeight: FontWeight.w700))),
       const SizedBox(width: 5),
       Expanded(child: AeroLiquidBar(amount: pct, working: working,
-        tint: Color(controller!.appearance[working ? 'working' : 'time']!))),
+        kind: working ? 'working' : 'time', appearance: controller!.appearance)),
     ]);
   }
 
@@ -667,7 +667,9 @@ class _SchedulerHomeState extends State<SchedulerHome> {
           if (!state.compact) editing(),
           if (state.compact && state.upcoming.isNotEmpty)
             section('NEXT RUN', runItem(state.upcoming.first, compact: true)),
-          section('USAGE REMAINING', quotas()),
+          section(state.compact && state.quotaModel.isNotEmpty
+            ? 'USAGE REMAINING · ' + state.quotaModel
+            : 'USAGE REMAINING', quotas()),
           if (!state.compact && state.upcoming.isNotEmpty) runsGrid(),
           Wrap(spacing: 10, children: [
             OutlinedButton.icon(onPressed: openLogs,
