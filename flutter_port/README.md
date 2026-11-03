@@ -1,27 +1,44 @@
-# Scheduler Flutter Windows review (unmerged)
+# Flutter Windows Scheduler port — parity candidate
 
-This is a **real Flutter desktop client** for the existing Windows Scheduler, not an image or simulated scheduler. It reads local Codex sessions, repository evidence, live model/usage catalog, Windows Task Scheduler jobs, and saved run evidence. Scheduling and cancellation call the existing verified PowerShell 7 modules. A newly created one-time task still pins and fingerprints the **v1.16 worker**, rechecks selected-workspace identity, and never automatically retries.
+The Flutter interface now uses the **original approved Windows/Aero v1.16 source
+pixels and GL optical program** (adapted to Flutter FragmentProgram coordinates
+and premultiplied alpha), with an original-pixel fallback. It preserves the
+v1.16 barAppearance settings, four independent colors, custom RGB choices,
+liquid material and studio lighting, optical strength/speed, full/compact
+window resizing, completed/history details and the existing secured worker.
 
-## Windows review
+**Do not merge or publish from this branch.** Code and test coverage have been
+authored, but compiling the revised shader and validating all behavior on
+BLACK-PUDDLE are still required. See docs/FLUTTER-PARITY.md.
 
-1. Install the **stable Flutter SDK** and Visual Studio with **Desktop development with C++**, following https://docs.flutter.dev/platform-integration/windows/setup and https://docs.flutter.dev/install. Run flutter doctor -v; verify Windows desktop support.
-2. Clone/checkout branch feat/flutter-windows-review-v0 and run from repo root: pwsh -NoProfile -File .\flutter_port\Run-WindowsReview.ps1
-3. Tests run first; on success Flutter builds and opens the Windows desktop client.
+## Run (Windows review)
 
-The Flutter toolchain generates the native Windows runner on first launch. No prebuilt binary, installer, code-signing certificate, GitHub Actions job, or production release is included. Existing v1.16 Windows UI remains available.
+1. Install Flutter stable (3.47+), Visual Studio C++ desktop toolchain,
+   PowerShell 7, Node, Git and npm Codex CLI.
+2. Clone/fast-forward branch feat/flutter-windows-review-v0.
+3. Run from the checkout:
 
-**Review caution:** Do not concurrently edit settings in the WinForms and Flutter applications. Both currently use the existing %LOCALAPPDATA%\CodexResumeScheduler settings and job history. Use a disposable saved Codex conversation for a real execution test.
+    pwsh -NoProfile -STA -File .\flutter_port\Run-WindowsReview.ps1
 
-## Verified architectural boundary / limitations
+The bounded command runs a PowerShell source/asset integrity check, Flutter
+dependency resolution, Dart analyzer and Flutter tests **once**, then starts
+the native Windows desktop GUI. A failed check stops launch; no CI loop.
 
-- Flutter UI and pure Dart scheduling-time math are platform-neutral.
-- The **only implemented backend adapter is Windows**: flutter_port/windows_bridge.ps1. macOS, Linux and browser execution will need native scheduling/worker adapters, plus platform-specific security and lifecycle acceptance.
-- The Flutter liquid tube is a native CustomPainter **approximation**, not a pixel-identical port of the WebView2/WebGL2 shader. The core scheduling behavior is kept; optical effects and the full appearance editor are not yet parity-complete. Test UI visually before accepting it as a replacement.
-- The bridge intentionally reruns fresh catalog/quota verification, canonical workspace checks, repository and branch validation, overlap checks and pinned-worker creation at task registration time.
-- This is an **experimental candidate**; no on-device Flutter build or executable acceptance has been claimed.
+## Standalone unsigned local engineering preview
 
-## Scope
+    pwsh -NoProfile -STA -File .\flutter_port\Build-WindowsPreview.ps1
 
-Implemented: session picker and repository lookup/browse, live model/effort/quota selection, one-shot task creation, cancellation, countdown, running indicators, compact mode, persistent draft, basic color appearance, saved history, copy response/log, display-only history removal, log-folder opening, automatic task polling. Existing worker semantics are unchanged.
+The script builds an unsigned release-mode Flutter executable and copies the
+**original pinned worker sources and required components** beside the executable.
+The archive is written under Downloads. It does not publish a GitHub release,
+disable antivirus or change existing scheduled jobs.
 
-Deferred: macOS/Linux/web adapters, full optics parity with the established shader, production signing, and distribution packaging. Flutter and PowerShell integration must be independently verified on BLACK-PUDDLE before merging.
+## Platform boundary
+
+Flutter UI, appearance model and optical renderer are cross-platform.
+The Windows bridge still uses Task Scheduler, Windows PowerShell paths and
+Codex's npm entrypoint. macOS/Linux/web workers are **not implemented**;
+neither a Flutter build nor Windows parity establishes those capabilities.
+
+Read and follow the acceptance matrix before treating the port as complete:
+docs/FLUTTER-PARITY.md.
