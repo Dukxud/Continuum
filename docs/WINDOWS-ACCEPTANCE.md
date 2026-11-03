@@ -31,6 +31,10 @@ Before accepting a release, run the isolated worker integration with a real mute
 
 When inspecting preexisting jobs, compare their **pinned runtime** and legacy payload retry flags with the candidate. Existing one-time tasks may run old code after a new GUI installation. Never replay a completed or failed Horizon job just to test a scheduler fix, and do not cancel old registrations without reviewing their associated session and work.
 
+## Acceptance file integrity
+
+A tracked source or test file removed during checkout or execution is a **source-integrity failure**, not a PowerShell syntax error. The local acceptance gate must report source-read exceptions distinctly and repeat the tracked-file check after parsing and after the suite. Never report passing acceptance when test files disappear. Diagnose security-tool activity without disabling protection or adding exclusions.
+
 ## Simplified one-shot scheduling and layout acceptance
 
 Verify Model, Reasoning and Access share one horizontal row without overlapping at 100% and 125% Windows scaling. The Run at row must contain the date/time picker, −, +, **Now +2**, and **Reset +2**. Default is two minutes ahead; Now +2 recalculates from current time and Reset +2 is disabled without a verified reset. Saving a new job must exclude autoResume/retryAttempt and create one Task Scheduler registration only. No automatic retries may appear on quota failure, ordinary failure, or a legacy job payload carrying the old flag. Verify preflight blocks denied quota before invoking Codex, and preserve full-access and overlap warnings. The usage cards must each contain their reset time, remaining percentage, last-updated time, and stale/error indication. Remove routine latest-result and readiness/usage footers, while preserving visible, dismissible actionable warnings. Verify Recent runs and cancellation still work.

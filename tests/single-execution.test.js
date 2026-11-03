@@ -38,3 +38,12 @@ test('new jobs omit retry fields and retain explicit behavior',()=>{
  assert.ok(!runtime.includes('CodexRetry.js'));
  assert.ok(runtime.includes('CodexUsage.js'));
 });
+test('release and worker manifests exclude retries without losing scheduling dependencies',()=>{
+ const release=read('scripts/Package-CodexScheduler.ps1');
+ assert.match(release,/'CodexScheduleTime\.ps1'/);
+ assert.match(release,/'CodexUsage\.js'/);
+ assert.doesNotMatch(release,/CodexRetry\.js/);
+ assert.match(worker,/'CodexUsage\.js'/);
+ assert.match(worker,/Set-CodexRunOutcome -JobFile \$JobFile -Status 'blocked'/);
+ assert.match(worker,/Set-CodexRunOutcome -JobFile \$JobFile -Status 'failed'/);
+});

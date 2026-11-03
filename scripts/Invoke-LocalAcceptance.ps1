@@ -19,9 +19,16 @@ try {
     $source = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $_.Extension -in @('.ps1','.psm1','.psd1') })
     $syntax = @(
         foreach ($file in $source) {
+            # ParseInput distinguishes file-access failures from syntax errors.
+            # A security product may remove a file after Git/status enumeration.
+            try { $contents = [IO.File]::ReadAllText($file.FullName) }
+            catch {
+                throw "SOURCE ACCESS FAILURE: $($file.FullName) ($($_.Exception.GetType().Name)): $($_.Exception.Message)"
+            }
             $tokens = $null
             $errors = $null
-            $ast = [System.Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$errors)
+            $ast = [System.Management.Automation.Language.Parser]::ParseInput(
+                $contents,$file.FullName,[ref]$tokens,[ref]$errors)
             foreach ($e in @($errors)) {
                 if ($e) { "$($file.FullName):$($e.Extent.StartLineNumber) $($e.Message)" }
             }
@@ -38,6 +45,12 @@ try {
         }
     )
     if ($syntax.Count -gt 0) { throw "PowerShell syntax errors:`n$($syntax -join [Environment]::NewLine)" }
+    # Catch disappearances between the initial Git check and source discovery:
+    # missing files must never make the acceptance suite appear smaller/green.
+    $postScan = @(& git -C $root status --porcelain --untracked-files=no)
+    if ($LASTEXITCODE -ne 0 -or $postScan.Count -gt 0) {
+        throw "SOURCE INTEGRITY FAILURE during scan: $($postScan -join '; ')"
+    }
     Write-Host "PASS — parsed $($source.Count) PowerShell source files" -ForegroundColor Green
     # Fresh checkouts lack the WebView2 SDK. Bootstrap only missing files
     # using the pinned download and archive SHA-256 in Prepare-AeroWebView2.ps1.
@@ -71,6 +84,10 @@ try {
         }
         $results.Add([pscustomobject]@{Name=$test.Name;Exit=$code;Log=$log})
         Write-Host "$(if($code -eq 0){'PASS'}else{'FAIL'}) — $($test.Name)" -ForegroundColor $(if($code -eq 0){'Green'}else{'Red'})
+    }
+    $postTests = @(& git -C $root status --porcelain --untracked-files=no)
+    if ($LASTEXITCODE -ne 0 -or $postTests.Count -gt 0) {
+        throw "SOURCE INTEGRITY FAILURE during tests: $($postTests -join '; ')"
     }
     $failed = @($results | Where-Object Exit -ne 0)
     Write-Host "RESULT — $($results.Count - $failed.Count) PASS / $($failed.Count) FAIL / $($results.Count) TEST FILES" -ForegroundColor $(if($failed.Count){'Red'}else{'Green'})
