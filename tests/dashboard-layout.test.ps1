@@ -101,6 +101,8 @@ try {
     Require ($script:refreshScopes.Count -eq 2 -and $script:refreshScopes[1] -ceq 'ModelChanged') 'Leaving compact mode must use the central model refresh coordinator.'
     Require ($script:ui.Dashboard.compactToggle.Visible) 'The switch must remain visible when returning to full mode.'
     Require ($grid.Visible) 'The full run list should be restored.'
+    $oneRowHeight=Get-UpcomingGridHeight -Grid $grid
+    Require ($oneRowHeight -le $grid.ColumnHeadersHeight + $grid.RowTemplate.Height + 3) 'One upcoming run must not reserve unused grid rows.'
     Require ($recentResults.Visible) 'Run-history control must be available in normal mode.'
     Require (-not $status.Visible) 'Latest-summary bar must not be visible.'
     Require (-not $script:ui.Dashboard.ContainsKey('activitySpinner')) 'Obsolete spinner should not remain in dashboard state.'
@@ -120,6 +122,12 @@ try {
     [void]$grid.Rows.Add('Time','5m','Demo 1')
     [void]$grid.Rows.Add('Time','7m','Demo 2')
     [void]$grid.Rows.Add('Time','9m','Demo 3')
+    Update-DashboardLayout
+    $threeRowHeight=$grid.Height
+    Require ($threeRowHeight -gt $oneRowHeight) 'The upcoming grid must expand for additional rows.'
+    Require ($recentResults.Top -eq $grid.Bottom+13) 'Footer actions must follow the grid without a tall empty gap.'
+    Require ($form.ClientSize.Height -lt 820) 'Few pending jobs should produce a shorter full-mode window.'
+    Require ((Get-RunLabelWidth -Text '23s' -Font $grid.Font -CellWidth 200) -lt 60) 'Short countdown text reserves too much horizontal space.'
     $grid.Rows[0].Cells[1].Tag = 25
     $grid.Rows[1].Cells[1].Tag = 75
     $grid.Rows[2].Cells[1].Tag = $null
@@ -131,6 +139,9 @@ try {
     Require ($script:ui.Dashboard.runBarHosts[0].Child -is [System.Windows.Controls.ProgressBar]) 'Runs must use real WPF controls.'
     # A queue of hundreds of tasks must NOT spawn hundreds of WebView2 browsers.
     foreach($index in 4..120){[void]$grid.Rows.Add('Time','2m',"Other $index")}
+    Update-DashboardLayout
+    Require ($grid.Height -eq (Get-UpcomingGridHeight -Grid $grid)) 'Large queues must use the bounded scrollable grid height.'
+    Require ($grid.Height -le $grid.ColumnHeadersHeight + 4*$grid.RowTemplate.Height + 3) 'The grid grew past the four-row viewport.'
     Sync-DashboardRunBars
     Require ($script:ui.Dashboard.runBarHosts.Count -lt 10) 'Rendering hidden jobs created unbounded browser controls.'
     $grid.Rows.Clear()

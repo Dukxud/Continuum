@@ -122,7 +122,10 @@ test('dashboard shares the pending snapshot and renders distinct countdown and q
   assert.match(source, /New-UsageCard 470 'Secondary window' 'weekly'/);
   assert.match(dash, /Set-AeroWorking \$bar/);
   assert.match(dash, /Set-AeroWorking \$script:ui\.Dashboard\.compactRunTrack/);
-  assert.match(dash, /\$barX=\$cell\.X\+\$labelWidth\+12/);
+  assert.match(dash, /\$barX=\$cell\.X\+6\+\$labelWidth\+6/);
+  assert.match(dash, /function Get-RunLabelWidth/);
+  assert.match(dash, /function Get-UpcomingGridHeight/);
+  assert.match(dash, /\$actionTop=\$grid\.Bottom\+13/);
   assert.doesNotMatch(dash, /activitySpinner|activityTimer/);
   assert.match(source, /Set-AeroProgress \$Card.Bar \$remaining/);
   assert.match(dash, /New-AeroProgressBar \$grid 0 0 100 15 'time'/);

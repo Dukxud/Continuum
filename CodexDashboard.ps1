@@ -25,6 +25,27 @@ function Get-DashboardUsageModel {
     return Get-SelectedModel
 }
 
+function Get-RunLabelWidth {
+    param([string]$Text,[System.Drawing.Font]$Font,[int]$CellWidth)
+    # Measure the actual countdown/status text instead of reserving a wide
+    # fixed slot before the bar. Leave a small allowance for native text edges.
+    $measured=[System.Windows.Forms.TextRenderer]::MeasureText(
+        $Text,$Font,[System.Drawing.Size]::new(10000,32),
+        [System.Windows.Forms.TextFormatFlags]::NoPadding).Width
+    return [math]::Min([math]::Max(24,[int]($CellWidth*.52)),[math]::Max(24,$measured+8))
+}
+
+function Get-UpcomingGridHeight {
+    param([System.Windows.Forms.DataGridView]$Grid)
+    # One through four real rows; beyond that use the grid's native scroll.
+    $visibleCount=[math]::Min(4,[math]::Max(1,$Grid.Rows.Count))
+    $rowPixels=0
+    for($i=0;$i -lt $visibleCount;$i++){
+        $rowPixels+=if($i -lt $Grid.Rows.Count){$Grid.Rows[$i].Height}else{$Grid.RowTemplate.Height}
+    }
+    return $Grid.ColumnHeadersHeight+$rowPixels+3
+}
+
 function New-DashboardLabel {
     param($Parent, [string]$Text, [int]$X, [int]$Y, [int]$Width, [int]$Height)
     $label = [System.Windows.Forms.Label]::new()
@@ -108,7 +129,7 @@ function Initialize-Dashboard {
         if ($e.RowIndex -lt 0 -or $e.ColumnIndex -ne 1) { return }
         $e.PaintBackground($e.CellBounds,$true)
         $cell = $sender.Rows[$e.RowIndex].Cells[1]
-        $labelWidth=[math]::Min(93,[math]::Max(59,[int]($e.CellBounds.Width*.42)))
+        $labelWidth=Get-RunLabelWidth -Text ([string]$cell.Value) -Font $sender.Font -CellWidth $e.CellBounds.Width
         $bounds = [System.Drawing.Rectangle]::new(
             $e.CellBounds.X+6,$e.CellBounds.Y+2,$labelWidth,$e.CellBounds.Height-4)
         $color = if (($e.State -band [System.Windows.Forms.DataGridViewElementStates]::Selected) -ne 0) {
@@ -163,8 +184,8 @@ function Sync-DashboardRunBars {
         $entry=$visible[$index]
         $bar=$hosts[$index]
         $cell=$entry.Cell
-        $labelWidth=[math]::Min(93,[math]::Max(59,[int]($cell.Width*.42)))
-        $barX=$cell.X+$labelWidth+12
+        $labelWidth=Get-RunLabelWidth -Text ([string]$grid.Rows[$entry.Row].Cells[1].Value) -Font $grid.Font -CellWidth $cell.Width
+        $barX=$cell.X+6+$labelWidth+6
         $bounds=[System.Drawing.Rectangle]::new($barX,$cell.Y+[int](($cell.Height-15)/2),[math]::Max(20,$cell.Right-$barX-9),15)
         Set-ProgressHostLayout -Primary $bar -Bounds $bounds -Visible $true
         $row=$grid.Rows[$entry.Row]
@@ -237,14 +258,26 @@ function Update-DashboardLayout {
         }
         $hasRuns = $script:ui.Dashboard.pendingSnapshot.Count -gt 0
         foreach ($control in @($separator2,$pending,$grid,$cancelRun)) { $control.Visible = $hasRuns }
-        $openFolder.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 185 } else { 18 }),$(if ($hasRuns) { 744 } else { 490 }))
-        $recentResults.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 352 } else { 185 }),$(if ($hasRuns) { 744 } else { 490 }))
-        $recentResults.Visible = $true
-        $status.Location = [System.Drawing.Point]::new(18,$(if ($hasRuns) { 783 } else { 526 }))
-        $status.Width = 880
-        $status.Visible = -not [string]::IsNullOrWhiteSpace([string]$script:ui.Preferences.alertMessage)
-        $form.MinimumSize = [System.Drawing.Size]::new(940,$(if ($hasRuns) { 845 } else { 595 }))
-        $form.ClientSize = [System.Drawing.Size]::new(920,$(if ($hasRuns) { 820 } else { 566 }))
+        $actionTop=490
+        $clientHeight=566
+        $minimumHeight=595
+        if($hasRuns){
+            $desiredGridHeight=Get-UpcomingGridHeight -Grid $grid
+            if($grid.Height -ne $desiredGridHeight){$grid.Height=$desiredGridHeight}
+            $actionTop=$grid.Bottom+13
+            $offset=744-$actionTop
+            $clientHeight=820-$offset
+            $minimumHeight=845-$offset
+            $cancelRun.Location=[System.Drawing.Point]::new(18,$actionTop)
+        }
+        $openFolder.Location=[System.Drawing.Point]::new($(if($hasRuns){185}else{18}),$actionTop)
+        $recentResults.Location=[System.Drawing.Point]::new($(if($hasRuns){352}else{185}),$actionTop)
+        $recentResults.Visible=$true
+        $status.Location=[System.Drawing.Point]::new(18,$(if($hasRuns){$actionTop+39}else{526}))
+        $status.Width=880
+        $status.Visible=-not [string]::IsNullOrWhiteSpace([string]$script:ui.Preferences.alertMessage)
+        $form.MinimumSize=[System.Drawing.Size]::new(940,$minimumHeight)
+        $form.ClientSize=[System.Drawing.Size]::new(920,$clientHeight)
         Sync-DashboardRunBars
         return
     }
