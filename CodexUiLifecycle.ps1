@@ -1,4 +1,6 @@
 Initialize-Dashboard
+Set-PixelSurfaceStyle -Panel $script:ui.Dashboard.compactRunPanel -Fill '#E7EEFC' -Accent '#547FD2'
+Set-PixelAction -Button $script:ui.Dashboard.appearanceButton -Accent '#785AC5'
 # The countdown timer is created by Initialize-Dashboard; attach the scheduling
 # default updater only after that owner initializes it.
 $script:ui.Dashboard.countdownTimer.Add_Tick({ Refresh-SuggestedRunTime })

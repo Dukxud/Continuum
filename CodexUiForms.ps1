@@ -248,3 +248,10 @@ $actionHints.SetToolTip($pending, 'Only scheduled and actively running tasks app
 $actionHints.SetToolTip($useReset, 'Uses the applicable exhausted quota reset time plus two minutes, when Codex reports one.')
 $actionHints.SetToolTip($status, 'Click to dismiss this warning.')
 
+# Add these before Initialize-Dashboard captures the full-layout-only controls.
+. (Join-Path $PSScriptRoot 'CodexUiPixelTheme.ps1')
+Initialize-SchedulerPixelTheme -Form $form -Inputs @($sessionBox,$repoBox,$whenBox,$modelBox,$effortBox,$accessBox,$messageBox) -Actions @{
+    Browse=$browse; Minus=$minusTime; Plus=$plusTime; Now=$nowPlusTwo; Reset=$useReset
+    Schedule=$schedule; Cancel=$cancelRun; Logs=$openFolder; Recent=$recentResults
+} -UsageCards $usageCards -Heading $heading -UsageHeading $usageHeading -PendingHeading $pending
+

@@ -149,3 +149,19 @@ test('compact switch occupies dedicated header space in both layouts', () => {
   assert.doesNotMatch(dash, /\$subtitle\.Visible/);
   assert.match(dash, /\$heading\.Width = 270/);
 });
+
+test('pixel-art control groups and associated actions ship in the production app',()=>{
+ const theme=fs.readFileSync(path.resolve(__dirname,'..','CodexUiPixelTheme.ps1'),'utf8');
+ const lifecycle=fs.readFileSync(path.resolve(__dirname,'..','CodexUiLifecycle.ps1'),'utf8');
+ const pack=fs.readFileSync(path.resolve(__dirname,'..','scripts/Package-CodexScheduler.ps1'),'utf8');
+ for(const functionName of ['Set-PixelSurfaceStyle','Add-PixelBackplate','Set-PixelAction','Initialize-SchedulerPixelTheme']){
+   assert.ok(theme.includes('function '+functionName),functionName+' missing');
+ }
+ for(const name of ['Conversation','Repository','RunTime','Options','Instruction']){
+   assert.ok(theme.includes("Name='"+name+"'"),'Missing '+name+' grouped backplate');
+ }
+ assert.ok(source.includes('Initialize-SchedulerPixelTheme -Form $form'));
+ assert.ok(lifecycle.includes('Set-PixelSurfaceStyle -Panel $script:ui.Dashboard.compactRunPanel'));
+ assert.ok(lifecycle.includes('Set-PixelAction -Button $script:ui.Dashboard.appearanceButton'));
+ assert.ok(pack.includes("'CodexUiPixelTheme.ps1'"));
+});
