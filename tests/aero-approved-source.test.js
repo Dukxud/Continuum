@@ -6,13 +6,23 @@ const path = require('node:path');
 const {Script} = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
-const reference = fs.readFileSync(path.join(root,'design','Aero-v3-hybrid-approved-v2.0.1.html'),'utf8');
-const production = fs.readFileSync(path.join(root,'assets','AeroBar.html'),'utf8');
+// Compare the approved optical source, not the checkout's OS-dependent
+// line endings. Every other character remains subject to exact equality.
+const normalizeNewlines = source => source.replace(/\r\n?/g, '\n');
+const reference = normalizeNewlines(fs.readFileSync(path.join(root,'design','Aero-v3-hybrid-approved-v2.0.1.html'),'utf8'));
+const production = normalizeNewlines(fs.readFileSync(path.join(root,'assets','AeroBar.html'),'utf8'));
 function script(source,id) {
   const match = source.match(new RegExp('<script id="'+id+'"[^>]*>([\\s\\S]*?)<\\/script>'));
   assert.ok(match,'Required shader/source '+id+' missing');
   return match[1];
 }
+
+test('source comparison normalizes Windows line endings but still detects altered optics',()=>{
+  const shader=script(production,'hybridfrag');
+  assert.equal(normalizeNewlines(shader.replaceAll('\n','\r\n')),shader);
+  assert.notEqual(normalizeNewlines(shader.replace('float rd=.422;','float rd=.500;')),shader);
+  assert.match(shader,/float rd=\.422;/);
+});
 
 test('production uses exact owner-approved vertex shader and corrected optical fragment',()=>{
   assert.equal(script(production,'v3vert'),script(reference,'v3vert'));
