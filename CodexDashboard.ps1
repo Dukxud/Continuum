@@ -38,7 +38,7 @@ function New-DashboardLabel {
 
 function Initialize-Dashboard {
     # Capture the old full-view controls before adding the compact-only controls.
-    $shared = @($heading,$usageHeading,$usageNotice,$usageCards[0].Panel,$usageCards[1].Panel)
+    $shared = @($heading,$usageHeading,$status,$usageCards[0].Panel,$usageCards[1].Panel)
     $script:ui.Dashboard.dashboardStandardOnly = @($form.Controls | Where-Object { $shared -notcontains $_ })
     $script:ui.Dashboard.fullTitleFont = $heading.Font
     $script:ui.Dashboard.compactTitleFont = [System.Drawing.Font]::new('Segoe UI',12,[System.Drawing.FontStyle]::Bold)
@@ -99,18 +99,6 @@ function Initialize-Dashboard {
     $script:ui.Dashboard.countdownTimer = [System.Windows.Forms.Timer]::new()
     $script:ui.Dashboard.countdownTimer.Interval = 1000
     $script:ui.Dashboard.countdownTimer.Add_Tick({ Update-DashboardCountdowns })
-
-    # The status strip is for the latest finished result only. Active work
-    # animates IN the countdown cell and compact run card, not in a ticker.
-    $activity=[System.Windows.Forms.Panel]::new()
-    $activity.Size=[System.Drawing.Size]::new(880,29)
-    $activity.BackColor=[System.Drawing.Color]::FromArgb(240,245,251)
-    $form.Controls.Add($activity)
-    $script:ui.Dashboard.activityPanel=$activity
-    $label=New-DashboardLabel $activity 'No recorded runs yet.' 9 2 858 25
-    $label.TextAlign='MiddleLeft'
-    $label.ForeColor=[System.Drawing.Color]::FromArgb(48,69,91)
-    $script:ui.Dashboard.activityLabel=$label
 
     # Standard view uses a single horizontal line: time text and Aero track
     # side by side. Never stack an execution percentage beneath Running.
@@ -223,38 +211,6 @@ function Update-DashboardCountdowns {
 }
 
 
-function Update-DashboardActivity {
-    param([object[]]$Items,[string]$Directory)
-    $label=$script:ui.Dashboard.activityLabel
-    $running=@($Items | Where-Object { $_.Status -eq 'Running' })
-    $script:ui.Dashboard.activityPanel.Visible=($running.Count -eq 0)
-    if($running.Count -gt 0){return}
-    $latest=@(Get-CodexRunHistory -Directory $Directory -Limit 1)
-    if($latest.Count -eq 0){
-        $label.Text='No recorded runs yet. Use Recent runs to inspect past runs.'
-        $label.AccessibleName=$label.Text
-        return
-    }
-    $result=$latest[0]
-    $key=[string]$result.Name+'|'+$result.When.ToString('o')
-    if($script:ui.Dashboard.latestResultKey -cne $key){
-        $evidence=Get-CodexRunEvidence -Directory $Directory -Name ([string]$result.Name)
-        $preview=([string]$evidence.Response -replace '[\r\n\t]+',' ').Trim()
-        if($preview -eq 'No final Codex response was recorded for this run.' -and $result.Message){
-            $preview=[string]$result.Message
-        }
-        $script:ui.Dashboard.latestResultPreview=$preview
-        $script:ui.Dashboard.latestResultKey=$key
-    }
-    # Plain delimiters avoid locale-dependent mojibake in the compact
-    # single-line summary. Preserve the Codex response text verbatim.
-    $summary='Latest: '+([string]$result.Status).ToUpperInvariant()+' | '+[string]$result.Name
-    $preview=[string]$script:ui.Dashboard.latestResultPreview
-    if($preview){$summary+=' | '+$preview}
-    $label.Text=$summary
-    $label.AccessibleName=$summary
-}
-
 function Update-DashboardLayout {
     $compact = $script:ui.Dashboard.compactToggle.Checked
     foreach ($control in $script:ui.Dashboard.dashboardStandardOnly) { $control.Visible = -not $compact }
@@ -273,26 +229,22 @@ function Update-DashboardLayout {
         $script:ui.Dashboard.compactToggle.BackColor = [System.Drawing.Color]::FromArgb(236,242,250)
         $script:ui.Dashboard.compactToggle.ForeColor = [System.Drawing.Color]::FromArgb(40,76,128)
         $script:ui.Dashboard.compactToggle.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(163,189,219)
-        $subtitle.Visible = $false
         $usageHeading.Text = 'Usage remaining'
         $usageHeading.Location = [System.Drawing.Point]::new(18,322)
-        $usageNotice.Visible = $true
-        $usageNotice.Location = [System.Drawing.Point]::new(18,477)
         foreach ($i in 0..1) {
             $usageCards[$i].Panel.Visible = $true
             $usageCards[$i].Panel.Location = [System.Drawing.Point]::new($(if ($i -eq 0) { 18 } else { 470 }),358)
         }
         $hasRuns = $script:ui.Dashboard.pendingSnapshot.Count -gt 0
         foreach ($control in @($separator2,$pending,$grid,$refreshRuns,$cancelRun)) { $control.Visible = $hasRuns }
-        $openFolder.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 352 } else { 18 }),$(if ($hasRuns) { 774 } else { 523 }))
-        $recentResults.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 520 } else { 185 }),$(if ($hasRuns) { 774 } else { 523 }))
+        $openFolder.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 352 } else { 18 }),$(if ($hasRuns) { 744 } else { 490 }))
+        $recentResults.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 520 } else { 185 }),$(if ($hasRuns) { 744 } else { 490 }))
         $recentResults.Visible = $true
-        $script:ui.Dashboard.activityPanel.Location = [System.Drawing.Point]::new(18,$(if ($hasRuns) { 817 } else { 574 }))
-        $script:ui.Dashboard.activityPanel.Size = [System.Drawing.Size]::new(880,29)
-        $script:ui.Dashboard.activityLabel.Width = 858
-        $status.Location = [System.Drawing.Point]::new(18,$(if ($hasRuns) { 853 } else { 610 }))
-        $form.MinimumSize = [System.Drawing.Size]::new(940,$(if ($hasRuns) { 933 } else { 690 }))
-        $form.ClientSize = [System.Drawing.Size]::new(920,$(if ($hasRuns) { 922 } else { 680 }))
+        $status.Location = [System.Drawing.Point]::new(18,$(if ($hasRuns) { 783 } else { 526 }))
+        $status.Width = 880
+        $status.Visible = -not [string]::IsNullOrWhiteSpace([string]$script:ui.Preferences.alertMessage)
+        $form.MinimumSize = [System.Drawing.Size]::new(940,$(if ($hasRuns) { 845 } else { 595 }))
+        $form.ClientSize = [System.Drawing.Size]::new(920,$(if ($hasRuns) { 820 } else { 566 }))
         Sync-DashboardRunBars
         return
     }
@@ -306,7 +258,6 @@ function Update-DashboardLayout {
     $script:ui.Dashboard.compactToggle.BackColor = [System.Drawing.Color]::FromArgb(49,95,167)
     $script:ui.Dashboard.compactToggle.ForeColor = [System.Drawing.Color]::White
     $script:ui.Dashboard.compactToggle.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(36,73,130)
-    $usageNotice.Visible = $false
     $top = if ($script:ui.Dashboard.pendingSnapshot.Count -gt 0) { 246 } else { 65 }
     $visibleWindows = @()
     $targetModel = Get-DashboardUsageModel
@@ -340,11 +291,12 @@ function Update-DashboardLayout {
         $height = $cardTop + 18
     }
     $form.MinimumSize = [System.Drawing.Size]::new(480,150)
-    # Keep live activity and latest result visible even in compact mode.
-    $script:ui.Dashboard.activityPanel.Location = [System.Drawing.Point]::new(18,$height)
-    $script:ui.Dashboard.activityPanel.Size = [System.Drawing.Size]::new(428,29)
-    $script:ui.Dashboard.activityLabel.Width = 406
-    $form.ClientSize = [System.Drawing.Size]::new(464,[math]::Max(166,$height+78))
+    # A warning appears only when necessary, never as a persistent footer.
+    $hasAlert=-not [string]::IsNullOrWhiteSpace([string]$script:ui.Preferences.alertMessage)
+    $status.Visible=$hasAlert
+    $status.Location=[System.Drawing.Point]::new(18,$height)
+    $status.Width=428
+    $form.ClientSize=[System.Drawing.Size]::new(464,[math]::Max(166,$height+40+$(if($hasAlert){31}else{0})))
     $script:ui.Dashboard.appearanceButton.Location = [System.Drawing.Point]::new(306,$form.ClientSize.Height-37)
     $recentResults.Location = [System.Drawing.Point]::new(150,$form.ClientSize.Height-37)
     $recentResults.Visible = $true

@@ -8,14 +8,14 @@ try {
     $draft = [pscustomobject]@{
         sessionId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'; repo = 'C:\repo\worktree'
         model = 'gpt-test'; effort = 'max'; access = 'yolo'; message = 'Continue the work.'
-        autoResume = $false; runAt = '2027-05-02T19:27:00'
+        runAt = '2027-05-02T19:27:00'
     }
     Write-CodexUiSettings $folder ([pscustomobject]@{version=1;lastAccess='yolo';draft=$draft})
     $read = Read-CodexUiSettings $folder
     foreach ($key in @('sessionId','repo','model','effort','access','message','runAt')) {
         Require ($read.draft.$key -ceq $draft.$key) "Draft field $key did not round trip."
     }
-    Require ($read.draft.autoResume -eq $false) 'Unchecked auto-resume must persist.'
+    Require ($read.draft.PSObject.Properties.Name -cnotcontains 'autoResume') 'Saved draft must not contain a retry preference.'
     Require ($read.lastAccess -eq 'yolo') 'Legacy lastAccess should be retained for migration.'
     $draft.message = ''
     $draft.access = 'read-only'
@@ -36,12 +36,13 @@ try {
     $gui = @('CodexResumeScheduler.ps1','CodexUiState.ps1','CodexUiForms.ps1','CodexUiActions.ps1','CodexUiLifecycle.ps1','CodexUiRefresh.ps1') | ForEach-Object { Get-Content -LiteralPath (Join-Path $root $_) -Raw } | Out-String
     foreach ($feature in @('Save-CurrentFormState','settingsTimer.Add_Tick','form.Add_FormClosing',
                            'whenBox.Add_ValueChanged','repoBox.Add_TextChanged','messageBox.Add_TextChanged',
-                           'autoResumeCheck.Add_CheckedChanged','accessBox.Add_SelectedIndexChanged',
+                           'accessBox.Add_SelectedIndexChanged',
                            'effortBox.Add_SelectedIndexChanged','modelBox.Add_SelectedIndexChanged',
                            'sessionBox.Add_SelectedIndexChanged','startupSavedModelId','Get-RestoredRunTime')) {
         Require ($gui.Contains($feature)) "Missing UI persistence wiring: $feature"
     }
-    Write-Host 'Draft settings roundtrip, migration, invalid/past times, and UI wiring passed.'
+    Require ($gui -notmatch 'autoResumeCheck|retryAttempt') 'Retry UI state still exists.'
+    Write-Host 'One-shot draft settings, migration, invalid/past times, and UI wiring PASS.'
 } finally {
     if (Test-Path -LiteralPath $folder) { Remove-Item -LiteralPath $folder -Recurse -Force }
 }

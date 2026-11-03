@@ -6,12 +6,12 @@ $script:ui.Dashboard.countdownTimer.Add_Tick({ Refresh-SuggestedRunTime })
 $runStatusRefresh = New-Object System.Windows.Forms.Timer
 $runStatusRefresh.Interval = 2000
 $runStatusRefresh.Add_Tick({
-    try { Refresh-PendingList } catch { Update-Status "Run status refresh failed: $($_.Exception.Message)" }
+    try { Refresh-PendingList } catch { Update-Status "Run status refresh failed: $($_.Exception.Message)" -Alert }
 })
 $autoRefresh = New-Object System.Windows.Forms.Timer
 $autoRefresh.Interval = 60000
 $autoRefresh.Add_Tick({
-    try { Refresh-PendingList } catch { Update-Status "Pending refresh failed: $($_.Exception.Message)" }
+    try { Refresh-PendingList } catch { Update-Status "Pending refresh failed: $($_.Exception.Message)" -Alert }
     Request-UsageRefresh
 })
 $form.Add_Shown({
@@ -20,7 +20,7 @@ $form.Add_Shown({
     $script:ui.Preferences.settingsReady = $true
     Update-DashboardLayout
     $script:ui.Dashboard.countdownTimer.Start()
-    try { Refresh-SessionList; Refresh-PendingList } catch { Update-Status "Startup warning: $($_.Exception.Message)" }
+    try { Refresh-SessionList; Refresh-PendingList } catch { Update-Status "Startup warning: $($_.Exception.Message)" -Alert }
     Request-UsageRefresh
     $autoRefresh.Start()
     $runStatusRefresh.Start()

@@ -31,25 +31,23 @@ try {
     $form.ClientSize = [System.Drawing.Size]::new(920,865)
     $heading = New-TestControl label 18 14 500 34
     $heading.Font = [System.Drawing.Font]::new('Segoe UI',15,[System.Drawing.FontStyle]::Bold)
-    $subtitle = New-TestControl label 544 22 355 25
     $usageHeading = New-TestControl label 18 322 280 30
-    $usageNotice = New-TestControl label 18 477 880 25
     $first = New-TestControl panel 18 358 428 108
     $second = New-TestControl panel 470 358 428 108
     $usageCards = @([pscustomobject]@{Panel=$first},[pscustomobject]@{Panel=$second})
-    $separator2 = New-TestControl panel 18 512 880 2
-    $pending = New-TestControl label 18 527 400 30
-    $grid = New-TestControl grid 18 566 880 195
+    $separator2 = New-TestControl panel 18 485 880 2
+    $pending = New-TestControl label 18 499 400 30
+    $grid = New-TestControl grid 18 536 880 195
     $grid.AllowUserToAddRows = $false
     $grid.RowTemplate.Height = 40
     [void]$grid.Columns.Add('When','When')
     [void]$grid.Columns.Add('Countdown','Time to run')
     [void]$grid.Columns.Add('Project','Project')
-    $refreshRuns = New-TestControl panel 18 774 154 31
-    $cancelRun = New-TestControl panel 185 774 154 31
-    $openFolder = New-TestControl panel 352 774 154 31
-    $recentResults = New-TestControl panel 520 774 158 31
-    $status = New-TestControl label 18 823 880 25
+    $refreshRuns = New-TestControl panel 18 744 154 31
+    $cancelRun = New-TestControl panel 185 744 154 31
+    $openFolder = New-TestControl panel 352 744 154 31
+    $recentResults = New-TestControl panel 520 744 178 31
+    $status = New-TestControl label 18 783 880 25
     $script:ui.Preferences.uiSettings = $null
     $script:ui.Dashboard.pendingSnapshot = @()
     $script:ui.Usage.usageSnapshot = $null
@@ -63,7 +61,7 @@ try {
 
     Require ($script:ui.Dashboard.compactToggle.Visible) 'The compact toggle must be visible in full view.'
     Require ($script:ui.Dashboard.compactToggle.Left -gt $heading.Right) 'The full-mode toggle must not overlap the heading.'
-    Require (-not $subtitle.Visible) 'The retired subtitle must not overlap the switch.'
+    Require (-not $status.Visible) 'Routine status/footer text must not be visible in full mode.'
     Require ($script:ui.Dashboard.compactToggle.Right -le $form.ClientSize.Width) 'The full-mode toggle must be inside the window.'
     Require ($script:ui.Dashboard.compactToggle.Text -eq 'Compact mode: OFF') 'Full mode should clearly offer the compact switch.'
 
@@ -73,7 +71,7 @@ try {
     Require ($script:ui.Dashboard.compactToggle.Left -gt $heading.Right) 'The compact-mode switch must not overlap the heading.'
     Require ($script:ui.Dashboard.compactToggle.Right -le $form.ClientSize.Width) 'Compact-mode switch must not be clipped.'
     Require (-not $script:ui.Dashboard.compactRunPanel.Visible) 'An empty queue must not render a run placeholder.'
-    Require ($script:ui.Dashboard.activityPanel.Visible) 'Activity strip must remain available in compact mode.'
+    Require (-not $status.Visible) 'Compact mode must not contain a permanent status footer.'
 
     $script:ui.Dashboard.pendingSnapshot = @([pscustomobject]@{
         Model='test-model'; Name='pending-1'; Repo='C:\work\demo'; Description='test instruction'
@@ -86,10 +84,16 @@ try {
     Require ($script:ui.Dashboard.compactToggle.Visible) 'The switch must remain visible when returning to full mode.'
     Require ($grid.Visible) 'The full run list should be restored.'
     Require ($recentResults.Visible) 'Run-history control must be available in normal mode.'
-    Require ($script:ui.Dashboard.activityPanel.Visible) 'Latest-result summary must be available in normal mode.'
+    Require (-not $status.Visible) 'Latest-summary bar must not be visible.'
     Require (-not $script:ui.Dashboard.ContainsKey('activitySpinner')) 'Obsolete spinner should not remain in dashboard state.'
     $script:ui.Dashboard.pendingSnapshot=@()
     Update-DashboardLayout
+    $script:ui.Preferences.alertMessage='Unable to schedule a run.'
+    Update-DashboardLayout
+    Require ($status.Visible -and $status.Text -ne 'Ready.') 'Actionable warnings must be able to appear.'
+    $script:ui.Preferences.alertMessage=''
+    Update-DashboardLayout
+    Require (-not $status.Visible) 'Dismissing a warning must remove the footer again.'
     Require (-not $grid.Visible -and -not $pending.Visible) 'Historical results must not keep Upcoming runs visible.'
     Require ($recentResults.Visible) 'Recent runs must remain available when the queue is empty.'
     $script:ui.Dashboard.pendingSnapshot=@([pscustomobject]@{Name='pending-again';Repo='C:\work\demo';When=(Get-Date).AddMinutes(5)})

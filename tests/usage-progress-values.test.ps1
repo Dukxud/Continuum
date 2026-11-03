@@ -34,6 +34,8 @@ try {
         Require ($card.Bar.Child -is [System.Windows.Controls.ProgressBar]) 'Usage must be a real WPF percentage bar.'
         Require ($card.Bar.Width -eq 400 -and $card.Bar.Height -eq 17) 'Usage bars must preserve layout.'
         Require ($card.Bar.Parent -eq $card.Panel) 'Usage bar must stay inside its card.'
+        Require ($card.Updated.Parent -eq $card.Panel) 'Usage freshness must be shown inside each card.'
+        Require ($card.Updated.Bottom -le $card.Panel.Height) 'Usage freshness text is clipped outside the card.'
     }
     $window = [pscustomobject]@{ label='5-hour usage'; remainingPercent=62.6; resetsAt=$null }
     Render-UsageCard $first $window 'Primary window'

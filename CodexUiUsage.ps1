@@ -77,16 +77,14 @@ function Apply-UsageSnapshot {
     }
     $permission = "Model $($Snapshot.model) | Quota $($Snapshot.bucketId) | $availability"
     if ($Snapshot.limitReachedType) { $permission += "; limit: $($Snapshot.limitReachedType)" }
-    $stateLabel = switch ([string]$Snapshot.ordinaryUsageAllowed) {
-        'True' { 'Usage available' }
-        'False' { 'Usage restricted' }
-        default { 'Availability not reported' }
+    # Keep freshness and quota context inside each window card. No separate
+    # global disclaimer beneath the bars.
+    $updated='Updated '+$script:ui.Usage.usageChecked.ToString('h:mm tt')+' | '+$availability
+    foreach($card in $usageCards) {
+        $card.Updated.Text=$updated
+        $usageHints.SetToolTip($card.Panel,$permission)
+        $usageHints.SetToolTip($card.Updated,$permission)
     }
-    $usageNotice.Text = "$stateLabel  ·  Updated $($script:ui.Usage.usageChecked.ToString('h:mm tt'))  ·  Refreshes every 60 seconds"
-    if ($Snapshot.recommendationKind -eq 'next-window') {
-        $usageNotice.Text += '  ·  Next reset is informational'
-    }
-    $usageHints.SetToolTip($usageNotice, $permission)
     $useReset.Enabled = $false
     if ($Snapshot.recommendationKind -eq 'exhausted-window' -and $Snapshot.recommendedResetAt) {
         $reset = [DateTimeOffset]::FromUnixTimeSeconds([long]$Snapshot.recommendedResetAt).LocalDateTime
@@ -103,12 +101,14 @@ function Request-UsageRefresh {
     try {
         $script:ui.Usage.usageProcess = Start-UsageRead
         $script:ui.Usage.usageStarted = Get-Date
-        $usageNotice.Text = 'Refreshing Codex usage...'
+        foreach($card in $usageCards){$card.Updated.Text='Refreshing Codex usage...'}
         $refreshUsage.Enabled = $false
         $usagePoll.Start()
     } catch {
-        $usageNotice.Text = 'Usage refresh failed; try again.'
-        $usageHints.SetToolTip($usageNotice, $_.Exception.Message)
+        foreach($card in $usageCards){
+            $card.Updated.Text='Usage refresh failed | Refresh now to retry'
+            $usageHints.SetToolTip($card.Updated,$_.Exception.Message)
+        }
         $script:ui.Usage.usageReadFailed = $true
         $refreshUsage.Enabled = $true
         $useReset.Enabled = $false
@@ -136,8 +136,10 @@ $usagePoll.Add_Tick({
         if (-not $snapshot.ok) { throw [string]$snapshot.error }
         Apply-UsageSnapshot $snapshot
     } catch {
-        $usageNotice.Text = 'Usage refresh failed; last displayed values may be stale.'
-        $usageHints.SetToolTip($usageNotice, $_.Exception.Message)
+        foreach($card in $usageCards){
+            $card.Updated.Text='Refresh failed | Previous values may be stale'
+            $usageHints.SetToolTip($card.Updated,$_.Exception.Message)
+        }
         $script:ui.Usage.usageReadFailed = $true
         Update-DashboardLayout
         $useReset.Enabled = $false
@@ -162,6 +164,5 @@ $useReset.Add_Click({
         [System.Windows.Forms.MessageBox]::Show('That reset time has passed. Refresh usage.','Reset expired') | Out-Null
         return
     }
-    $whenBox.Value = $rounded
-    Update-Status "Selected reset +2 minutes: $($rounded.ToString('MMM dd, h:mm tt')). Review access before scheduling."
+    Set-SelectedRunTime $rounded
 })

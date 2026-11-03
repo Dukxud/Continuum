@@ -24,9 +24,9 @@ $files=@(
  'CodexUiRefresh.ps1','CodexUiSelection.ps1','CodexUiPending.ps1','CodexUiUsage.ps1',
  'CodexUiActions.ps1','CodexUiLifecycle.ps1','CodexUiState.ps1',
  'CodexUiHistory.ps1','CodexJobStore.ps1',
- 'CodexDashboard.ps1','CodexFlowingBar.ps1',
+ 'CodexDashboard.ps1','CodexScheduleTime.ps1','CodexFlowingBar.ps1',
  'CodexAeroBar.ps1','CodexBarAppearance.ps1','CodexData.ps1',
- 'CodexUsage.js','CodexRetry.js','Start-Codex-Scheduler.vbs',
+ 'CodexUsage.js','Start-Codex-Scheduler.vbs',
  'Start-Codex-Scheduler.cmd','CodexRunJob.vbs','README.md','LICENSE','VERSION'
 )
 foreach($file in $files){

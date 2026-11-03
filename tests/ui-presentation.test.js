@@ -17,23 +17,28 @@ function namedFunction(name) {
 
 test('model and effort are grouped and schedule action is distinct', () => {
   assert.match(source, /New-DesktopWindow -Title 'Codex Resume Scheduler v1\.[0-9]+\.[0-9]+'/);
-  assert.match(source, /\$modelBox\.Location = \[System\.Drawing\.Point\]::new\(155,199\)/);
-  assert.match(source, /\$effortBox\.Location = \[System\.Drawing\.Point\]::new\(597,199\)/);
-  assert.match(source, /\$accessBox\.Location = \[System\.Drawing\.Point\]::new\(597,154\)/);
+  assert.match(source, /\$modelBox\.Location = \[System\.Drawing\.Point\]::new\(90,199\)/);
+  assert.match(source, /\$effortBox\.Location = \[System\.Drawing\.Point\]::new\(450,199\)/);
+  assert.match(source, /\$accessBox\.Location = \[System\.Drawing\.Point\]::new\(652,199\)/);
   assert.match(source, /\$schedule = Add-Button 'Schedule once' 720 274 178/);
-  assert.match(source, /\$autoResumeCheck\.Text = 'Retry if Codex hits a usage limit \(max 4\)'/);
+  assert.doesNotMatch(source, /\$autoResumeCheck|Retry if Codex/);
   assert.match(source, /\$whenBox\.Value = Get-CodexSuggestedRunTime/);
   assert.match(source, /\$minusTime = Add-Button/);
   assert.match(source, /\$plusTime = Add-Button/);
   assert.match(source, /\$minusTime\.Add_Click/);
   assert.match(source, /\$plusTime\.Add_Click/);
+  assert.match(source, /\$nowPlusTwo = Add-Button 'Now \+2' 494 154 112/);
+  assert.match(source, /\$useReset = Add-Button 'Reset \+2' 618 154 137/);
+  assert.match(source, /\$nowPlusTwo\.Add_Click/);
+  assert.match(source, /\$useReset\.Add_Click/);
 });
 
 test('normal scheduling has no redundant success dialog, but preserves safety warnings', () => {
   const schedule = source.slice(source.indexOf('$schedule.Add_Click({'));
   assert.ok(schedule.length > 0);
   assert.doesNotMatch(schedule, /'Codex task scheduled'/);
-  assert.match(schedule, /Update-Status "Scheduled once for/);
+  assert.match(schedule, /Clear-SchedulerAlert/);
+  assert.doesNotMatch(schedule, /Update-Status "Scheduled once for/);
   assert.match(schedule, /'Unrestricted access'/);
   assert.match(schedule, /'Existing scheduled work'/);
   assert.match(schedule, /'Scheduling check failed'/);
@@ -71,7 +76,8 @@ test('usage reports remaining and keeps reset as an explicit action', () => {
   assert.match(source, /Usage remaining/);
   assert.match(source, /% remaining' -f \$remaining/);
   assert.match(source, /\$useReset\.Add_Click\(/);
-  assert.match(source, /Next reset is informational/);
+  assert.match(source, /\$card\.Updated\.Text=/);
+  assert.doesNotMatch(source, /\$usageNotice|Next reset is informational/);
 });
 
 test('dashboard shares the pending snapshot and renders distinct countdown and quota bars', () => {
@@ -99,12 +105,23 @@ test('dashboard shares the pending snapshot and renders distinct countdown and q
   assert.doesNotMatch(dash, /Draw-SchedulerProgress/);
 });
 
+test('routine status clutter is absent but actionable errors remain visible', () => {
+  const dash = fs.readFileSync(path.resolve(__dirname,'..','CodexDashboard.ps1'),'utf8');
+  assert.doesNotMatch(dash,/activityPanel|activityLabel|Update-DashboardActivity/);
+  assert.doesNotMatch(source,/\$usageNotice|\$autoResumeCheck/);
+  assert.match(source,/\$status = Add-Label ''/);
+  assert.match(source,/function Update-Status \{/);
+  assert.match(source,/\[switch\]\$Alert/);
+  assert.match(dash,/\$status\.Visible = -not \[string\]::IsNullOrWhiteSpace/);
+  assert.match(source,/Clear-SchedulerAlert/);
+});
+
 test('compact switch occupies dedicated header space in both layouts', () => {
   const dash = fs.readFileSync(path.resolve(__dirname, '..', 'CodexDashboard.ps1'), 'utf8');
   assert.match(dash, /\$script:ui\.Dashboard\.compactToggle\.Appearance = \[System\.Windows\.Forms\.Appearance\]::Button/);
   assert.match(dash, /\$script:ui\.Dashboard\.compactToggle\.Text = 'Compact mode: OFF'/);
   assert.match(dash, /\$script:ui\.Dashboard\.compactToggle\.Text = 'Compact mode: ON'/);
   assert.match(dash, /\$script:ui\.Dashboard\.compactToggle\.Location = \[System\.Drawing\.Point\]::new\(298,13\)/);
-  assert.match(dash, /\$subtitle\.Visible = \$false/);
+  assert.doesNotMatch(dash, /\$subtitle\.Visible/);
   assert.match(dash, /\$heading\.Width = 270/);
 });

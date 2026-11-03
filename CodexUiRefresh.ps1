@@ -22,7 +22,7 @@ function Start-DataRead {
         }
         $script:ui.Async.dataJobs[$Kind] = $job
         if ($Kind -eq 'selection') { $script:ui.Selection.selectionJobGeneration = $script:ui.Selection.selectionGeneration }
-    } catch { Update-Status "$Kind refresh failed to start: $($_.Exception.Message)" }
+    } catch { Update-Status "$Kind refresh failed to start: $($_.Exception.Message)" -Alert }
 }
 
 function Refresh-SessionList { Start-DataRead 'sessions' }
@@ -42,7 +42,7 @@ $dataPoll.Add_Tick({
                 'pending' { Apply-PendingList $result }
                 'selection' { Apply-SelectionResult $result }
             }
-        } catch { Update-Status "$kind refresh failed: $($_.Exception.Message)" }
+        } catch { Update-Status "$kind refresh failed: $($_.Exception.Message)" -Alert }
         finally { Remove-Job -Job $job -Force -ErrorAction SilentlyContinue }
         if ($script:ui.Async.dataQueued[$kind]) {
             $script:ui.Async.dataQueued[$kind] = $false

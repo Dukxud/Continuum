@@ -62,7 +62,7 @@ test('scheduled runtime snapshot excludes every GUI module',()=>{
  const worker=read('CodexRunEngine.ps1');
  const runtime=worker.match(/function Get-CodexRuntimeFiles\s*\{([\s\S]*?)\n\}/)?.[1];
  assert.ok(runtime,'runtime dependency manifest missing');
- for(const file of ['CodexResumeScheduler.ps1','CodexRunEngine.ps1','CodexUsage.js','CodexRetry.js',
+ for(const file of ['CodexResumeScheduler.ps1','CodexRunEngine.ps1','CodexUsage.js',
                      'components/RuntimeBundle/RuntimeBundle.psm1','components/GitRepository/GitRepository.psm1',
                      'components/JobOutcomes/JobOutcomes.psm1','components/SettingsStore/SettingsStore.psm1']){
    assert.ok(runtime.includes("'"+file+"'"),'worker missing '+file);
@@ -78,10 +78,12 @@ test('pending jobs never mix with result histories and countdowns do not scan pe
  assert.match(dash,/pendingIndex/);
  assert.doesNotMatch(dash,/pendingSnapshot\s*\|\s*Where-Object/);
 });
-test('run history is user-visible and retry linking is persistent',()=>{
+test('run history remains user-visible without retry scheduling',()=>{
  assert.match(read('CodexUiForms.ps1'),/\$recentResults = Add-Button/);
  assert.match(read('CodexUiActions.ps1'),/Show-CodexRunHistoryDialog/);
- assert.match(read('CodexRunEngine.ps1'),/NextJob \(\[string\]\$nextJob\)/);
+ assert.doesNotMatch(read('CodexRunEngine.ps1'),/Schedule-LimitRetry|CodexRetry/);
+ // Historic deferred results remain readable after removing retry authoring.
+ assert.match(read('CodexJobStore.ps1'),/Get-CodexRunHistory/);
 });
 
 test('cancellation rechecks authoritative Windows state before unregistering',()=>{

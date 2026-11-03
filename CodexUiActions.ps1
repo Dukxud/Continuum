@@ -17,7 +17,6 @@ function Save-CurrentFormState {
         effort = $effort
         access = $access
         message = [string]$messageBox.Text
-        autoResume = [bool]$autoResumeCheck.Checked
         runAt = $whenBox.Value.ToString('yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture)
     }
     $appearanceForStorage = if ($script:ui.Preferences.appearanceBeforeDraft) { $script:ui.Preferences.appearanceBeforeDraft } else { $script:aeroAppearance }
@@ -32,7 +31,7 @@ function Queue-FormStateSave {
 }
 $script:ui.Preferences.settingsTimer.Add_Tick({
     $script:ui.Preferences.settingsTimer.Stop()
-    try { Save-CurrentFormState } catch { Update-Status "Settings were not saved: $($_.Exception.Message)" }
+    try { Save-CurrentFormState } catch { Update-Status "Settings were not saved: $($_.Exception.Message)" -Alert }
 })
 $repoBox.Add_TextChanged({ Queue-FormStateSave })
 function Refresh-SuggestedRunTime {
@@ -50,19 +49,23 @@ $whenBox.Add_ValueChanged({
         Queue-FormStateSave
     }
 })
-function Adjust-CodexScheduledTime {
-    param([int]$Direction)
-    $current=$whenBox.Value
-    $next=Step-CodexScheduledRunTime -Time $current -Direction $Direction
-    if($next -eq $current){Update-Status 'Run time must stay at least 30 seconds in the future.';return}
+function Set-SelectedRunTime {
+    param([datetime]$Time)
     $script:ui.Preferences.scheduleTimeEdited=$true
     $script:ui.Preferences.scheduleTimeUpdating=$true
-    try {$whenBox.Value=$next}
+    try {$whenBox.Value=$Time}
     finally {$script:ui.Preferences.scheduleTimeUpdating=$false}
     Queue-FormStateSave
 }
+function Adjust-CodexScheduledTime {
+    param([int]$Direction)
+    $next=Step-CodexScheduledRunTime -Time $whenBox.Value -Direction $Direction
+    if($next -eq $whenBox.Value){Update-Status 'Run time must stay at least 30 seconds in the future.' -Alert;return}
+    Set-SelectedRunTime $next
+}
 $minusTime.Add_Click({ Adjust-CodexScheduledTime -Direction -1 })
 $plusTime.Add_Click({ Adjust-CodexScheduledTime -Direction 1 })
+$nowPlusTwo.Add_Click({ Set-SelectedRunTime (Get-CodexSuggestedRunTime) })
 $accessBox.Add_SelectedIndexChanged({ Queue-FormStateSave })
 $effortBox.Add_SelectedIndexChanged({
     if (-not $script:ui.Selection.updatingModels) {
@@ -71,7 +74,6 @@ $effortBox.Add_SelectedIndexChanged({
     }
 })
 $messageBox.Add_TextChanged({ Queue-FormStateSave })
-$autoResumeCheck.Add_CheckedChanged({ Queue-FormStateSave })
 
 $modelBox.Add_SelectedIndexChanged({
     if (-not $script:ui.Selection.updatingModels) { $script:ui.Selection.preferredModelId = Get-SelectedModel }
@@ -115,8 +117,7 @@ $cancelRun.Add_Click({
         $taskRemoved = $true
         $payloadPath=Join-Path $appDir ($name + '.json')
         if(Test-Path -LiteralPath $payloadPath -PathType Leaf){
-            $payload=Get-Content -LiteralPath $payloadPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-            [void](Write-JobOutcome -Path ([IO.Path]::ChangeExtension($payloadPath,'.result.json')) -Status 'cancelled' -Attempt ([int]$payload.retryAttempt) -Message 'Cancelled by the operator before execution.')
+            [void](Write-JobOutcome -Path ([IO.Path]::ChangeExtension($payloadPath,'.result.json')) -Status 'cancelled' -Attempt 0 -Message 'Cancelled by the operator before execution.')
             Remove-Item -LiteralPath $payloadPath -Force -ErrorAction Stop
         }
         Request-UsageRefresh
@@ -126,7 +127,7 @@ $cancelRun.Add_Click({
     } finally {
         # Task removal can succeed before a later file write fails. Always
         # reconcile the displayed list with Windows Task Scheduler.
-        try { Refresh-PendingList } catch { Update-Status "Pending-list refresh failed: $($_.Exception.Message)" }
+        try { Refresh-PendingList } catch { Update-Status "Pending-list refresh failed: $($_.Exception.Message)" -Alert }
     }
 })
 $recentResults.Add_Click({
@@ -187,7 +188,6 @@ $schedule.Add_Click({
         [pscustomobject]@{
             sessionId=$sessionId; repo=$root; branch=$branch
             model=$model; effort=$effort; access=$access; message=$message
-            autoResume=[bool]$autoResumeCheck.Checked; retryAttempt=0
             createdAt=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
             accountId=$accountId
             runtimeFingerprint=$runtime.Fingerprint; log=$log
@@ -205,17 +205,16 @@ $schedule.Add_Click({
         }
         # The validated Windows task already exists. A preference write or
         # follow-up UI refresh failure must not report scheduling as failed.
-        Update-Status "Scheduled once for $($when.ToString('MMM dd, h:mm tt')): $name"
+        Clear-SchedulerAlert
         $script:ui.Preferences.settingsTimer.Stop()
         try { Save-CurrentFormState } catch {
-            Update-Status "Scheduled $name, but preferences were not saved: $($_.Exception.Message)"
+            Update-Status "Scheduled $name, but preferences were not saved: $($_.Exception.Message)" -Alert
         }
         try { Refresh-PendingList } catch {
-            Update-Status "Scheduled $name, but the task list could not refresh: $($_.Exception.Message)"
+            Update-Status "Scheduled $name, but the task list could not refresh: $($_.Exception.Message)" -Alert
         }
         try { Request-UsageRefresh } catch { }
-        # Scheduling success is already reflected in the status line and
-        # Upcoming runs. Avoid a redundant modal acknowledgment.
+        # The Upcoming runs row is the success confirmation.
     } catch {
         # A task may have been registered before a later check failed. Surface it,
         # rather than leaving an empty list that encourages duplicate schedules.

@@ -21,7 +21,7 @@ function New-CodexUiState {
         Preferences = @{
             uiSettings=$null; savedDraft=$null; settingsReady=$false
             settingsTimer=$null; lastAccessPreference='workspace-write'
-            appearanceBeforeDraft=$null; scheduleTimeEdited=$false; scheduleTimeUpdating=$false
+            appearanceBeforeDraft=$null; alertMessage=''; scheduleTimeEdited=$false; scheduleTimeUpdating=$false
         }
         Dashboard = @{
             appearanceButton=$null; compactRunDate=$null; compactRunDetails=$null
@@ -29,8 +29,6 @@ function New-CodexUiState {
             compactRunPanel=$null; compactRunTrack=$null; compactTitleFont=$null
             compactToggle=$null; compactUsageModel=$null; compactUsageStatus=$null
             countdownBlue=$null; countdownTimer=$null; dashboardStandardOnly=@()
-            activityPanel=$null; activityLabel=$null
-            latestResultKey=''; latestResultPreview=''
             fullTitleFont=$null; pendingSnapshot=@(); historySnapshot=@()
             pendingIndex=@{}; runBarHosts=$null
         }

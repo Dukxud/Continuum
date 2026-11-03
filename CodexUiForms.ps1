@@ -38,9 +38,6 @@ function Add-Button {
 $heading = Add-Label 'Schedule a continuation' 18 14 500
 $heading.Font = [System.Drawing.Font]::new('Segoe UI',15,[System.Drawing.FontStyle]::Bold)
 $heading.Height = 34
-$subtitle = Add-Label 'One-time run · Opens a visible terminal' 544 22 355
-$subtitle.ForeColor = [System.Drawing.Color]::DimGray
-$subtitle.TextAlign = 'MiddleRight'
 
 [void](Add-Label 'Conversation' 18 65)
 $sessionBox = New-Object System.Windows.Forms.ComboBox
@@ -80,27 +77,32 @@ $minusTime = Add-Button '−' 401 154 38
 $minusTime.AccessibleName='Schedule one minute earlier'
 $plusTime = Add-Button '+' 446 154 38
 $plusTime.AccessibleName='Schedule one minute later'
+$nowPlusTwo = Add-Button 'Now +2' 494 154 112
+$nowPlusTwo.AccessibleName='Schedule two minutes from now'
+$useReset = Add-Button 'Reset +2' 618 154 137
+$useReset.AccessibleName='Schedule two minutes after verified quota reset'
+$useReset.Enabled = $false
 
-[void](Add-Label 'Access' 500 157 95)
+[void](Add-Label 'Reasoning' 361 202 86)
 $effortBox = New-Object System.Windows.Forms.ComboBox
-$effortBox.Location = [System.Drawing.Point]::new(597,199)
-$effortBox.Size = [System.Drawing.Size]::new(301,30)
+$effortBox.Location = [System.Drawing.Point]::new(450,199)
+$effortBox.Size = [System.Drawing.Size]::new(122,30)
 $effortBox.DropDownStyle = 'DropDownList'
 $form.Controls.Add($effortBox)
 
-[void](Add-Label 'Model' 18 202)
+[void](Add-Label 'Access' 586 202 60)
 $accessBox = New-Object System.Windows.Forms.ComboBox
-$accessBox.Location = [System.Drawing.Point]::new(597,154)
-$accessBox.Size = [System.Drawing.Size]::new(301,30)
+$accessBox.Location = [System.Drawing.Point]::new(652,199)
+$accessBox.Size = [System.Drawing.Size]::new(246,30)
 $accessBox.DropDownStyle = 'DropDownList'
 [void]$accessBox.Items.AddRange([object[]]@('Workspace write','Full access (YOLO)','Read-only test'))
 $script:ui.Preferences.lastAccessPreference = Get-SavedAccessPreference
 $accessBox.SelectedIndex = switch ($script:ui.Preferences.lastAccessPreference) { 'yolo' { 1 } 'read-only' { 2 } default { 0 } }
 $form.Controls.Add($accessBox)
-[void](Add-Label 'Reasoning' 500 203 95)
+[void](Add-Label 'Model' 18 202 70)
 $modelBox = New-Object System.Windows.Forms.ComboBox
-$modelBox.Location = [System.Drawing.Point]::new(155,199)
-$modelBox.Size = [System.Drawing.Size]::new(325,30)
+$modelBox.Location = [System.Drawing.Point]::new(90,199)
+$modelBox.Size = [System.Drawing.Size]::new(258,30)
 $modelBox.DropDownStyle = 'DropDownList'
 $modelBox.DisplayMember = 'Display'
 $form.Controls.Add($modelBox)
@@ -115,13 +117,6 @@ $schedule = Add-Button 'Schedule once' 720 274 178
 $schedule.Height = 31
 $schedule.Font = [System.Drawing.Font]::new('Segoe UI',10,[System.Drawing.FontStyle]::Bold)
 $schedule.Enabled = $false
-$autoResumeCheck = New-Object System.Windows.Forms.CheckBox
-$autoResumeCheck.Text = 'Retry if Codex hits a usage limit (max 4)'
-$autoResumeCheck.Location = [System.Drawing.Point]::new(155,276)
-$autoResumeCheck.Size = [System.Drawing.Size]::new(520,21)
-$autoResumeCheck.Checked = if ($script:ui.Preferences.savedDraft -and $script:ui.Preferences.savedDraft.autoResume -is [bool]) { [bool]$script:ui.Preferences.savedDraft.autoResume } else { $true }
-$form.Controls.Add($autoResumeCheck)
-
 $separator = New-Object System.Windows.Forms.Label
 $separator.BorderStyle = 'Fixed3D'
 $separator.Location = [System.Drawing.Point]::new(18,309)
@@ -131,9 +126,7 @@ $form.Controls.Add($separator)
 $usageHeading = Add-Label 'Usage remaining' 18 322 280
 $usageHeading.Font = [System.Drawing.Font]::new('Segoe UI',12,[System.Drawing.FontStyle]::Bold)
 $usageHeading.Height = 30
-$refreshUsage = Add-Button 'Refresh now' 605 320 139
-$useReset = Add-Button 'Use reset +2 min' 755 320 143
-$useReset.Enabled = $false
+$refreshUsage = Add-Button 'Refresh now' 755 320 143
 
 . (Join-Path $PSScriptRoot 'CodexFlowingBar.ps1')
 . (Join-Path $PSScriptRoot 'CodexAeroBar.ps1')
@@ -169,24 +162,28 @@ function New-UsageCard {
     $reset.Text = 'Waiting for Codex usage...'
     $reset.ForeColor = [System.Drawing.Color]::DimGray
     $card.Controls.Add($reset)
-    return [pscustomobject]@{ Panel = $card; Title = $name; Remaining = $remaining; Bar = $bar; Reset = $reset }
+    $updated = New-Object System.Windows.Forms.Label
+    $updated.Location = [System.Drawing.Point]::new(12,89)
+    $updated.Size = [System.Drawing.Size]::new(400,16)
+    $updated.Font = [System.Drawing.Font]::new('Segoe UI',8)
+    $updated.ForeColor = [System.Drawing.Color]::DimGray
+    $updated.Text = 'Checking account usage...'
+    $card.Controls.Add($updated)
+    return [pscustomobject]@{ Panel = $card; Title = $name; Remaining = $remaining; Bar = $bar; Reset = $reset; Updated = $updated }
 }
 $usageCards = @((New-UsageCard 18 'Primary window' 'quota'), (New-UsageCard 470 'Secondary window' 'weekly'))
-$usageNotice = Add-Label 'Loading account usage...' 18 477 880
-$usageNotice.ForeColor = [System.Drawing.Color]::DimGray
-
 $separator2 = New-Object System.Windows.Forms.Label
 $separator2.BorderStyle = 'Fixed3D'
-$separator2.Location = [System.Drawing.Point]::new(18,512)
+$separator2.Location = [System.Drawing.Point]::new(18,485)
 $separator2.Size = [System.Drawing.Size]::new(880,2)
 $form.Controls.Add($separator2)
 
-$pending = Add-Label 'Upcoming runs' 18 527 400
+$pending = Add-Label 'Upcoming runs' 18 499 400
 $pending.Font = [System.Drawing.Font]::new('Segoe UI',12,[System.Drawing.FontStyle]::Bold)
 $pending.Height = 30
 
 $grid = New-Object System.Windows.Forms.DataGridView
-$grid.Location = [System.Drawing.Point]::new(18,566)
+$grid.Location = [System.Drawing.Point]::new(18,536)
 $grid.Size = [System.Drawing.Size]::new(880,195)
 $grid.ReadOnly = $true
 $grid.AllowUserToAddRows = $false
@@ -227,18 +224,30 @@ $grid.Add_SelectionChanged({
     }
 })
 
-$refreshRuns = Add-Button 'Refresh runs' 18 774 154
-$cancelRun = Add-Button 'Cancel selected' 185 774 154
+$refreshRuns = Add-Button 'Refresh runs' 18 744 154
+$cancelRun = Add-Button 'Cancel selected' 185 744 154
 $cancelRun.Enabled = $false
-$openFolder = Add-Button 'Open logs folder' 352 774 154
-$recentResults = Add-Button 'Recent runs' 520 774 178
-$status = Add-Label 'Ready. Keep Windows awake and signed in for scheduled runs.' 18 823 880
-$status.ForeColor = [System.Drawing.Color]::DimGray
+$openFolder = Add-Button 'Open logs folder' 352 744 154
+$recentResults = Add-Button 'Recent runs' 520 744 178
+# Only actionable warnings/errors deserve space; no permanent status footer.
+$status = Add-Label '' 18 783 880
+$status.ForeColor = [System.Drawing.Color]::FromArgb(138,49,33)
 $status.AutoEllipsis = $true
-
+$status.Visible = $false
+$status.Cursor = [System.Windows.Forms.Cursors]::Hand
+$status.Add_Click({Clear-SchedulerAlert})
+function Clear-SchedulerAlert {
+    $script:ui.Preferences.alertMessage = ''
+    $status.Visible = $false
+    if ($script:ui.Dashboard.compactToggle) { Update-DashboardLayout }
+}
 function Update-Status {
-    param([string]$Text)
+    param([string]$Text,[switch]$Alert)
+    if (-not $Alert) { return }
+    $script:ui.Preferences.alertMessage = $Text
     $status.Text = $Text
+    $status.Visible = $true
+    if ($script:ui.Dashboard.compactToggle) { Update-DashboardLayout }
 }
 
 $repoHints = [System.Windows.Forms.ToolTip]::new()
@@ -246,6 +255,6 @@ $usageHints = [System.Windows.Forms.ToolTip]::new()
 $actionHints = [System.Windows.Forms.ToolTip]::new()
 $actionHints.SetToolTip($schedule, 'Creates one Windows Task Scheduler run. Your settings are rechecked when the task starts.')
 $actionHints.SetToolTip($pending, 'Only scheduled and actively running tasks appear here. See Recent runs for finished results and their responses.')
-$actionHints.SetToolTip($autoResumeCheck, 'Only retries after a confirmed Codex usage-limit failure; does not monitor other Codex terminals.')
 $actionHints.SetToolTip($useReset, 'Uses the applicable exhausted quota reset time plus two minutes, when Codex reports one.')
+$actionHints.SetToolTip($status, 'Click to dismiss this warning.')
 

@@ -53,7 +53,7 @@ function Read-CodexModelCatalog {
 function Get-CodexRuntimeFiles {
     return @(
         'CodexResumeScheduler.ps1','CodexRunEngine.ps1',
-        'CodexUsage.js','CodexRetry.js','CodexRunJob.vbs',
+        'CodexUsage.js','CodexRunJob.vbs',
         'components/RuntimeBundle/RuntimeBundle.psm1',
         'components/OneTimeTasks/OneTimeTasks.psm1',
         'components/GitRepository/GitRepository.psm1',
@@ -98,50 +98,13 @@ function Test-CanonicalWorkspaceIdentity {
     return ($Identity -cmatch '^workspace-sha256:[0-9a-f]{64}$')
 }
 
-function Schedule-LimitRetry {
-    param($Job, [long]$ResetAt, [long]$RunAt, [string]$BucketId,
-          [string]$AppDirectory, [string]$RuntimeDirectory)
-    $attempt = [int]$Job.retryAttempt + 1
-    if ($attempt -gt 4) { Write-Host 'Automatic resume stopped: maximum four attempts reached.' -ForegroundColor Yellow; return $false }
-    if (-not (Test-CanonicalWorkspaceIdentity ([string]$Job.accountId))) {
-        throw 'No verified workspace identity; automatic retry refused.'
-    }
-    Assert-RuntimeFingerprint -Directory $RuntimeDirectory -RelativeFiles (Get-CodexRuntimeFiles) -ExpectedFingerprint ([string]$Job.runtimeFingerprint)
-    $when = [DateTimeOffset]::FromUnixTimeSeconds($RunAt).LocalDateTime
-    $rounded = [datetime]::new($when.Year,$when.Month,$when.Day,$when.Hour,$when.Minute,0)
-    if ($when -gt $rounded) { $rounded = $rounded.AddMinutes(1) }
-    $when = $rounded
-    if ($when -le (Get-Date).AddSeconds(60)) { Write-Host 'Reset time is not safely in the future; no retry scheduled.' -ForegroundColor Yellow; return $false }
-    $name = 'CodexResume-' + $when.ToString('yyyyMMdd-HHmm') + '-' + ([guid]::NewGuid().ToString('N').Substring(0,8))
-    $jobFile = Join-Path $AppDirectory ($name + '.json')
-    $next = [pscustomobject]@{
-        sessionId=$Job.sessionId; repo=$Job.repo; branch=$Job.branch
-        model=$Job.model; effort=$Job.effort; access=$Job.access; message=$Job.message
-        autoResume=$true; createdAt=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-        accountId=$Job.accountId; retryAttempt=$attempt; previousResetAt=$ResetAt
-        runtimeFingerprint=$Job.runtimeFingerprint; log=(Join-Path $AppDirectory ($name + '.log'))
-    }
-    $next | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $jobFile -Encoding utf8
-    $runner = Join-Path $RuntimeDirectory 'CodexRunJob.vbs'
-    $exe = Join-Path $env:WINDIR 'System32\wscript.exe'
-    try {
-        [void](Register-OneTimeTask -Name $name -At $when -Executable $exe -Arguments (Get-CodexTaskArguments $runner $jobFile) -WorkingDirectory $Job.repo -Description "Codex retry $attempt/4")
-    } catch {
-        $existing = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
-        if (-not $existing) { Remove-Item -LiteralPath $jobFile -Force -ErrorAction SilentlyContinue }
-        throw
-    }
-    Write-Host "Quota '$BucketId' blocked; retry $attempt/4 scheduled for $($when.ToString('yyyy-MM-dd HH:mm')) (local)."
-    return $name
-}
-
 # Task Scheduler reports handler success; the persisted outcome distinguishes
-# completed work from a correctly registered retry.
+# completed, failed, or blocked one-time work.
 function Set-CodexRunOutcome {
-    param([string]$JobFile,[string]$Status,[int]$Attempt=0,$ExitCode=$null,[string]$Message='',[string]$NextJob='')
+    param([string]$JobFile,[string]$Status,$ExitCode=$null,[string]$Message='')
     if (-not $JobFile -or -not [IO.Path]::IsPathRooted($JobFile)) { return }
     $outcomePath=[IO.Path]::ChangeExtension($JobFile,'.result.json')
-    [void](Write-JobOutcome -Path $outcomePath -Status $Status -Attempt $Attempt -ExitCode $ExitCode -Message $Message -NextJob $NextJob)
+    [void](Write-JobOutcome -Path $outcomePath -Status $Status -Attempt 0 -ExitCode $ExitCode -Message $Message)
 }
 function Invoke-CodexScheduledJob {
     [CmdletBinding()]
@@ -167,7 +130,7 @@ function Invoke-CodexScheduledJob {
         $sessionGuard = Enter-CodexSessionRun -SessionId ([string]$job.sessionId)
         if (-not $sessionGuard) {
             $message = 'Another scheduled continuation is active for this Codex conversation; duplicate execution refused.'
-            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -Attempt ([int]$job.retryAttempt) -ExitCode 1 -Message $message
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode 1 -Message $message
             Write-Host $message -ForegroundColor Yellow
             return 1
         }
@@ -181,8 +144,8 @@ function Invoke-CodexScheduledJob {
         Write-Host "Model: $($job.model) | Reasoning: $($job.effort) | Access: $($job.access) | Message: $($job.message)"
         $model = [string]$job.model
         Assert-ModelEffortSupported (Read-CodexModelCatalog) $model ([string]$job.effort)
-        # A one-time task is unattended even when automatic retry is disabled.
-        # Check selected workspace identity immediately before running the CLI.
+        # Every run has one opportunity. Verify selected workspace and quota
+        # immediately before execution; never register an automatic follow-up.
         if (-not (Test-CanonicalWorkspaceIdentity ([string]$job.accountId))) {
             throw 'Scheduled job lacks verified workspace identity. Refresh usage and reschedule.'
         }
@@ -191,19 +154,11 @@ function Invoke-CodexScheduledJob {
             [string]$job.accountId -cne [string]$state.accountId) {
             throw 'Selected workspace identity is unavailable or changed; scheduled execution refused.'
         }
-        $auto = $job.autoResume -eq $true
-        if ($auto -and [int]$job.retryAttempt -gt 0) {
-            if (-not $state.canAttempt) {
-                if ($state.recommendationKind -eq 'exhausted-window' -and $state.recommendedResetAt -and [int]$job.retryAttempt -lt 4) {
-                    $nextJob=Schedule-LimitRetry $job ([long]$state.recommendedResetAt) ([long]$state.recommendedResetAt + 120) ([string]$state.bucketId) $AppDirectory $RuntimeDirectory
-                    if ($nextJob) {
-                        Set-CodexRunOutcome -JobFile $JobFile -Status 'deferred' -Attempt ([int]$job.retryAttempt) -Message 'Another retry registered after verified quota reset.' -NextJob ([string]$nextJob)
-                        return 0
-                    }
-                } else { Write-Host "Usage still unavailable; no reliable future retry: $($state.blockedReason)" -ForegroundColor Yellow }
-                Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -Attempt ([int]$job.retryAttempt) -Message ([string]$state.blockedReason)
-                return 1
-            }
+        if ($state.canAttempt -eq $false) {
+            $message = if ($state.blockedReason) { [string]$state.blockedReason } else { 'Codex reports usage unavailable for the selected model.' }
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode 1 -Message $message
+            Write-Host $message -ForegroundColor Yellow
+            return 1
         }
         $argsList = @('exec','--json','-m',$model,'-c',"model_reasoning_effort=$($job.effort)",'-C',$root)
         if (-not $model) { $argsList = @('exec','--json','-c',"model_reasoning_effort=$($job.effort)",'-C',$root) }
@@ -224,31 +179,15 @@ function Invoke-CodexScheduledJob {
         # An interactive Codex process does not hold our Scheduler mutex.
         # Report native thread-writer conflicts rather than a generic failure.
         if ($result -ne 0 -and (Select-String -LiteralPath $events -Pattern 'thread-store conflict|already has an active writer' -Quiet)) {
-            $message = 'Codex reports an existing active writer for this conversation. No automatic retry was scheduled.'
-            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -Attempt ([int]$job.retryAttempt) -ExitCode ([int]$result) -Message $message
+            $message = 'Codex reports an existing active writer for this conversation. Scheduled run blocked.'
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode ([int]$result) -Message $message
             return [int]$result
         }
-        $nextJob = $null
-        if ($auto -and $result -ne 0) {
-            $retryHelper = Join-Path $PSScriptRoot 'CodexRetry.js'
-            $cli = Get-CodexCliJs
-            $assessment = & node $retryHelper --events $events --cli-js $cli --model $model --exit-code $result | Select-Object -Last 1 | ConvertFrom-Json
-            if ($assessment.kind -eq 'retry') {
-                if (-not $assessment.accountId -or $assessment.accountId -cne $job.accountId) { throw 'Codex account changed or identity unavailable; refusing retry.' }
-                $nextJob = Schedule-LimitRetry $job ([long]$assessment.resetAt) ([long]$assessment.runAt) ([string]$assessment.bucketId) $AppDirectory $RuntimeDirectory
-            } elseif ($assessment.kind -eq 'unknown') {
-                Write-Host "Not auto-resuming: $($assessment.reason)" -ForegroundColor Yellow
-            }
-        }
-        if ($nextJob) {
-            Set-CodexRunOutcome -JobFile $JobFile -Status 'deferred' -Attempt ([int]$job.retryAttempt) -ExitCode ([int]$result) -Message 'Codex hit a verified limit; a retry is scheduled.' -NextJob ([string]$nextJob)
-            return 0
-        }
         if ([int]$result -eq 0) {
-            Set-CodexRunOutcome -JobFile $JobFile -Status 'completed' -Attempt ([int]$job.retryAttempt) -ExitCode 0
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'completed' -ExitCode 0
             return 0
         }
-        Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -Attempt ([int]$job.retryAttempt) -ExitCode ([int]$result) -Message 'Codex exited unsuccessfully without a scheduled retry.'
+        Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -ExitCode ([int]$result) -Message 'Codex exited unsuccessfully.'
         return [int]$result
     } catch {
         $failure = "Scheduled run failed: $($_.Exception.Message)"
@@ -260,7 +199,7 @@ function Invoke-CodexScheduledJob {
                 Add-Content -LiteralPath $target -Value "$(Get-Date -Format o) $failure" -ErrorAction Stop
             } catch { }
         }
-        try { Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -Attempt $(if ($job) { [int]$job.retryAttempt } else { 0 }) -ExitCode 1 -Message $failure } catch { }
+        try { Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -ExitCode 1 -Message $failure } catch { }
         return 1
     } finally {
         # Releasing the writer lock must not depend on transcript shutdown.

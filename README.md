@@ -11,21 +11,21 @@ Download the versioned ZIP from **Releases**, not GitHub's generic `main.zip`. T
 ## What it does
 
 - Selects from recent saved Codex CLI sessions, **auto-locates their Git root when evidence is sufficient**, and validates the selected repository/branch. A manual Browse override remains available.
-- Schedules a message (default `Resume.`) at a specific local date and time.
+- Schedules a message (default `Resume.`) at a specific local date and time. The time defaults to two minutes ahead; `−`, `+`, and **Now +2** offer quick adjustment.
 - Configures the Codex model and *only* that model’s advertised ordinary reasoning efforts (excluding the separate Ultra/multi-agent mode), plus access mode (read-only, workspace-write, or unrestricted/YOLO). The list comes from Codex `model/list`, not a built-in list of model names.
 - Shows pending scheduled runs, supports cancellation, and saves a transcript in `%LOCALAPPDATA%\CodexResumeScheduler`.
 - **Compact mode** remembers the preferred view, displays the next upcoming run and its model-specific usage windows, and hides the run section entirely when no run is scheduled. Standard mode shows every upcoming run.
 - **The progress bars use the owner-approved Windows v1.8 + Aero Liquid v3 hybrid (v2.0.1)**. Quota bars are green and countdowns blue, with the corrected rounded liquid tip, Fresnel optics, reflections, and continuous animation. The actual approved shader and Windows-color source pixels are packaged locally. It runs through Microsoft Edge WebView2; if the runtime/SDK is unavailable, the prior WPF progress bars remain a functional fallback. Time bars fill from **schedule creation** to the scheduled launch time; older tasks without a creation timestamp display the remaining time and an unfilled track rather than a made-up percentage. Reaching 100% is not confirmation that Codex started.
-- Countdown labels update locally every second without additional Codex requests. Task and quota snapshots still refresh every 60 seconds.
-- Autosaves and restores the complete scheduling draft: conversation, repository, model, reasoning effort, access, instruction, auto-resume, and requested local run time. Saving does not require creating a scheduled run.
+- Countdown labels update locally every second without additional Codex requests. Running-task state refreshes every two seconds, and quota snapshots every 60 seconds.
+- Autosaves and restores the scheduling draft: conversation, repository, model, reasoning effort, access, instruction, and requested local run time. Saving does not require creating a scheduled run.
 - Starts through Windows' built-in Script Host (`wscript.exe`), without a visible terminal. New scheduled jobs also run with a hidden window and report their exit status; transcripts and event logs remain available.
-- When a scheduled Codex run reports an actual usage-limit failure, **Auto-resume** (enabled by default) reads the current model’s applicable quota and schedules another one-time run after the reported reset **+2 minutes**. A retry is only started when backend permission is explicitly restored; attempts are capped at four.
-- Displays **percentage remaining**, progress bars, and local reset times from Codex's official `account/rateLimits/read` App Server method. **Use reset +2 min** sets the scheduling control to two minutes after the selected reset, rounded up to the next whole minute. It never schedules automatically.
+- **One schedule = one execution.** When Codex reports a usage limit or execution failure, the application records the result for review under **Recent runs**; it does not register another task.
+- Displays **percentage remaining**, progress bars, and local reset times from Codex's official `account/rateLimits/read` App Server method. **Reset +2** sets the scheduling control to two minutes after the selected reset, rounded up to the next whole minute. It never schedules automatically.
 - Refreshes **usage and pending runs automatically on startup, every 60 seconds, and after scheduling or cancellation**. Usage reads run in a short-lived process; conversation, repository, and pending-task reads run in background jobs.
 
 ## Responsiveness and concurrent sessions
 
-The modular GUI dispatches saved-conversation discovery, repository lookup, and pending scheduled-task reads to short-lived background PowerShell jobs. It coalesces overlapping refresh requests, and all UI updates occur on the interface thread. No persistent service runs after you close the GUI. The interface groups model and reasoning settings, displays recognizable project names rather than opaque task IDs, and keeps full details in tooltips. When there are no scheduled runs, the upcoming-run section collapses. Background pending refresh no longer replaces actionable status messages.
+The modular GUI dispatches saved-conversation discovery, repository lookup, and pending scheduled-task reads to short-lived background PowerShell jobs. It coalesces overlapping refresh requests, and all UI updates occur on the interface thread. No persistent service runs after you close the GUI. The interface groups model, reasoning, and access on one line, displays recognizable project names rather than opaque task IDs, and keeps full details in tooltips. When there are no scheduled runs, the upcoming-run section collapses. Background pending refresh no longer replaces actionable status messages.
 
 **Concurrent sessions:** the previous process-based open-session detector was removed because it could not reliably identify an independently opened interactive Codex conversation. Before scheduling a continuation, close any other Codex window that might be using that conversation.
 
@@ -69,7 +69,7 @@ See [reusable components and usage examples](components/README.md) and [architec
 
 **Scheduled jobs are pinned to their original worker files.** A later app upgrade creates a new runtime snapshot rather than overwriting the runner for existing tasks. Before execution, the worker validates every pinned file against the saved SHA-256 fingerprint. This detects accidental runtime changes; it does not defend against the same Windows account intentionally rewriting both job metadata and files.
 
-The scheduler records completed, deferred, failed, blocked and cancelled outcomes, including the name of any registered follow-up task. Use **Recent results** to inspect their history. Every scheduled execution, including a one-time run with Auto-resume disabled, requires a verified selected-workspace identity. The application computes the same canonical hash from `account/rateLimits/read.accountId` or from experimental `account/read.workspaceRouting.chatgptAccountId`; it rejects conflicting identifiers. **Email alone never permits unattended execution.** If the backend offers no reliable workspace ID, scheduling is unavailable until identity can be verified. Every worker checks identity again immediately before execution. Previously created tasks retain their old launchers and must be cancelled and rescheduled to gain these protections.
+The scheduler records completed, failed, blocked and cancelled outcomes; historical deferred results from older worker versions remain readable. Use **Recent runs** to inspect their history. Every scheduled execution requires a verified selected-workspace identity. The application computes the same canonical hash from `account/rateLimits/read.accountId` or from experimental `account/read.workspaceRouting.chatgptAccountId`; it rejects conflicting identifiers. **Email alone never permits unattended execution.** If the backend offers no reliable workspace ID, scheduling is unavailable until identity can be verified. Every worker checks identity again immediately before execution. Previously created tasks retain their old launchers and must be cancelled and rescheduled to gain these protections.
 
 ## Requirements
 
@@ -83,10 +83,10 @@ The scheduler records completed, deferred, failed, blocked and cancelled outcome
 1. Download the latest **versioned CodexResumeScheduler ZIP** from [Releases](https://github.com/Dukxud/codex-resume-scheduler/releases/latest).
 2. Extract the complete versioned folder, preserving its `assets` and `AeroWebView2` subfolders alongside the supplied scripts.
 3. Double-click **`Start-Codex-Scheduler.vbs`** to open the interface without a visible terminal. The `.cmd` fallback may briefly flash its own shell before exiting.
-4. Usage and pending jobs load automatically; optionally click **Refresh now**. If a reset time is available, click **Use reset +2 min**, or enter a time manually.
-5. Select the conversation, **model**, repository, model-supported effort, access mode, and instruction, then click **Schedule once**. Leave Auto-resume checked to retry on a confirmed usage-limit failure.
+4. Usage and pending jobs load automatically; optionally click **Refresh now**. Use **Now +2**, **Reset +2** (when a verified quota reset is available), or enter a time manually.
+5. Select the conversation, **model**, repository, model-supported effort, access mode, and instruction, then click **Schedule once**.
 
-Newly scheduled jobs use Windows Script Host (`wscript.exe`) to run in the background without a visible terminal. Output and failures are saved in `%LOCALAPPDATA%\CodexResumeScheduler`; use **Open logs folder** for transcripts and **Recent results** for the recorded run status. **Older pending jobs retain their originally registered command**; cancel and reschedule them if you want them to run without a console. Keep the computer **awake, online, and signed into Windows** at the scheduled time. A task missed while the computer was unavailable may execute at the next opportunity.
+Newly scheduled jobs use Windows Script Host (`wscript.exe`) to run in the background without a visible terminal. Output and failures are saved in `%LOCALAPPDATA%\CodexResumeScheduler`; use **Open logs folder** for transcripts and **Recent runs** for the recorded run status. **Older pending jobs retain their originally registered command**; cancel and reschedule them if you want them to run without a console. Keep the computer **awake, online, and signed into Windows** at the scheduled time. A task missed while the computer was unavailable may execute at the next opportunity.
 
 ## How the usage read works
 
@@ -96,13 +96,11 @@ The response may include both five-hour and weekly limits, or other-duration win
 
 The usage helper currently supports the **npm Codex installation** on Windows. When the CLI model catalog is unavailable, the GUI disables new scheduling rather than guess model/effort compatibility; previously registered tasks are unchanged. The UI refreshes automatically every minute, only while open; it does **not** create a recurring Windows task or poll in the background after closing.
 
-## Automatic continuation after a limit
+## One-time execution
 
-Only operations launched **through a scheduled job in this application** are monitored; this utility cannot capture and pause arbitrary Codex CLI sessions started independently. A run uses `codex exec --json` with its saved session, model, reasoning effort, repository, access mode, and original instruction. If a structured Codex error reports an actual usage limit, it re-reads `account/rateLimits/read` and registers a one-time retry for the **relevant reported reset plus two minutes**. The retry starts by checking that Codex explicitly reports ordinary usage allowed and that the applicable window is no longer exhausted.
+Only operations launched **through a scheduled job in this application** are monitored. Each task runs its saved Codex session at most once, with a pinned worker, selected model/effort, repository, branch, access, and instruction. It verifies the account/workspace and available quota before execution, records a blocked or failed outcome if it cannot safely proceed, and **never registers an automatic retry**. Review the response and logs under **Recent runs**; schedule another run explicitly if desired.
 
-Unknown quota-to-model mappings, missing/expired reset times, changes in account, non-quota failures, exhausted credits, and unsupported responses **stop automatic retries** rather than guess or spin. A maximum of four reschedules prevents an unattended loop. A retried task retains the model, reasoning, worktree, branch, access, and message, and validates the worktree and branch at execution. Every attempt has a local PowerShell transcript and Codex JSONL event log; these may contain conversation text and should remain private.
-
-Model choices are dynamically discovered with Codex's `model/list`. If discovery fails or a session references a model not currently listed, the scheduler does not offer arbitrary model/effort combinations. Refresh the Codex model catalog or select an advertised model. Scheduled jobs independently revalidate the model and effort against fresh catalog data at launch. Ultra is a multi-agent selection in the CLI, not an ordinary reasoning-effort tier, and is deliberately excluded. The application does not assume that all models share a quota or that the availability of one model permits another to run.
+Previously scheduled jobs use **their own immutable worker snapshots**. Jobs created by old versions may still retry if their original worker and payload enabled that behavior; this upgrade does not rewrite or cancel those registrations.
 
 ## Repository auto-detection
 
@@ -131,7 +129,7 @@ MIT License. See [LICENSE](LICENSE).
 
 ## Development
 
-Run the quota, model discovery, and retry-decision tests with Node.js:
+Run the quota, model discovery, and single-execution tests with Node.js:
 
 ```sh
 node --test tests/*.test.js
@@ -176,4 +174,4 @@ AeroProgress now stores WebView2 state privately, without reading or overwriting
 
 Multiple one-time task triggers can fire while an earlier continuation is still working on the same Codex thread. The v1.16 worker uses a cross-process, per-conversation Windows mutex to prevent a second **Scheduler** worker from launching concurrently. An overlapping attempt is recorded as blocked (not silently queued or retried). Codex's own active-writer error is also recorded distinctly when the writer belongs to an interactive Codex process outside the Scheduler mutex. The operator decides whether another continuation is still needed.
 
-An already registered job runs its **pinned worker snapshot**, not whichever Scheduler GUI version is open. The interface countdown is not execution status. Prior versions may neither produce result JSON nor auto-retry if their saved autoResume flag is false.
+An already registered job runs its **pinned worker snapshot**, not whichever Scheduler GUI version is open. The interface countdown is not execution status. Prior versions may have different outcome handling and may still schedule retries if their pinned worker enabled them.

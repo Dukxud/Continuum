@@ -83,7 +83,7 @@ function Apply-SelectionResult {
             $detail = "Codex reported: $($info.Found.Root)`nOther checkout(s): $($otherRoots -join '; ')`nChoose Browse to override."
             $repoHints.SetToolTip($repoBox, $detail)
             $repoHints.SetToolTip($status, $detail)
-            Update-Status "Codex: $($info.Found.Root) | Other: $($otherRoots -join '; ') (hover for details)"
+            Update-Status "Codex: $($info.Found.Root) | Other: $($otherRoots -join '; ') (hover for details)" -Alert
         } else {
             $repoHints.SetToolTip($repoBox, "From $($info.Found.Source): $($info.Found.Root)")
             Update-Status "Repository: $($info.Found.Root) ($($info.Found.Source))"
@@ -92,8 +92,8 @@ function Apply-SelectionResult {
         $detail = "Conflicting fallback checkouts: $(@($info.Found.Candidates) -join '; ')`nChoose Browse to select the active checkout."
         $repoHints.SetToolTip($repoBox, $detail)
         $repoHints.SetToolTip($status, $detail)
-        Update-Status "Conflicting roots: $(@($info.Found.Candidates) -join '; ') (hover for details)"
-    } else { Update-Status 'Repository could not be identified. Use Browse.' }
+        Update-Status "Conflicting roots: $(@($info.Found.Candidates) -join '; ') (hover for details)" -Alert
+    } else { Update-Status 'Repository could not be identified. Use Browse.' -Alert }
 
 }
 
