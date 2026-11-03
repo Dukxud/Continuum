@@ -12,13 +12,30 @@ try {
     $request=if($Payload){[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Payload)) | ConvertFrom-Json -ErrorAction Stop}else{[pscustomobject]@{}}
     . (Join-Path $source 'CodexRunEngine.ps1')
     . (Join-Path $source 'CodexData.ps1')
+    function Get-FlutterHistory {
+        $recentTasks=@(Get-UpcomingCodexTasks -AppDirectory $appDir)
+        $records=@(Get-CodexRunHistory -Directory $appDir -Limit 100)
+        $known=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+        foreach($entry in $records){[void]$known.Add([string]$entry.Name)}
+        $hidden=Get-HiddenCodexRunNames -Directory $appDir
+        foreach($task in $recentTasks){
+            $name=[string]$task.Name
+            if($task.Status -in @('Scheduled','Running') -or $known.Contains($name) -or $hidden.Contains($name)){continue}
+            $records+= [pscustomobject]@{
+                Name=$name;When=$task.When;Status=$task.Status;ExitCode=$null
+                Attempt=$null;NextJob='';Message='Windows Task Scheduler record; no saved worker outcome available.'
+            }
+            [void]$known.Add($name)
+        }
+        return @($records | Sort-Object When -Descending)
+    }
     $result=$null
     switch($Action){
         'load' {
             $result=@{
                 sessions=@(Get-RecentCliSessions)
                 pending=@(Get-UpcomingCodexTasks -AppDirectory $appDir)
-                history=@(Get-CodexRunHistory -Directory $appDir -Limit 100)
+                history=@(Get-FlutterHistory)
                 settings=Read-CodexUiSettings $appDir
                 logDirectory=$appDir
             }
@@ -26,7 +43,7 @@ try {
         'pending' {
             $result=@{
                 pending=@(Get-UpcomingCodexTasks -AppDirectory $appDir)
-                history=@(Get-CodexRunHistory -Directory $appDir -Limit 100)
+                history=@(Get-FlutterHistory)
             }
         }
         'usage' {
@@ -154,11 +171,28 @@ try {
                 model=[string]$draft.model;effort=[string]$draft.effort
                 access=$access;message=[string]$draft.message;runAt=[string]$draft.runAt
             }
+            $appearance=if($request.barAppearance){$request.barAppearance}elseif($previous){$previous.barAppearance}else{$null}
+            if($appearance){
+                $validColors=@('green','blue','cyan','violet','amber','red')
+                foreach($kind in @('quota','weekly','time','working')){
+                    $color=[string]$appearance.$kind
+                    if($color -cnotin $validColors -and $color -cnotmatch '^#[0-9a-fA-F]{6}$'){
+                        throw "Invalid appearance color for $kind."
+                    }
+                }
+                foreach($kind in @('finish','lighting')){
+                    if($appearance.$kind -notin @(0,1,2)){throw "Invalid appearance $kind."}
+                }
+                if($appearance.shimmer -isnot [int] -and $appearance.shimmer -isnot [long]){throw 'Reflection strength must be integral.'}
+                if([int]$appearance.shimmer -lt 0 -or [int]$appearance.shimmer -gt 200){throw 'Invalid reflection strength.'}
+                if($appearance.speed -isnot [int] -and $appearance.speed -isnot [long]){throw 'Reflection speed must be integral.'}
+                if([int]$appearance.speed -lt 25 -or [int]$appearance.speed -gt 300){throw 'Invalid reflection speed.'}
+                if($appearance.aero -isnot [bool]){throw 'Invalid Aero Liquid setting.'}
+            }
             $settings=[pscustomobject]@{
                 version=1;lastAccess=$access
                 compactMode=($request.compactMode -eq $true)
-                barAppearance=$(if($previous){$previous.barAppearance}else{$null})
-                flutterAppearance=$(if($request.flutterAppearance){$request.flutterAppearance}elseif($previous){$previous.flutterAppearance}else{$null})
+                barAppearance=$appearance
                 draft=$safeDraft
             }
             Write-CodexUiSettings -Directory $appDir -State $settings
