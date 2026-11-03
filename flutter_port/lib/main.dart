@@ -207,22 +207,37 @@ class _SchedulerHomeState extends State<SchedulerHome> {
           value: stringField(session, 'Id'),
           child: Text(stringField(session, 'Display'), overflow: TextOverflow.ellipsis))).toList(),
         onChanged: (id) { repository.clear(); state.selectSession(id); })),
-      section('REPOSITORY', Row(children: [
-        Expanded(child: TextField(
-          controller: repository,
-          onChanged: (s) => state.edit(repository: s),
-          decoration: const InputDecoration(labelText: 'Git repository path'))),
-        const SizedBox(width: 10),
-        OutlinedButton(onPressed: () async {
-          try {
-            final result = await state.adapter.call('browse');
-            final path = stringField(result, 'path');
-            if (path.isNotEmpty) {
-              repository.text = path;
-              state.edit(repository: path);
-            }
-          } catch (e) { toast('Folder picker: $e'); }
-        }, child: const Text('Browse...')),
+      section('REPOSITORY', Column(
+        crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: TextField(
+            controller: repository,
+            onChanged: (v) => state.edit(repository: v),
+            decoration: const InputDecoration(labelText: 'Git repository path'))),
+          const SizedBox(width: 10),
+          OutlinedButton(onPressed: () async {
+            try {
+              final result = await state.adapter.call('browse');
+              final folder = stringField(result, 'path');
+              if (folder.isNotEmpty) {
+                repository.text = folder;
+                state.edit(repository: folder);
+              }
+            } catch (e) { toast('Folder picker: $e'); }
+          }, child: const Text('Browse...')),
+        ]),
+        if (state.repositoryWarning != null) ...[
+          const SizedBox(height: 6),
+          Text(state.repositoryWarning!,
+            style: const TextStyle(color: Colors.deepOrange, fontSize: 12)),
+          for (final root in state.repositoryAlternatives)
+            TextButton(
+              onPressed: () {
+                repository.text = root;
+                state.edit(repository: root);
+              },
+              child: Text('Use ' + root, overflow: TextOverflow.ellipsis)),
+        ],
       ])),
       section('RUN AT', Wrap(spacing: 9, runSpacing: 9,
         crossAxisAlignment: WrapCrossAlignment.center, children: [
