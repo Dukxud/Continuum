@@ -1,7 +1,9 @@
 # One deterministic, manual Windows acceptance entrypoint. Never calls CI.
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidatePattern('^[a-fA-F0-9]{40}
+    [Parameter(Mandatory)][ValidatePattern('^[a-fA-F0-9]{40}$')][string]$ExpectedCommit,
+    [ValidateRange(30,1800)][int]$TestTimeoutSeconds = 300
+)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $originalDirectory = (Get-Location).Path
