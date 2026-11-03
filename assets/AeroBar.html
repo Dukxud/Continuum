@@ -68,7 +68,7 @@ vec3 illuminate(vec3 normal,vec3 worldPos){
  float spec1=pow(S(dot(normal,h1)),88.);
  return env+vec3(2.0,2.12,2.30)*spec0+vec3(2.4,2.1,1.85)*spec1;
 }
-vec3 colorSurface(vec3 normal,vec3 position,float thickness,vec2 p,float front){
+vec3 colorSurface(vec3 normal,vec3 position,float thickness,vec2 p,float front,float capPresence){
  float nz=S(normal.z),fres=F(nz,.13);
  vec3 e=illuminate(normal,position);
  vec3 dye=pow(uAccent,vec3(1.09));
@@ -96,12 +96,12 @@ vec3 colorSurface(vec3 normal,vec3 position,float thickness,vec2 p,float front){
  vec3 reflectance=e*(.16+.68*metalFresnel)*mix(vec3(1.0),vec3(.90,.94,1.0),pearl);
  float pearly=pearl*.45*(.5+.5*sin(19.*p.y+uTime*.47))*pow(1.-nz,2.);
  reflectance+=pearly*vec3(.36,.48,.79);
- // A rounded end catches a localized curved cap reflection and dark collar.
- float collar=G(p.x-(front-.145),.052)*(1.-.65*abs(normal.y));
- float capGlow=G(p.x-(front+.05),.17)*pow(1.-nz,1.4);
+ // The curved-end collar/glow must disappear when the head is flat at 100%.
+ float collar=capPresence*G(p.x-(front-.145),.052)*(1.-.65*abs(normal.y));
+ float capGlow=capPresence*G(p.x-(front+.05),.17)*pow(1.-nz,1.4);
  base*=1.-collar*.22;
  reflectance+=vec3(.40,.54,.70)*capGlow;
- float pFront=G(p.x-(front-.035),.07)*G(p.y-.02,.12);
+ float pFront=capPresence*G(p.x-(front-.035),.07)*G(p.y-.02,.12);
  reflectance+=vec3(.62,.80,1.0)*pFront*.45;
  // A wide, softly reflected studio light moves across the curved liquid.
  // Its two-dimensional footprint, view-dependent response and curved falloff
@@ -177,7 +177,7 @@ void main() {
     vec3 norm=normalize(vec3(delta,zz+.00001));
     float front=-4.08+centerPx/uRes.x*8.16;
     vec2 world=vec2(-4.08+px/uRes.x*8.16,(uv.y-.5)*.845);
-    vec3 liquid=colorSurface(norm,vec3(world,zz+.35),2.*zz,world,front);
+    vec3 liquid=colorSurface(norm,vec3(world,zz+.35),2.*zz,world,front,1.-fullTip);
     float meniscusContact=G(rr-rd+.015,.023);
     liquid=mix(liquid,liquid*.71,meniscusContact*.28);
     fragColor=vec4(liquid,alpha);

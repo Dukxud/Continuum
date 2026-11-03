@@ -37,7 +37,14 @@ test('production uses exact owner-approved vertex shader and corrected optical f
     .replace('    float fullTip=step(.999999,f);\n','')
     .replace('    tipPx=mix(tipPx,uRes.x-edgeX,step(.999999,f));\n','')
     .replace('dxPx=mix(max(px-centerPx,0.),0.,fullTip);','dxPx=max(px-centerPx,0.);')
-    .replace('float alpha=cov*left*step(.00001,f)*.94*(1.-fullTip*smoothstep(uRes.x-edgeX-.5,uRes.x-edgeX+.5,px));','float alpha=cov*left*step(.00001,f)*.94;');
+    .replace('float alpha=cov*left*step(.00001,f)*.94*(1.-fullTip*smoothstep(uRes.x-edgeX-.5,uRes.x-edgeX+.5,px));','float alpha=cov*left*step(.00001,f)*.94;')
+    // Remove only the owner-requested 100%-flat cap shading correction.
+    .replace('vec3 colorSurface(vec3 normal,vec3 position,float thickness,vec2 p,float front,float capPresence){','vec3 colorSurface(vec3 normal,vec3 position,float thickness,vec2 p,float front){')
+    .replace(' // The curved-end collar/glow must disappear when the head is flat at 100%.\n',' // A rounded end catches a localized curved cap reflection and dark collar.\n')
+    .replace('float collar=capPresence*G(','float collar=G(')
+    .replace('float capGlow=capPresence*G(','float capGlow=G(')
+    .replace('float pFront=capPresence*G(','float pFront=G(')
+    .replace('vec3 liquid=colorSurface(norm,vec3(world,zz+.35),2.*zz,world,front,1.-fullTip);','vec3 liquid=colorSurface(norm,vec3(world,zz+.35),2.*zz,world,front);');
   assert.equal(stripped,approved);
   assert.match(augmented,/specularPatch/);
   assert.match(augmented,/float sweepEnvelope=smoothstep/);
@@ -72,6 +79,13 @@ test('production preserves captured Windows v1.8 bar pixels and compositor',()=>
   assert.match(script(production,'hybridfrag'),/float fullTip=step\(\.999999,f\)/);
   assert.match(script(production,'hybridfrag'),/tipPx=mix\(tipPx,uRes\.x-edgeX,step\(\.999999,f\)\)/);
   assert.match(script(production,'hybridfrag'),/dxPx=mix\(max\(px-centerPx,0\.\),0\.,fullTip\)/);
+  // Partial capsules retain their cap reflection. At full fill all three
+  // localized cap highlights are disabled without changing the studio sweep.
+  const fragment=script(production,'hybridfrag');
+  assert.match(fragment,/colorSurface\(norm,vec3\(world,zz\+\.35\),2\.\*zz,world,front,1\.-fullTip\)/);
+  for(const term of ['collar','capGlow','pFront']){
+    assert.match(fragment,new RegExp('float '+term+'=capPresence\\\\*G\\\\('),term+' must be gated by the cap shape');
+  }
   assert.match(production,/if\(value===1\)\{visual=1;velocity=0;lastNative=-1;\}/);
   assert.match(production,/function softenOutline\(canvas\)/);
 });
