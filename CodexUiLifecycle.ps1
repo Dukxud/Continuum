@@ -1,4 +1,7 @@
 Initialize-Dashboard
+# The countdown timer is created by Initialize-Dashboard; attach the scheduling
+# default updater only after that owner initializes it.
+$script:ui.Dashboard.countdownTimer.Add_Tick({ Refresh-SuggestedRunTime })
 
 $runStatusRefresh = New-Object System.Windows.Forms.Timer
 $runStatusRefresh.Interval = 2000

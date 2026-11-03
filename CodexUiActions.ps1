@@ -63,8 +63,6 @@ function Adjust-CodexScheduledTime {
 }
 $minusTime.Add_Click({ Adjust-CodexScheduledTime -Direction -1 })
 $plusTime.Add_Click({ Adjust-CodexScheduledTime -Direction 1 })
-# Share the existing one-second UI timer; do not add a background scheduler.
-$script:ui.Dashboard.countdownTimer.Add_Tick({ Refresh-SuggestedRunTime })
 $accessBox.Add_SelectedIndexChanged({ Queue-FormStateSave })
 $effortBox.Add_SelectedIndexChanged({
     if (-not $script:ui.Selection.updatingModels) {

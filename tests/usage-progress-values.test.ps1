@@ -26,8 +26,9 @@ function Require($Condition,[string]$Message) { if (-not $Condition) { throw $Me
 
 $form = [System.Windows.Forms.Form]::new()
 try {
-    $first = New-UsageCard 18 'Primary window'
-    $second = New-UsageCard 470 'Secondary window'
+    $first = New-UsageCard 18 'Primary window' 'quota'
+    $second = New-UsageCard 470 'Secondary window' 'weekly'
+    Require ($first.Bar.Tag.Kind -eq 'quota' -and $second.Bar.Tag.Kind -eq 'weekly') 'Usage cards must bind independently to 5-hour and weekly color roles.'
     foreach ($card in @($first,$second)) {
         Require ($card.Bar -is [System.Windows.Forms.Integration.ElementHost]) 'Usage must be WPF hosted in WinForms.'
         Require ($card.Bar.Child -is [System.Windows.Controls.ProgressBar]) 'Usage must be a real WPF percentage bar.'

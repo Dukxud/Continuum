@@ -14,8 +14,11 @@ $near=[datetime]'2026-11-02T17:51:00'
 Require ((Step-CodexScheduledRunTime -Time $near -Direction -1 -Now $now) -eq $near) 'Minus must not schedule inside the 30-second safety window.'
 $actions=Get-Content -LiteralPath (Join-Path $root 'CodexUiActions.ps1') -Raw
 $forms=Get-Content -LiteralPath (Join-Path $root 'CodexUiForms.ps1') -Raw
-foreach($fragment in @('scheduleTimeEdited','scheduleTimeUpdating','Refresh-SuggestedRunTime','countdownTimer.Add_Tick({ Refresh-SuggestedRunTime })','minusTime.Add_Click','plusTime.Add_Click')){
+$lifecycle=Get-Content -LiteralPath (Join-Path $root 'CodexUiLifecycle.ps1') -Raw
+foreach($fragment in @('scheduleTimeEdited','scheduleTimeUpdating','Refresh-SuggestedRunTime','minusTime.Add_Click','plusTime.Add_Click')){
     Require ($actions.Contains($fragment)) "Time control wiring missing: $fragment"
 }
+Require (-not $actions.Contains('countdownTimer.Add_Tick({ Refresh-SuggestedRunTime })')) 'Do not subscribe to dashboard timer before dashboard initialization.'
+Require ($lifecycle.IndexOf('Initialize-Dashboard') -ge 0 -and $lifecycle.IndexOf('countdownTimer.Add_Tick({ Refresh-SuggestedRunTime })') -gt $lifecycle.IndexOf('Initialize-Dashboard')) 'Scheduling timer handler must be wired after dashboard initialization.'
 Require ($forms.Contains('if ($restoredTime)') -and $forms.Contains('scheduleTimeEdited=$true')) 'Future user-selected times must not be overwritten.'
 Write-Host 'Two-minute default, rollover, one-minute step, guard, and manual-edit protection PASS.'
