@@ -168,6 +168,16 @@ test('transcript cleanup cannot override the worker exit status',()=>{
  assert.match(worker,/catch \{ Write-Warning "Worker session lock could not be released:/);
  assert.match(worker,/catch \{ Write-Warning "Worker session lock could not be disposed:/);
 });
+test('acceptance entrypoint must contain one complete script body',()=>{
+ const script=read('scripts/Invoke-LocalAcceptance.ps1');
+ assert.match(script,/^\[CmdletBinding\(\)\]\r?\nparam\(/m);
+ assert.equal((script.match(/BLACK-PUDDLE — LOCAL ACCEPTANCE START/g)||[]).length,1);
+ assert.equal((script.match(/BLACK-PUDDLE — LOCAL ACCEPTANCE END/g)||[]).length,1);
+ assert.equal((script.match(/^\$ErrorActionPreference = 'Stop'$/gm)||[]).length,1);
+ assert.equal((script.match(/^param\($/gm)||[]).length,1);
+ assert.doesNotMatch(script,/^\)\]\[string\]\$ExpectedCommit,/m);
+});
+
 test('all scheduled executions must bind to a verified selected workspace',()=>{
  const ui=read('CodexUiActions.ps1'), worker=read('CodexRunEngine.ps1');
  assert.match(ui,/Test-CanonicalWorkspaceIdentity \$accountId/);

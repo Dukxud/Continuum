@@ -52,6 +52,17 @@ jobs:
           if ($runs.Count -ne [int]$env:VALIDATION_ATTEMPT) {
             throw "Attempt number must be $($runs.Count) for this commit."
           }
+      - name: Parse acceptance entrypoint before running any tests
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'scripts/Invoke-LocalAcceptance.ps1'),
+            [ref]$tokens, [ref]$parseErrors)
+          if ($parseErrors.Count -ne 0) {
+            throw ($parseErrors | Out-String)
+          }
       - name: Complete single-pass acceptance (PowerShell, JavaScript, WinForms, WebView2)
         shell: pwsh
         run: pwsh -NoProfile -STA -File ./scripts/Invoke-LocalAcceptance.ps1 -ExpectedCommit $env:GITHUB_SHA
