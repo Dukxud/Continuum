@@ -492,7 +492,11 @@ class _SchedulerHomeState extends State<SchedulerHome> {
     String log = '';
     int generation = 0;
     bool reading = false;
-    await showDialog<void>(context: context,
+    _dialogOpen = true;
+    try {
+      await widget.windowHost?.showDialogWindow(history: true);
+      if (!mounted) return;
+      await showDialog<void>(context: context,
       builder: (parent) => StatefulBuilder(builder: (dialog, refresh) {
         Future<void> select(Map<String, dynamic> row) async {
           final token = ++generation;
@@ -538,12 +542,31 @@ class _SchedulerHomeState extends State<SchedulerHome> {
                     final name = stringField(row, 'Name');
                     return ListTile(dense: true,
                       selected: selected != null && stringField(selected, 'Name') == name,
-                      title: Text(stringField(row, 'Status')),
-                      subtitle: Text(timeLabel(dateField(row, 'When')) + '\n' + name,
+                      title: Text(timeLabel(dateField(row, 'When')) + ' · ' +
+                        stringField(row, 'Status')),
+                      subtitle: Text(name + '\n' + stringField(row, 'Message'),
                         maxLines: 2, overflow: TextOverflow.ellipsis),
                       onTap: () => select(row));
                   });
                 final detail = DefaultTabController(length: 2, child: Column(children: [
+                  if (selected != null) Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(9),
+                    color: surface,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Result: ' + stringField(selected, 'Status') +
+                        '  ·  Exit: ' + (field(selected, 'ExitCode')?.toString() ?? '—') +
+                        '  ·  Attempt: ' + (field(selected, 'Attempt')?.toString() ?? '—'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      if (stringField(selected, 'NextJob').isNotEmpty)
+                        Text('Next task: ' + stringField(selected, 'NextJob'),
+                          style: const TextStyle(fontSize: 12)),
+                      if (stringField(selected, 'Message').isNotEmpty)
+                        Text(stringField(selected, 'Message'),
+                          maxLines: 2, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12)),
+                    ]),
+                  ),
                   if (reading) const LinearProgressIndicator(),
                   const TabBar(tabs: [Tab(text: 'Codex response'), Tab(text: 'Worker log')]),
                   Expanded(child: TabBarView(children: [
@@ -580,6 +603,11 @@ class _SchedulerHomeState extends State<SchedulerHome> {
               ]),
             ]))));
       }));
+    } finally {
+      _dialogOpen = false;
+      _lastWindowKey = '';
+      updateWindowSize();
+    }
   }
 
   Future<void> appearanceDialog() async {
