@@ -203,9 +203,9 @@ $grid.BackgroundColor = [System.Drawing.Color]::White
 [void]$grid.Columns.Add('Details','Model / access / instruction')
 [void]$grid.Columns.Add('Session','Session')
 $grid.Columns[0].FillWeight = 149
-$grid.Columns[1].FillWeight = 150
+$grid.Columns[1].FillWeight = 205
 $grid.Columns[2].FillWeight = 145
-$grid.Columns[3].FillWeight = 325
+$grid.Columns[3].FillWeight = 290
 $grid.Columns[4].FillWeight = 85
 $grid.RowTemplate.Height = 40
 $grid.ShowCellToolTips = $true

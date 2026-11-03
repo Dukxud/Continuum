@@ -147,6 +147,7 @@ function Ensure-AeroFallback {
             if($Bar.Tag.Working){
                 $replacement.AccessibleName='Codex working; completion unknown'
                 Set-FlowingProgress $replacement 100
+                $replacement.Child.IsIndeterminate=$true
             }else{Set-FlowingProgress $replacement $Bar.Tag.Percent}
         }
     } catch {
@@ -244,7 +245,8 @@ function Set-AeroProgress {
     if($Bar -is [System.Windows.Forms.Integration.ElementHost]){
         if($Bar.Tag.Working){
             $Bar.Tag.Working=$false
-            $Bar.AccessibleName=if($Bar.Tag.Kind -eq 'time'){'Time until scheduled run'}else{'Usage remaining'}
+            $Bar.AccessibleName=switch($Bar.Tag.Kind){quota{'Five-hour usage remaining'}weekly{'Weekly usage remaining'}time{'Time until scheduled run'}default{'Usage remaining'}}
+            $Bar.Child.IsIndeterminate=$false
             Set-FlowingProgressColors -Bar $Bar -Kind $Bar.Tag.Kind -Color ([string]$script:aeroAppearance[$Bar.Tag.Kind])
         }
         $Bar.Tag.Percent=$value
@@ -255,11 +257,12 @@ function Set-AeroProgress {
     $Bar.Tag.Working=$false
     $Bar.Tag.Percent=$value
     $Bar.Tag.Color=[string]$script:aeroAppearance[$Bar.Tag.Kind]
-    $Bar.AccessibleName=if($Bar.Tag.Kind -eq 'time'){'Time until scheduled run'}else{'Usage remaining'}
+    $Bar.AccessibleName=switch($Bar.Tag.Kind){quota{'Five-hour usage remaining'}weekly{'Weekly usage remaining'}time{'Time until scheduled run'}default{'Usage remaining'}}
     $active=Get-ProgressHostSurface -Primary $Bar
     if($active -ne $Bar){
         Set-FlowingProgressColors -Bar $active -Kind $Bar.Tag.Kind -Color $Bar.Tag.Color
         $active.AccessibleName=$Bar.AccessibleName
+        $active.Child.IsIndeterminate=$false
         Set-FlowingProgress $active $value
         return
     }
@@ -280,6 +283,7 @@ function Set-AeroWorking {
     if($Bar -is [System.Windows.Forms.Integration.ElementHost]){
         Set-FlowingProgressColors -Bar $Bar -Kind 'working' -Color $Bar.Tag.Color
         Set-FlowingProgress $Bar 100
+        $Bar.Child.IsIndeterminate=$true
         return
     }
     $active=Get-ProgressHostSurface -Primary $Bar
@@ -287,6 +291,7 @@ function Set-AeroWorking {
         Set-FlowingProgressColors -Bar $active -Kind 'working' -Color $Bar.Tag.Color
         $active.AccessibleName='Codex working; completion unknown'
         Set-FlowingProgress $active 100
+        $active.Child.IsIndeterminate=$true
         return
     }
     Ensure-AeroFallback $Bar

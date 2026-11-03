@@ -32,9 +32,9 @@ try{
     Set-AeroWorking $bar
     Require ($bar.Tag.Working -and $null -eq $bar.Tag.Percent) 'Fallback must not claim an execution percentage.'
     Require ($fallbackHost.AccessibleName -eq 'Codex working; completion unknown') 'Working state lacks an accessible indeterminate label.'
-    Require ($fallbackHost.Child.Value -eq 100) 'Fixed WPF tube must support a continuous glint without moving its end.'
+    Require ($fallbackHost.Child.Value -eq 100 -and $fallbackHost.Child.IsIndeterminate) 'Working WPF tube must explicitly report indeterminate state, never measured completion.'
     Set-AeroProgress $bar $null
-    Require (-not $bar.Tag.Working -and $null -eq (Get-FlowingProgressViewValue $fallbackHost)) 'Fallback did not leave working mode safely.'
+    Require (-not $bar.Tag.Working -and -not $fallbackHost.Child.IsIndeterminate -and $null -eq (Get-FlowingProgressViewValue $fallbackHost)) 'Fallback did not leave working mode safely.'
     Ensure-AeroFallback $bar
     Require ([object]::ReferenceEquals($fallbackHost,(Get-AeroProgressSurface $bar))) 'Recovery created duplicate controls.'
     Update-AeroAppearance ([ordered]@{quota='violet';time='amber';finish=0;lighting=0;shimmer=100;speed=100;aero=$true})
