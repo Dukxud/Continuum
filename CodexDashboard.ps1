@@ -236,9 +236,9 @@ function Update-DashboardLayout {
             $usageCards[$i].Panel.Location = [System.Drawing.Point]::new($(if ($i -eq 0) { 18 } else { 470 }),358)
         }
         $hasRuns = $script:ui.Dashboard.pendingSnapshot.Count -gt 0
-        foreach ($control in @($separator2,$pending,$grid,$refreshRuns,$cancelRun)) { $control.Visible = $hasRuns }
-        $openFolder.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 352 } else { 18 }),$(if ($hasRuns) { 744 } else { 490 }))
-        $recentResults.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 520 } else { 185 }),$(if ($hasRuns) { 744 } else { 490 }))
+        foreach ($control in @($separator2,$pending,$grid,$cancelRun)) { $control.Visible = $hasRuns }
+        $openFolder.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 185 } else { 18 }),$(if ($hasRuns) { 744 } else { 490 }))
+        $recentResults.Location = [System.Drawing.Point]::new($(if ($hasRuns) { 352 } else { 185 }),$(if ($hasRuns) { 744 } else { 490 }))
         $recentResults.Visible = $true
         $status.Location = [System.Drawing.Point]::new(18,$(if ($hasRuns) { 783 } else { 526 }))
         $status.Width = 880
@@ -262,8 +262,13 @@ function Update-DashboardLayout {
     $visibleWindows = @()
     $targetModel = Get-DashboardUsageModel
     $currentSnapshot = $script:ui.Usage.usageSnapshot -and (-not $targetModel -or $script:ui.Usage.usageSnapshotRequestedModel -ceq $targetModel)
-    if ($currentSnapshot -and -not $script:ui.Usage.usageReadFailed) {
+    if ($currentSnapshot) {
+        # Failed refresh already replaced the card values with Unavailable;
+        # retain the cards rather than showing a detached compact disclaimer.
         $visibleWindows = @($script:ui.Usage.usageSnapshot.windows | Where-Object { $null -ne $_ })
+    }
+    if ($script:ui.Usage.usageReadFailed -and $visibleWindows.Count -eq 0) {
+        $visibleWindows = @([pscustomobject]@{}) # show the existing unavailable card
     }
     if ($visibleWindows.Count -eq 0) {
         $usageHeading.Visible = $false

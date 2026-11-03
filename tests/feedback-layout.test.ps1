@@ -12,7 +12,8 @@ $dashboard=Get-Content -LiteralPath (Join-Path $root 'CodexDashboard.ps1') -Raw
 $usage=Get-Content -LiteralPath (Join-Path $root 'CodexUiUsage.ps1') -Raw
 Require ($forms -notmatch 'usageNotice|autoResumeCheck|Ready\. Keep Windows awake') 'Obsolete status/disclaimer controls remain.'
 Require ($dashboard -notmatch 'activityPanel|activityLabel|Update-DashboardActivity') 'Latest result ticker remains in dashboard.'
-Require ($usage -match '\$card\.Updated\.Text' -and $usage -notmatch 'usageNotice') 'Usage freshness was not moved inside cards.'
+Require ($usage -match 'Set-UsageUnavailable' -and $usage -notmatch 'usageNotice|card\.Updated') 'Usage failures must appear inside cards without an updated-time footer.'
+Require ($forms -notmatch 'refreshSessions|refreshUsage|refreshRuns|Updated =') 'Redundant refresh buttons or timestamps remain.'
 $tokens=$null;$parseErrors=$null
 $ast=[System.Management.Automation.Language.Parser]::ParseInput($forms,[ref]$tokens,[ref]$parseErrors)
 if($parseErrors){throw ($parseErrors | Out-String)}
@@ -36,6 +37,6 @@ try {
     Require ($status.Visible -and $status.Text -eq 'Quota request failed') 'Actionable error was hidden.'
     Clear-SchedulerAlert
     Require (-not $status.Visible -and [string]::IsNullOrWhiteSpace($script:ui.Preferences.alertMessage)) 'Dismissing an error must restore the clean layout.'
-    Write-Host 'No permanent tickers/disclaimers; warning-only feedback and quota-card freshness PASS.'
+    Write-Host 'No redundant refresh controls, timestamps or tickers; warning-only feedback PASS.'
 } finally {$form.Dispose()}
 Assert-NoUnhandledWinFormsErrors

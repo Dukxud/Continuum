@@ -43,10 +43,9 @@ try {
     [void]$grid.Columns.Add('When','When')
     [void]$grid.Columns.Add('Countdown','Time to run')
     [void]$grid.Columns.Add('Project','Project')
-    $refreshRuns = New-TestControl panel 18 744 154 31
-    $cancelRun = New-TestControl panel 185 744 154 31
-    $openFolder = New-TestControl panel 352 744 154 31
-    $recentResults = New-TestControl panel 520 744 178 31
+    $cancelRun = New-TestControl panel 18 744 154 31
+    $openFolder = New-TestControl panel 185 744 154 31
+    $recentResults = New-TestControl panel 352 744 178 31
     $status = New-TestControl label 18 783 880 25
     $script:ui.Preferences.uiSettings = $null
     $script:ui.Dashboard.pendingSnapshot = @()
@@ -72,6 +71,11 @@ try {
     Require ($script:ui.Dashboard.compactToggle.Right -le $form.ClientSize.Width) 'Compact-mode switch must not be clipped.'
     Require (-not $script:ui.Dashboard.compactRunPanel.Visible) 'An empty queue must not render a run placeholder.'
     Require (-not $status.Visible) 'Compact mode must not contain a permanent status footer.'
+    $script:ui.Usage.usageReadFailed=$true
+    Update-DashboardLayout
+    Require ($first.Visible -and -not $script:ui.Dashboard.compactUsageStatus.Visible) 'Compact usage errors must remain inside the usage card.'
+    $script:ui.Usage.usageReadFailed=$false
+    Update-DashboardLayout
 
     $script:ui.Dashboard.pendingSnapshot = @([pscustomobject]@{
         Model='test-model'; Name='pending-1'; Repo='C:\work\demo'; Description='test instruction'

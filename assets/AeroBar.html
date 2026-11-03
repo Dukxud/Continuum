@@ -149,11 +149,13 @@ void main() {
     float edgeX=max(1.,floor(uRes.x/400.+.5));
     float radiusPx=max(.5,(uRes.y-2.*edgeY)*.5);
     float tipPx=clamp(f*uRes.x-2.*uRes.x/400.,edgeX,uRes.x-edgeX);
+    tipPx=mix(tipPx,uRes.x-edgeX,step(.999999,f));
     float occupied=max(0.,tipPx-edgeX);
     float rd=.422;
     float rx=radiusPx;
     float ry=radiusPx;
     float centerPx=tipPx-radiusPx;
+    float fullTip=step(.999999,f);
     float dxPx,dyPx=py-uRes.y*.5;
     if(occupied<2.*radiusPx){
         // At 1-2% fill the tiny drop contracts into a circular bead.
@@ -163,14 +165,14 @@ void main() {
         dxPx=px-centerPx;
     }else{
         // Normal fill: straight left body, convex hemispherical leading edge.
-        dxPx=max(px-centerPx,0.);
+        dxPx=mix(max(px-centerPx,0.),0.,fullTip);
     }
     vec2 delta=vec2(dxPx*rd/rx,dyPx*rd/ry);
     float rr=length(delta);
     float aa=rd/max(ry,1.);
     float cov=1.-smoothstep(rd-aa,rd+aa,rr);
     float left=smoothstep(edgeX-.5,edgeX+.5,px);
-    float alpha=cov*left*step(.00001,f)*.94;
+    float alpha=cov*left*step(.00001,f)*.94*(1.-fullTip*smoothstep(uRes.x-edgeX-.5,uRes.x-edgeX+.5,px));
     float zz=sqrt(max(0.,rd*rd-rr*rr));
     vec3 norm=normalize(vec3(delta,zz+.00001));
     float front=-4.08+centerPx/uRes.x*8.16;
@@ -242,7 +244,7 @@ function nativePaint(canvas,idx,hybrid){
  const fy=Math.max(1,Math.round(h/13));
  const edgeX=Math.max(1,Math.round(w/400));
  const percent=(hybrid&&aeroEnabled)?Math.max(0,Math.min(1,visual)):value;
- const tip=Math.max(edgeX,Math.min(w-edgeX,percent*w-2*w/400));
+ const tip=value>=1?w-edgeX:Math.max(edgeX,Math.min(w-edgeX,percent*w-2*w/400));
  if(tip>edgeX){
    if(hybrid&&aeroEnabled){
      // Shared convex tip. A clip is applied to the captured Windows pigment
@@ -250,7 +252,10 @@ function nativePaint(canvas,idx,hybrid){
      // cutoff remains completely untouched in the comparison column and OFF.
      const cy=h*.5,rad=Math.max(.5,(h-2*fy)*.5),used=tip-edgeX;
      ctx.save();ctx.beginPath();
-     if(used<rad*2){
+     if(value>=1){
+       // At exactly 100%, the liquid meets a flat right endcap.
+       ctx.rect(edgeX,cy-rad,used,2*rad);
+     }else if(used<rad*2){
        const rx=used*.5,ry=Math.min(rad,rx);
        ctx.ellipse((tip+edgeX)*.5,cy,rx,Math.max(.05,ry),0,0,Math.PI*2);
      }else{
@@ -328,7 +333,10 @@ function apply({value:next,color,finish:nextFinish,lighting:nextLighting,shimmer
    working=false;velocity=0;lastNative=-1;
    if(typeof next==='number'&&Number.isFinite(next))visual=Math.max(0,Math.min(1,next));
   }
-  if(typeof next==='number' && Number.isFinite(next))value=Math.max(0,Math.min(1,next));
+  if(typeof next==='number' && Number.isFinite(next)){
+   value=Math.max(0,Math.min(1,next));
+   if(value===1){visual=1;velocity=0;lastNative=-1;}
+  }
  }
  if(typeof color==='string'){
   if(/^#[0-9a-fA-F]{6}$/.test(color)){

@@ -42,11 +42,10 @@ $heading.Height = 34
 [void](Add-Label 'Conversation' 18 65)
 $sessionBox = New-Object System.Windows.Forms.ComboBox
 $sessionBox.Location = [System.Drawing.Point]::new(155,61)
-$sessionBox.Size = [System.Drawing.Size]::new(605,30)
+$sessionBox.Size = [System.Drawing.Size]::new(743,30)
 $sessionBox.DropDownStyle = 'DropDownList'
 $sessionBox.DisplayMember = 'Display'
 $form.Controls.Add($sessionBox)
-$refreshSessions = Add-Button 'Refresh' 773 60 125
 
 [void](Add-Label 'Repository root' 18 111)
 $repoBox = New-Object System.Windows.Forms.TextBox
@@ -57,7 +56,7 @@ $browse = Add-Button 'Browse' 773 106 125
 
 [void](Add-Label 'Run at (local)' 18 157)
 $whenBox = New-Object System.Windows.Forms.DateTimePicker
-$whenBox.Location = [System.Drawing.Point]::new(155,154)
+$whenBox.Location = [System.Drawing.Point]::new(202,154)
 $whenBox.Size = [System.Drawing.Size]::new(237,30)
 $whenBox.Format = 'Custom'
 $whenBox.CustomFormat = 'ddd MMM dd, yyyy  hh:mm tt'
@@ -73,7 +72,7 @@ if ($script:ui.Preferences.savedDraft) {
     }
 }
 $form.Controls.Add($whenBox)
-$minusTime = Add-Button '−' 401 154 38
+$minusTime = Add-Button '−' 155 154 38
 $minusTime.AccessibleName='Schedule one minute earlier'
 $plusTime = Add-Button '+' 446 154 38
 $plusTime.AccessibleName='Schedule one minute later'
@@ -126,7 +125,6 @@ $form.Controls.Add($separator)
 $usageHeading = Add-Label 'Usage remaining' 18 322 280
 $usageHeading.Font = [System.Drawing.Font]::new('Segoe UI',12,[System.Drawing.FontStyle]::Bold)
 $usageHeading.Height = 30
-$refreshUsage = Add-Button 'Refresh now' 755 320 143
 
 . (Join-Path $PSScriptRoot 'CodexFlowingBar.ps1')
 . (Join-Path $PSScriptRoot 'CodexAeroBar.ps1')
@@ -162,14 +160,7 @@ function New-UsageCard {
     $reset.Text = 'Waiting for Codex usage...'
     $reset.ForeColor = [System.Drawing.Color]::DimGray
     $card.Controls.Add($reset)
-    $updated = New-Object System.Windows.Forms.Label
-    $updated.Location = [System.Drawing.Point]::new(12,89)
-    $updated.Size = [System.Drawing.Size]::new(400,16)
-    $updated.Font = [System.Drawing.Font]::new('Segoe UI',8)
-    $updated.ForeColor = [System.Drawing.Color]::DimGray
-    $updated.Text = 'Checking account usage...'
-    $card.Controls.Add($updated)
-    return [pscustomobject]@{ Panel = $card; Title = $name; Remaining = $remaining; Bar = $bar; Reset = $reset; Updated = $updated }
+    return [pscustomobject]@{ Panel = $card; Title = $name; Remaining = $remaining; Bar = $bar; Reset = $reset }
 }
 $usageCards = @((New-UsageCard 18 'Primary window' 'quota'), (New-UsageCard 470 'Secondary window' 'weekly'))
 $separator2 = New-Object System.Windows.Forms.Label
@@ -224,11 +215,10 @@ $grid.Add_SelectionChanged({
     }
 })
 
-$refreshRuns = Add-Button 'Refresh runs' 18 744 154
-$cancelRun = Add-Button 'Cancel selected' 185 744 154
+$cancelRun = Add-Button 'Cancel selected' 18 744 154
 $cancelRun.Enabled = $false
-$openFolder = Add-Button 'Open logs folder' 352 744 154
-$recentResults = Add-Button 'Recent runs' 520 744 178
+$openFolder = Add-Button 'Open logs folder' 185 744 154
+$recentResults = Add-Button 'Recent runs' 352 744 178
 # Only actionable warnings/errors deserve space; no permanent status footer.
 $status = Add-Label '' 18 783 880
 $status.ForeColor = [System.Drawing.Color]::FromArgb(138,49,33)

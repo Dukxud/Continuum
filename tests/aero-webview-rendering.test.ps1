@@ -168,6 +168,26 @@ try {
         if ($value -eq 68) { $fillColor = Snapshot $quota (Join-Path $captures 'aero-green-68.png') }
     }
     Require ($emptyColor.ToArgb() -ne $fillColor.ToArgb()) 'Aero fill did not alter the actual rendered bitmap.'
+    # Measure the right-end pixel in actual browser captures: 99% retains
+    # the droplet/tube track, whereas 100% must reach the square tube end.
+    Set-AeroProgress $quota 99
+    PumpUntil { [math]::Abs([double](Evaluate $quota 'window.aeroBarProof.getVisual()')-.99) -lt .002 }
+    $almostPath=Join-Path $captures 'aero-tip-99.png'
+    [void](Snapshot $quota $almostPath)
+    Set-AeroProgress $quota 100
+    PumpUntil { [math]::Abs([double](Evaluate $quota 'window.aeroBarProof.getVisual()')-1) -lt .000001 }
+    $fullPath=Join-Path $captures 'aero-flat-100.png'
+    [void](Snapshot $quota $fullPath)
+    $almost=[Drawing.Bitmap]::new($almostPath)
+    $full=[Drawing.Bitmap]::new($fullPath)
+    try{
+        $x=$full.Width-3
+        $y=[int]($full.Height/2)
+        $p=$almost.GetPixel($x,$y)
+        $f=$full.GetPixel($x,$y)
+        $difference=[math]::Abs([int]$p.R-[int]$f.R)+[math]::Abs([int]$p.G-[int]$f.G)+[math]::Abs([int]$p.B-[int]$f.B)
+        Require ($difference -gt 20) 'Full bar failed to fill the square right endcap visible in WebView2.'
+    }finally{$almost.Dispose();$full.Dispose()}
     Set-AeroProgress $run 75
     PumpUntil { [math]::Abs([double](Evaluate $run 'window.aeroBarProof.getVisual()') - .75) -lt .015 }
     [void](Snapshot $run (Join-Path $captures 'aero-blue-75.png'))
@@ -208,7 +228,7 @@ try {
     PumpUntil { [math]::Abs([double](Evaluate $quota 'window.aeroBarProof.getTarget()') - .93) -lt .001 }
     PumpUntil { [math]::Abs([double](Evaluate $quota 'window.aeroBarProof.getVisual()') - .93) -lt .015 }
 
-    Write-Host 'WebView2: real optical v3, independent quota/time, rounded tip, screenshot, null, rapid updates PASS'
+    Write-Host 'WebView2: actual Aero optics, partial rounded tip, full square cap, null and indeterminate flow PASS'
 } finally {
     $form.Close()
     $form.Dispose()

@@ -80,7 +80,7 @@ $modelBox.Add_SelectedIndexChanged({
     Select-AvailableEfforts
     if (-not $script:ui.Selection.updatingModels) {
         $useReset.Enabled = $false
-        Request-UsageRefresh
+        Request-SystemRefresh -Scope ModelChanged
         Queue-FormStateSave
     }
 })
@@ -89,7 +89,6 @@ $sessionBox.Add_SelectedIndexChanged({
     Request-SelectionLookup
     Queue-FormStateSave
 })
-$refreshSessions.Add_Click({ try { Refresh-SessionList } catch { [System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Sessions error') | Out-Null } })
 $browse.Add_Click({
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     $dialog.Description = 'Select the Git repository root'
@@ -101,7 +100,6 @@ $browse.Add_Click({
     }
     $dialog.Dispose()
 })
-$refreshRuns.Add_Click({ try { Refresh-PendingList } catch { [System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Task Scheduler error') | Out-Null } })
 $cancelRun.Add_Click({
     if ($grid.SelectedRows.Count -ne 1) { [System.Windows.Forms.MessageBox]::Show('Select an upcoming task first.','No selection') | Out-Null; return }
     $name = [string]$grid.SelectedRows[0].Tag
@@ -120,19 +118,18 @@ $cancelRun.Add_Click({
             [void](Write-JobOutcome -Path ([IO.Path]::ChangeExtension($payloadPath,'.result.json')) -Status 'cancelled' -Attempt 0 -Message 'Cancelled by the operator before execution.')
             Remove-Item -LiteralPath $payloadPath -Force -ErrorAction Stop
         }
-        Request-UsageRefresh
     } catch {
         $caption = if ($taskRemoved) { 'Task cancelled; cleanup warning' } else { 'Cancellation failed' }
         [System.Windows.Forms.MessageBox]::Show($_.Exception.Message,$caption) | Out-Null
     } finally {
         # Task removal can succeed before a later file write fails. Always
         # reconcile the displayed list with Windows Task Scheduler.
-        try { Refresh-PendingList } catch { Update-Status "Pending-list refresh failed: $($_.Exception.Message)" -Alert }
+        try { Request-SystemRefresh } catch { Update-Status "System refresh after cancellation failed: $($_.Exception.Message)" -Alert }
     }
 })
 $recentResults.Add_Click({
     Show-CodexRunHistoryDialog -Owner $form -Directory $appDir -RecentTasks $script:ui.Dashboard.historySnapshot
-    Refresh-PendingList
+    Request-SystemRefresh -Scope TaskStatus
 })
 $openFolder.Add_Click({
     [void](New-Item -Path $appDir -ItemType Directory -Force)
@@ -166,7 +163,7 @@ $schedule.Add_Click({
         Assert-ModelEffortSupported $script:ui.Selection.models $model $effort
         $accountId = [string]$script:ui.Usage.usageSnapshot.accountId
         if (-not (Test-CanonicalWorkspaceIdentity $accountId)) {
-            throw 'Every scheduled run requires a verified workspace identity. Refresh usage before scheduling.'
+            throw 'Selected workspace identity is unverified. Automatic usage refresh will retry; schedule when usage is available.'
         }
         # A GUI catalog snapshot can age before the scheduled task starts;
         # the runner independently revalidates the model and effort.
@@ -210,16 +207,15 @@ $schedule.Add_Click({
         try { Save-CurrentFormState } catch {
             Update-Status "Scheduled $name, but preferences were not saved: $($_.Exception.Message)" -Alert
         }
-        try { Refresh-PendingList } catch {
-            Update-Status "Scheduled $name, but the task list could not refresh: $($_.Exception.Message)" -Alert
+        try { Request-SystemRefresh } catch {
+            Update-Status "Scheduled $name, but the system could not refresh: $($_.Exception.Message)" -Alert
         }
-        try { Request-UsageRefresh } catch { }
         # The Upcoming runs row is the success confirmation.
     } catch {
         # A task may have been registered before a later check failed. Surface it,
         # rather than leaving an empty list that encourages duplicate schedules.
         $failureMessage = $_.Exception.Message
-        try { Refresh-PendingList } catch { $failureMessage += "`nPending-list refresh: $($_.Exception.Message)" }
+        try { Request-SystemRefresh -Scope TaskStatus } catch { $failureMessage += "`nPending-list refresh: $($_.Exception.Message)" }
         [System.Windows.Forms.MessageBox]::Show($failureMessage,'Scheduling check failed') | Out-Null
     }
 })

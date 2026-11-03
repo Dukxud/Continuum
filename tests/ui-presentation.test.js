@@ -23,6 +23,9 @@ test('model and effort are grouped and schedule action is distinct', () => {
   assert.match(source, /\$schedule = Add-Button 'Schedule once' 720 274 178/);
   assert.doesNotMatch(source, /\$autoResumeCheck|Retry if Codex/);
   assert.match(source, /\$whenBox\.Value = Get-CodexSuggestedRunTime/);
+  assert.match(source, /\$minusTime = Add-Button '−' 155 154 38/);
+  assert.match(source, /\$whenBox\.Location = \[System\.Drawing\.Point\]::new\(202,154\)/);
+  assert.match(source, /\$plusTime = Add-Button '\+' 446 154 38/);
   assert.match(source, /\$minusTime = Add-Button/);
   assert.match(source, /\$plusTime = Add-Button/);
   assert.match(source, /\$minusTime\.Add_Click/);
@@ -76,8 +79,23 @@ test('usage reports remaining and keeps reset as an explicit action', () => {
   assert.match(source, /Usage remaining/);
   assert.match(source, /% remaining' -f \$remaining/);
   assert.match(source, /\$useReset\.Add_Click\(/);
-  assert.match(source, /\$card\.Updated\.Text=/);
-  assert.doesNotMatch(source, /\$usageNotice|Next reset is informational/);
+  assert.match(source, /\$card\.Reset\.Text = 'Usage unavailable; retrying automatically'/);
+  assert.doesNotMatch(source, /\$card\.Updated|\$usageNotice|Next reset is informational/);
+  assert.doesNotMatch(source,/\$refreshUsage|\$refreshSessions|\$refreshRuns/);
+  assert.doesNotMatch(source,/Add-Button 'Refresh now'|Add-Button 'Refresh runs'/);
+});
+
+test('one coordinator handles timer and window-activation refreshes', () => {
+  const lifecycle=fs.readFileSync(path.resolve(__dirname,'..','CodexUiLifecycle.ps1'),'utf8');
+  assert.match(source,/function Request-SystemRefresh \{/);
+  assert.match(source,/lastFullRefresh=Get-Date/);
+  assert.match(source,/Refresh-SessionList/);
+  assert.match(source,/Refresh-PendingList/);
+  assert.match(source,/Request-UsageRefresh/);
+  assert.match(lifecycle,/\$systemRefreshTimer\.Interval = 2000/);
+  assert.match(lifecycle,/Request-SystemRefresh -Scope \$scope/);
+  assert.match(lifecycle,/\$form\.Add_Activated/);
+  assert.doesNotMatch(lifecycle,/\$autoRefresh|\$runStatusRefresh/);
 });
 
 test('dashboard shares the pending snapshot and renders distinct countdown and quota bars', () => {

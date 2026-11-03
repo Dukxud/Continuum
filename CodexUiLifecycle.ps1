@@ -3,16 +3,23 @@ Initialize-Dashboard
 # default updater only after that owner initializes it.
 $script:ui.Dashboard.countdownTimer.Add_Tick({ Refresh-SuggestedRunTime })
 
-$runStatusRefresh = New-Object System.Windows.Forms.Timer
-$runStatusRefresh.Interval = 2000
-$runStatusRefresh.Add_Tick({
-    try { Refresh-PendingList } catch { Update-Status "Run status refresh failed: $($_.Exception.Message)" -Alert }
+# One timer: active Windows task status every two seconds, all application
+# data every minute. GUI-thread work only dispatches asynchronous readers.
+$systemRefreshTimer = New-Object System.Windows.Forms.Timer
+$systemRefreshTimer.Interval = 2000
+$systemRefreshTimer.Add_Tick({
+    $scope=if(((Get-Date)-$script:ui.Async.lastFullRefresh).TotalSeconds -ge 60){'Full'}else{'TaskStatus'}
+    try { Request-SystemRefresh -Scope $scope }
+    catch { Update-Status "System refresh failed: $($_.Exception.Message)" -Alert }
 })
-$autoRefresh = New-Object System.Windows.Forms.Timer
-$autoRefresh.Interval = 60000
-$autoRefresh.Add_Tick({
-    try { Refresh-PendingList } catch { Update-Status "Pending refresh failed: $($_.Exception.Message)" -Alert }
-    Request-UsageRefresh
+$form.Add_Activated({
+    # After focus returns from another app or Windows sleep, refresh stale
+    # system data immediately without flooding Codex during rapid focus changes.
+    if($script:ui.Preferences.settingsReady -and
+        ((Get-Date)-$script:ui.Async.lastFullRefresh).TotalSeconds -ge 15) {
+        try { Request-SystemRefresh }
+        catch { Update-Status "System refresh failed: $($_.Exception.Message)" -Alert }
+    }
 })
 $form.Add_Shown({
     [void][CodexScheduler.NativeWindow]::ShowWindow($form.Handle, 5) # SW_SHOW
@@ -20,10 +27,8 @@ $form.Add_Shown({
     $script:ui.Preferences.settingsReady = $true
     Update-DashboardLayout
     $script:ui.Dashboard.countdownTimer.Start()
-    try { Refresh-SessionList; Refresh-PendingList } catch { Update-Status "Startup warning: $($_.Exception.Message)" -Alert }
-    Request-UsageRefresh
-    $autoRefresh.Start()
-    $runStatusRefresh.Start()
+    try { Request-SystemRefresh } catch { Update-Status "Startup warning: $($_.Exception.Message)" -Alert }
+    $systemRefreshTimer.Start()
     $dataPoll.Start()
 })
 $form.Add_FormClosing({
@@ -34,8 +39,7 @@ $form.Add_FormClosing({
 })
 $form.Add_FormClosed({
     $script:ui.Dashboard.countdownTimer.Stop()
-    $autoRefresh.Stop()
-    $runStatusRefresh.Stop()
+    $systemRefreshTimer.Stop()
     $usagePoll.Stop()
     $dataPoll.Stop()
     foreach ($job in @($script:ui.Async.dataJobs.Values)) {
@@ -49,8 +53,7 @@ $form.Add_FormClosed({
     }
 })
 [void]$form.ShowDialog()
-$autoRefresh.Dispose()
-$runStatusRefresh.Dispose()
+$systemRefreshTimer.Dispose()
 $script:ui.Dashboard.countdownTimer.Dispose()
 $script:ui.Preferences.settingsTimer.Dispose()
 $usagePoll.Dispose()

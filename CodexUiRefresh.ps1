@@ -28,6 +28,23 @@ function Start-DataRead {
 function Refresh-SessionList { Start-DataRead 'sessions' }
 function Refresh-PendingList { Start-DataRead 'pending' }
 
+# One refresh coordinator owns all user-facing refresh triggers. Narrow
+# internal scopes avoid re-reading usage and conversations every two seconds.
+# Existing readers retain their asynchronous/coalesced execution.
+function Request-SystemRefresh {
+    param([ValidateSet('Full','TaskStatus','ModelChanged')][string]$Scope='Full')
+    switch ($Scope) {
+        'Full' {
+            $script:ui.Async.lastFullRefresh=Get-Date
+            Refresh-SessionList
+            Refresh-PendingList
+            Request-UsageRefresh
+        }
+        'TaskStatus' { Refresh-PendingList }
+        'ModelChanged' { Request-UsageRefresh }
+    }
+}
+
 $dataPoll = New-Object System.Windows.Forms.Timer
 $dataPoll.Interval = 250
 $dataPoll.Add_Tick({

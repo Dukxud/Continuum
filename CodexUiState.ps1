@@ -12,7 +12,7 @@ function New-CodexUiState {
             selectionGeneration=0; selectionJobGeneration=0; selectionOriginalModel=''
             startupSavedModelId=''; startupSavedSessionId=''; updatingModels=$false
         }
-        Async = @{ dataJobs=@{}; dataQueued=@{} }
+        Async = @{ dataJobs=@{}; dataQueued=@{}; lastFullRefresh=[datetime]::MinValue }
         Usage = @{
             usageSnapshot=$null; usageRequestedModel=''; usageSnapshotRequestedModel=''
             usageReadFailed=$false; usageProcess=$null; usageStarted=[datetime]::MinValue

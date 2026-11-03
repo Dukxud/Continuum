@@ -23,7 +23,11 @@ test('production uses exact owner-approved vertex shader and corrected optical f
   const stripped=augmented
     .replace('uDepth,uCompact,uShimmer,uWorking;','uDepth,uCompact;')
     .replace(/ \/\/ A wide, softly reflected studio light[\s\S]*?\*uShimmer\*sweepEnvelope;\r?\n/, '')
-    .replace(/ \/\/ Indeterminate work keeps a constant full tube[\s\S]*?reflectance\+=uWorking[^;]*;\r?\n/, '');
+    .replace(/ \/\/ Indeterminate work keeps a constant full tube[\s\S]*?reflectance\+=uWorking[^;]*;\r?\n/, '')
+    .replace('    float fullTip=step(.999999,f);\n','')
+    .replace('    tipPx=mix(tipPx,uRes.x-edgeX,step(.999999,f));\n','')
+    .replace('dxPx=mix(max(px-centerPx,0.),0.,fullTip);','dxPx=max(px-centerPx,0.);')
+    .replace('float alpha=cov*left*step(.00001,f)*.94*(1.-fullTip*smoothstep(uRes.x-edgeX-.5,uRes.x-edgeX+.5,px));','float alpha=cov*left*step(.00001,f)*.94;');
   assert.equal(stripped,approved);
   assert.match(augmented,/specularPatch/);
   assert.match(augmented,/float sweepEnvelope=smoothstep/);
@@ -46,7 +50,19 @@ test('production preserves captured Windows v1.8 bar pixels and compositor',()=>
   assert.ok(a&&b);
   // The approved image compositor remains byte-for-byte intact; only its
   // outermost captured black terminal pixels are softened afterward.
-  assert.equal(a[1].trim(),b[1].split('// Leave the captured Windows source')[0].replaceAll('aeroEnabled','aero').trim());
+  const baseline=b[1].split('// Leave the captured Windows source')[0]
+    .replaceAll('aeroEnabled','aero')
+    .replace('const tip=value>=1?w-edgeX:Math.max(edgeX,Math.min(w-edgeX,percent*w-2*w/400));',
+             'const tip=Math.max(edgeX,Math.min(w-edgeX,percent*w-2*w/400));')
+    .replace(/     if\(value>=1\)\{\r?\n       \/\/ At exactly 100%[^\n]*\r?\n       ctx\.rect\(edgeX,cy-rad,used,2\*rad\);\r?\n     \}else if\(used<rad\*2\)\{/,'     if(used<rad*2){')
+    .trim();
+  assert.equal(a[1].trim(),baseline);
+  assert.match(production,/const tip=value>=1\?w-edgeX:/);
+  assert.match(production,/if\(value>=1\)\{[\s\S]*?ctx\.rect\(edgeX,cy-rad,used,2\*rad\)/);
+  assert.match(script(production,'hybridfrag'),/float fullTip=step\(\.999999,f\)/);
+  assert.match(script(production,'hybridfrag'),/tipPx=mix\(tipPx,uRes\.x-edgeX,step\(\.999999,f\)\)/);
+  assert.match(script(production,'hybridfrag'),/dxPx=mix\(max\(px-centerPx,0\.\),0\.,fullTip\)/);
+  assert.match(production,/if\(value===1\)\{visual=1;velocity=0;lastNative=-1;\}/);
   assert.match(production,/function softenOutline\(canvas\)/);
 });
 

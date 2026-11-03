@@ -70,5 +70,5 @@ function Apply-PendingList {
     $emptyRuns.Visible=$false
     Update-DashboardLayout
     Update-DashboardCountdowns
-    if($script:ui.Dashboard.compactToggle.Checked -and (Get-DashboardUsageModel) -ne [string]$script:ui.Usage.usageRequestedModel){Request-UsageRefresh}
+    if($script:ui.Dashboard.compactToggle.Checked -and (Get-DashboardUsageModel) -ne [string]$script:ui.Usage.usageRequestedModel){Request-SystemRefresh -Scope ModelChanged}
 }

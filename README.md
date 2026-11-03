@@ -11,17 +11,17 @@ Download the versioned ZIP from **Releases**, not GitHub's generic `main.zip`. T
 ## What it does
 
 - Selects from recent saved Codex CLI sessions, **auto-locates their Git root when evidence is sufficient**, and validates the selected repository/branch. A manual Browse override remains available.
-- Schedules a message (default `Resume.`) at a specific local date and time. The time defaults to two minutes ahead; `−`, `+`, and **Now +2** offer quick adjustment.
+- Schedules a message (default `Resume.`) at a specific local date and time. The time defaults to two minutes ahead; `−` sits before the date chooser, followed by `+`, **Now +2** and **Reset +2**.
 - Configures the Codex model and *only* that model’s advertised ordinary reasoning efforts (excluding the separate Ultra/multi-agent mode), plus access mode (read-only, workspace-write, or unrestricted/YOLO). The list comes from Codex `model/list`, not a built-in list of model names.
 - Shows pending scheduled runs, supports cancellation, and saves a transcript in `%LOCALAPPDATA%\CodexResumeScheduler`.
 - **Compact mode** remembers the preferred view, displays the next upcoming run and its model-specific usage windows, and hides the run section entirely when no run is scheduled. Standard mode shows every upcoming run.
 - **The progress bars use the owner-approved Windows v1.8 + Aero Liquid v3 hybrid (v2.0.1)**. Quota bars are green and countdowns blue, with the corrected rounded liquid tip, Fresnel optics, reflections, and continuous animation. The actual approved shader and Windows-color source pixels are packaged locally. It runs through Microsoft Edge WebView2; if the runtime/SDK is unavailable, the prior WPF progress bars remain a functional fallback. Time bars fill from **schedule creation** to the scheduled launch time; older tasks without a creation timestamp display the remaining time and an unfilled track rather than a made-up percentage. Reaching 100% is not confirmation that Codex started.
-- Countdown labels update locally every second without additional Codex requests. Running-task state refreshes every two seconds, and quota snapshots every 60 seconds.
+- Countdown labels update locally every second without additional Codex requests. One system refresh coordinator polls task status every two seconds and refreshes conversations, tasks and quota every 60 seconds or after returning to the app.
 - Autosaves and restores the scheduling draft: conversation, repository, model, reasoning effort, access, instruction, and requested local run time. Saving does not require creating a scheduled run.
 - Starts through Windows' built-in Script Host (`wscript.exe`), without a visible terminal. New scheduled jobs also run with a hidden window and report their exit status; transcripts and event logs remain available.
 - **One schedule = one execution.** When Codex reports a usage limit or execution failure, the application records the result for review under **Recent runs**; it does not register another task.
 - Displays **percentage remaining**, progress bars, and local reset times from Codex's official `account/rateLimits/read` App Server method. **Reset +2** sets the scheduling control to two minutes after the selected reset, rounded up to the next whole minute. It never schedules automatically.
-- Refreshes **usage and pending runs automatically on startup, every 60 seconds, and after scheduling or cancellation**. Usage reads run in a short-lived process; conversation, repository, and pending-task reads run in background jobs.
+- Refreshes **all system data automatically on startup, every 60 seconds, after returning to the app, and after scheduling or cancellation**. No manual refresh controls or timestamps are needed. Quota failures are labeled inside the usage cards; the next cycle retries automatically. Usage reads run in a short-lived process; conversation, repository, and pending-task reads run in background jobs.
 
 ## Responsiveness and concurrent sessions
 
@@ -83,7 +83,7 @@ The scheduler records completed, failed, blocked and cancelled outcomes; histori
 1. Download the latest **versioned CodexResumeScheduler ZIP** from [Releases](https://github.com/Dukxud/codex-resume-scheduler/releases/latest).
 2. Extract the complete versioned folder, preserving its `assets` and `AeroWebView2` subfolders alongside the supplied scripts.
 3. Double-click **`Start-Codex-Scheduler.vbs`** to open the interface without a visible terminal. The `.cmd` fallback may briefly flash its own shell before exiting.
-4. Usage and pending jobs load automatically; optionally click **Refresh now**. Use **Now +2**, **Reset +2** (when a verified quota reset is available), or enter a time manually.
+4. Usage, conversations and pending jobs load automatically and refresh together. Use **Now +2**, **Reset +2** (when a verified quota reset is available), or enter a time manually.
 5. Select the conversation, **model**, repository, model-supported effort, access mode, and instruction, then click **Schedule once**.
 
 Newly scheduled jobs use Windows Script Host (`wscript.exe`) to run in the background without a visible terminal. Output and failures are saved in `%LOCALAPPDATA%\CodexResumeScheduler`; use **Open logs folder** for transcripts and **Recent runs** for the recorded run status. **Older pending jobs retain their originally registered command**; cancel and reschedule them if you want them to run without a console. Keep the computer **awake, online, and signed into Windows** at the scheduled time. A task missed while the computer was unavailable may execute at the next opportunity.
@@ -94,7 +94,7 @@ Newly scheduled jobs use Windows Script Host (`wscript.exe`) to run in the backg
 
 The response may include both five-hour and weekly limits, or other-duration windows. The UI displays the snapshot's actual duration and reset time, not assumed 5h/weekly slots. If several **applicable** windows are exhausted, it suggests the **latest** of their reset times. Otherwise, it displays the next window reset as informational, **not** a promise that usage will be restored. If the backend says usage is restricted without an identifiable exhausted window, the reset button remains disabled; scheduling remains available manually. Quota selection uses `rateLimitsByLimitId` and the reported `normalModelSlug` when present. When multiple quotas exist and the selected model cannot be mapped unambiguously, **no automatic reset time is inferred**. Information can be stale, and actual model permission remains authoritative.
 
-The usage helper currently supports the **npm Codex installation** on Windows. When the CLI model catalog is unavailable, the GUI disables new scheduling rather than guess model/effort compatibility; previously registered tasks are unchanged. The UI refreshes automatically every minute, only while open; it does **not** create a recurring Windows task or poll in the background after closing.
+The usage helper currently supports the **npm Codex installation** on Windows. When the CLI model catalog is unavailable, the GUI disables new scheduling rather than guess model/effort compatibility; previously registered tasks are unchanged. The UI refreshes automatically every minute, with faster task-status checks and a refresh when you return to the window; it does **not** create a recurring Windows task or poll in the background after closing.
 
 ## One-time execution
 
