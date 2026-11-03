@@ -1,0 +1,229 @@
+# Persist edited fields independently of scheduling. Debounce typing to avoid disk writes per keystroke.
+$script:ui.Preferences.settingsTimer = New-Object System.Windows.Forms.Timer
+$script:ui.Preferences.settingsTimer.Interval = 650
+function Save-CurrentFormState {
+    if (-not $script:ui.Preferences.settingsReady) { return }
+    $sessionId = if ($sessionBox.SelectedItem) { [string]$sessionBox.SelectedItem.Id } else { $script:ui.Selection.preferredSessionId }
+    $model = Get-SelectedModel
+    if (-not $model) { $model = $script:ui.Selection.preferredModelId }
+    $effort = if ($effortBox.SelectedItem) { [string]$effortBox.SelectedItem } else { $script:ui.Selection.preferredEffort }
+    $access = switch ($accessBox.SelectedIndex) { 1 { 'yolo' } 2 { 'read-only' } default { 'workspace-write' } }
+    $savedRoot = [string]$repoBox.Text
+    if (-not $sessionBox.SelectedItem -and -not $savedRoot -and $script:ui.Preferences.savedDraft) { $savedRoot = [string]$script:ui.Preferences.savedDraft.repo }
+    $draft = [pscustomobject]@{
+        sessionId = $sessionId
+        repo = $savedRoot
+        model = $model
+        effort = $effort
+        access = $access
+        message = [string]$messageBox.Text
+        runAt = $whenBox.Value.ToString('yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture)
+    }
+    $appearanceForStorage = if ($script:ui.Preferences.appearanceBeforeDraft) { $script:ui.Preferences.appearanceBeforeDraft } else { $script:aeroAppearance }
+    Write-CodexUiSettings $appDir ([pscustomobject]@{ version = 1; lastAccess = $access; compactMode = [bool]$script:ui.Dashboard.compactToggle.Checked; barAppearance = $appearanceForStorage; draft = $draft })
+    $script:ui.Preferences.savedDraft = $draft
+    $script:ui.Selection.preferredSessionId = $sessionId
+}
+function Queue-FormStateSave {
+    if (-not $script:ui.Preferences.settingsReady -or $script:ui.Selection.loadingSessions -or $script:ui.Selection.updatingModels) { return }
+    $script:ui.Preferences.settingsTimer.Stop()
+    $script:ui.Preferences.settingsTimer.Start()
+}
+$script:ui.Preferences.settingsTimer.Add_Tick({
+    $script:ui.Preferences.settingsTimer.Stop()
+    try { Save-CurrentFormState } catch { Update-Status "Settings were not saved: $($_.Exception.Message)" -Alert }
+})
+$repoBox.Add_TextChanged({ Queue-FormStateSave })
+function Refresh-SuggestedRunTime {
+    if($script:ui.Preferences.scheduleTimeEdited -or $script:ui.Preferences.scheduleTimeUpdating){return}
+    $next=Get-CodexSuggestedRunTime
+    if($whenBox.Value -ne $next){
+        $script:ui.Preferences.scheduleTimeUpdating=$true
+        try {$whenBox.Value=$next}
+        finally {$script:ui.Preferences.scheduleTimeUpdating=$false}
+    }
+}
+$whenBox.Add_ValueChanged({
+    if(-not $script:ui.Preferences.scheduleTimeUpdating){
+        $script:ui.Preferences.scheduleTimeEdited=$true
+        Queue-FormStateSave
+    }
+})
+function Set-SelectedRunTime {
+    param([datetime]$Time)
+    $script:ui.Preferences.scheduleTimeEdited=$true
+    $script:ui.Preferences.scheduleTimeUpdating=$true
+    try {$whenBox.Value=$Time}
+    finally {$script:ui.Preferences.scheduleTimeUpdating=$false}
+    Queue-FormStateSave
+}
+function Adjust-CodexScheduledTime {
+    param([int]$Direction)
+    $next=Step-CodexScheduledRunTime -Time $whenBox.Value -Direction $Direction
+    if($next -eq $whenBox.Value){Update-Status 'Run time must stay at least 30 seconds in the future.' -Alert;return}
+    Set-SelectedRunTime $next
+}
+$minusTime.Add_Click({ Adjust-CodexScheduledTime -Direction -1 })
+$plusTime.Add_Click({ Adjust-CodexScheduledTime -Direction 1 })
+$nowPlusTwo.Add_Click({ Set-SelectedRunTime (Get-CodexSuggestedRunTime) })
+$accessBox.Add_SelectedIndexChanged({ Queue-FormStateSave })
+$effortBox.Add_SelectedIndexChanged({
+    if (-not $script:ui.Selection.updatingModels) {
+        $script:ui.Selection.preferredEffort = [string]$effortBox.SelectedItem
+        Queue-FormStateSave
+    }
+})
+$messageBox.Add_TextChanged({ Queue-FormStateSave })
+
+$modelBox.Add_SelectedIndexChanged({
+    if (-not $script:ui.Selection.updatingModels) { $script:ui.Selection.preferredModelId = Get-SelectedModel }
+    Select-AvailableEfforts
+    if (-not $script:ui.Selection.updatingModels) {
+        $useReset.Enabled = $false
+        Request-SystemRefresh -Scope ModelChanged
+        Queue-FormStateSave
+    }
+})
+$sessionBox.Add_SelectedIndexChanged({
+    if (-not $script:ui.Selection.loadingSessions) { $script:ui.Selection.preferredSessionId = if ($sessionBox.SelectedItem) { [string]$sessionBox.SelectedItem.Id } else { '' } }
+    Request-SelectionLookup
+    Queue-FormStateSave
+})
+$browse.Add_Click({
+    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    $dialog.Description = 'Select the Git repository root'
+    if (Test-Path -LiteralPath $repoBox.Text -PathType Container) { $dialog.SelectedPath = $repoBox.Text }
+    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        $root = Get-RepositoryRoot $dialog.SelectedPath
+        if ($root) { $script:ui.Selection.selectionGeneration++; $script:ui.Async.dataQueued['selection'] = $false; $repoBox.Text = $root }
+        else { [System.Windows.Forms.MessageBox]::Show('Select a folder inside a Git repository.','Invalid folder') | Out-Null }
+    }
+    $dialog.Dispose()
+})
+$cancelRun.Add_Click({
+    if ($grid.SelectedRows.Count -ne 1) { [System.Windows.Forms.MessageBox]::Show('Select an upcoming task first.','No selection') | Out-Null; return }
+    $name = [string]$grid.SelectedRows[0].Tag
+    if (-not $script:ui.Dashboard.pendingIndex.ContainsKey($name) -or
+        $script:ui.Dashboard.pendingIndex[$name].Status -notin @($null,'Scheduled')) {
+        [System.Windows.Forms.MessageBox]::Show('Only future scheduled tasks can be cancelled here; an already-running worker is not stopped by unregistering its task.','Cannot cancel active/history') | Out-Null
+        return
+    }
+    if ([System.Windows.Forms.MessageBox]::Show("Cancel and remove the one-time task '$name'?",'Cancel scheduled run','YesNo','Question') -ne 'Yes') { return }
+    $taskRemoved = $false
+    try {
+        Remove-OneTimeTask -Name $name -OnlyBeforeStart
+        $taskRemoved = $true
+        $payloadPath=Join-Path $appDir ($name + '.json')
+        if(Test-Path -LiteralPath $payloadPath -PathType Leaf){
+            [void](Write-JobOutcome -Path ([IO.Path]::ChangeExtension($payloadPath,'.result.json')) -Status 'cancelled' -Attempt 0 -Message 'Cancelled by the operator before execution.')
+            Remove-Item -LiteralPath $payloadPath -Force -ErrorAction Stop
+        }
+    } catch {
+        $caption = if ($taskRemoved) { 'Task cancelled; cleanup warning' } else { 'Cancellation failed' }
+        [System.Windows.Forms.MessageBox]::Show($_.Exception.Message,$caption) | Out-Null
+    } finally {
+        # Task removal can succeed before a later file write fails. Always
+        # reconcile the displayed list with Windows Task Scheduler.
+        try { Request-SystemRefresh } catch { Update-Status "System refresh after cancellation failed: $($_.Exception.Message)" -Alert }
+    }
+})
+$recentResults.Add_Click({
+    Show-CodexRunHistoryDialog -Owner $form -Directory $appDir -RecentTasks $script:ui.Dashboard.historySnapshot
+    Request-SystemRefresh -Scope TaskStatus
+})
+$openFolder.Add_Click({
+    [void](New-Item -Path $appDir -ItemType Directory -Force)
+    Start-Process explorer.exe -ArgumentList ('"' + $appDir + '"')
+})
+
+$schedule.Add_Click({
+    try {
+        if (-not $sessionBox.SelectedItem) { throw 'Select a saved CLI conversation.' }
+        $sessionId = [string]$sessionBox.SelectedItem.Id
+        if ($sessionId -notmatch $sessionIdPattern) { throw 'Selected session ID is invalid.' }
+        $root = Get-RepositoryRoot $repoBox.Text.Trim().Trim('"')
+        if (-not $root) { throw 'Select an existing Git repository.' }
+        $branch = Get-RepositoryBranch $root
+        # The control displays minutes, but can retain invisible seconds/ticks.
+        # Task Scheduler serializes StartBoundary at second precision. Compare displayed minutes.
+        $picked = $whenBox.Value
+        $when = [datetime]::new($picked.Year,$picked.Month,$picked.Day,$picked.Hour,$picked.Minute,0)
+        if ($when -lt (Get-Date).AddSeconds(30)) { throw 'Choose a future time (at least 30 seconds ahead).' }
+        $message = $messageBox.Text.Trim()
+        if ([string]::IsNullOrWhiteSpace($message)) { throw 'Enter the instruction to send to Codex.' }
+        $access = switch ($accessBox.SelectedIndex) { 0 { 'workspace-write' } 1 { 'yolo' } 2 { 'read-only' } default { throw 'Choose an access mode.' } }
+        if ($access -eq 'yolo') {
+            $confirmation = [System.Windows.Forms.MessageBox]::Show('Full access (YOLO) allows unattended commands with NO sandbox or approval prompts, including changes outside this repository. Schedule anyway?','Unrestricted access','YesNo','Warning')
+            if ($confirmation -ne 'Yes') { return }
+        }
+        $model = Get-SelectedModel
+        if ($model -notmatch '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}$') { throw 'Select a valid Codex model.' }
+        $effort = [string]$effortBox.SelectedItem
+        if ($effort -notmatch '^[a-zA-Z][a-zA-Z0-9_-]{0,40}$') { throw 'Select a valid reasoning effort.' }
+        Assert-ModelEffortSupported $script:ui.Selection.models $model $effort
+        # Recheck the sole eligibility policy at the task-registration
+        # boundary; a stale usage response must not be authorized by a
+        # previously enabled button.
+        Update-SchedulingEligibility
+        if (-not $schedule.Enabled) {
+            throw 'Current usage and verified workspace identity are required for the selected model. Automatic refresh will retry.'
+        }
+        $accountId = [string]$script:ui.Usage.usageSnapshot.accountId
+        if (-not (Test-CanonicalWorkspaceIdentity $accountId)) {
+            throw 'Selected workspace identity is unverified. Automatic usage refresh will retry; schedule when usage is available.'
+        }
+        # A GUI catalog snapshot can age before the scheduled task starts;
+        # the runner independently revalidates the model and effort.
+        $overlaps = @($script:ui.Dashboard.pendingSnapshot | Where-Object { $_.Status -in @('Running','Scheduled') -and $_.Repo -ne '-' -and $_.Repo.TrimEnd([char[]]@('/','\')) -ieq $root.TrimEnd([char[]]@('/','\')) })
+        if (@($overlaps | Where-Object { $_.Status -eq 'Running' -and $_.Session -ceq $sessionId }).Count -gt 0) {
+            throw 'This conversation is already running in a scheduled Codex worker. Review that result before scheduling another continuation.'
+        }
+        if ($overlaps.Count -gt 0) {
+            $answer = [System.Windows.Forms.MessageBox]::Show("There are already $($overlaps.Count) upcoming task(s) targeting this repository. Creating another may cause concurrent work if times overlap. Continue?",'Existing scheduled work','YesNo','Warning')
+            if ($answer -ne 'Yes') { return }
+        }
+        [void](New-Item -Path $appDir -ItemType Directory -Force)
+        # Copy a self-contained, content-addressed runtime once. Future schedules
+        # never overwrite the files used by an already registered task.
+        $runtime = Publish-ImmutableRuntime -SourceDirectory $PSScriptRoot -DestinationDirectory (Join-Path $appDir 'runtimes') -RelativeFiles (Get-CodexRuntimeFiles)
+        $name = 'CodexResume-' + $when.ToString('yyyyMMdd-HHmm') + '-' + ([guid]::NewGuid().ToString('N').Substring(0,8))
+        $jobFilePath = Join-Path $appDir ($name + '.json')
+        $log = Join-Path $appDir ($name + '.log')
+        [pscustomobject]@{
+            sessionId=$sessionId; repo=$root; branch=$branch
+            model=$model; effort=$effort; access=$access; message=$message
+            createdAt=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+            accountId=$accountId
+            runtimeFingerprint=$runtime.Fingerprint; log=$log
+        } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $jobFilePath -Encoding utf8
+        $installedRunner = Join-Path $runtime.Directory 'CodexRunJob.vbs'
+        $runnerArguments = Get-CodexTaskArguments $installedRunner $jobFilePath
+        try {
+            [void](Register-OneTimeTask -Name $name -At $when -Executable (Join-Path $env:WINDIR 'System32\wscript.exe') -Arguments $runnerArguments -WorkingDirectory $root -Description "Codex session $sessionId ($branch)")
+        } catch {
+            # The generic adapter rolls back a failed validation. Keep payloads
+            # only if Windows still reports a registered task for diagnosis.
+            $existing = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
+            if (-not $existing) { Remove-Item -LiteralPath $jobFilePath -Force -ErrorAction SilentlyContinue }
+            throw
+        }
+        # The validated Windows task already exists. A preference write or
+        # follow-up UI refresh failure must not report scheduling as failed.
+        Clear-SchedulerAlert
+        $script:ui.Preferences.settingsTimer.Stop()
+        try { Save-CurrentFormState } catch {
+            Update-Status "Scheduled $name, but preferences were not saved: $($_.Exception.Message)" -Alert
+        }
+        try { Request-SystemRefresh } catch {
+            Update-Status "Scheduled $name, but the system could not refresh: $($_.Exception.Message)" -Alert
+        }
+        # The Upcoming runs row is the success confirmation.
+    } catch {
+        # A task may have been registered before a later check failed. Surface it,
+        # rather than leaving an empty list that encourages duplicate schedules.
+        $failureMessage = $_.Exception.Message
+        try { Request-SystemRefresh -Scope TaskStatus } catch { $failureMessage += "`nPending-list refresh: $($_.Exception.Message)" }
+        [System.Windows.Forms.MessageBox]::Show($failureMessage,'Scheduling check failed') | Out-Null
+    }
+})
+

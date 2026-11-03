@@ -1,18 +1,17 @@
+Import-Module (Join-Path $PSScriptRoot 'components/GitRepository/GitRepository.psm1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot 'components/SettingsStore/SettingsStore.psm1') -Force -ErrorAction Stop
+. (Join-Path $PSScriptRoot 'CodexJobStore.ps1')
 # Codex Resume Scheduler - local data readers (PowerShell 7).
-# Used by the GUI's short-lived background thread jobs and scheduled runners.
+# Used by GUI background jobs; the scheduled CLI worker does not import this file.
 # No UI controls, timers, or persistent services.
 
 function Get-RepositoryRoot {
     param([string]$Path)
-    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path -PathType Container)) { return $null }
-    try {
-        $result = & git -C $Path rev-parse --show-toplevel 2>$null
-        if ($LASTEXITCODE -ne 0 -or -not $result) { return $null }
-        return ([string]($result | Select-Object -First 1)).Trim()
-    } catch { return $null }
+    return Get-GitRepositoryRoot -Path $Path
 }
 
 function Get-RecentCliSessions {
+    $sessionIdPattern = '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$'
     $sessionRoot = Join-Path $(if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }) 'sessions'
     $sessions = @()
     if (Test-Path -LiteralPath $sessionRoot -PathType Container) {
@@ -22,7 +21,10 @@ function Get-RecentCliSessions {
             try {
                 $line = Get-Content -LiteralPath $item.FullName -TotalCount 1 -ErrorAction Stop
                 $meta = ($line | ConvertFrom-Json).payload
-                if ($meta.source -ne 'cli' -or $meta.id -notmatch $sessionIdPattern) { continue }
+                # Both interactive CLI and non-interactive exec sessions can
+                # be resumed by the scheduled "codex exec resume <id>" worker.
+                # Do not include IDE, subagent or unknown session sources.
+                if ($meta.source -notin @('cli','exec') -or $meta.id -notmatch $sessionIdPattern) { continue }
                 if (-not $seen.Add([string]$meta.id)) { continue }
                 $name = if ($meta.cwd) { Split-Path -Leaf ([string]$meta.cwd) } else { 'CLI session' }
                 $sessions += [pscustomobject]@{
@@ -60,7 +62,8 @@ function Get-ReportedThreadDirectory {
 }
 
 function Find-SessionRepository {
-    param($Session, [string]$ReportedCwd = $null)
+    param($Session, [string]$ReportedCwd = $null,
+          [Parameter(Mandatory)][string]$AppDirectory)
     if (-not $Session) { return $null }
     $candidates = [System.Collections.Generic.List[string]]::new()
     $reportedRoot = Get-RepositoryRoot $ReportedCwd
@@ -68,8 +71,8 @@ function Find-SessionRepository {
     if ($direct) { $candidates.Add($direct) }
 
     # A prior schedule is evidence, not proof that it targeted the right checkout.
-    if (Test-Path -LiteralPath $appDir -PathType Container) {
-        foreach ($saved in @(Get-ChildItem -LiteralPath $appDir -Filter 'CodexResume-*.json' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 5)) {
+    if (Test-Path -LiteralPath $AppDirectory -PathType Container) {
+        foreach ($saved in @(Get-CodexJobPayloadFiles -Directory $AppDirectory)) {
             try {
                 $job = Get-Content -LiteralPath $saved.FullName -Raw -ErrorAction Stop | ConvertFrom-Json
                 if ([string]$job.sessionId -ne [string]$Session.Id) { continue }
@@ -121,20 +124,51 @@ function Find-SessionRepository {
     return $null
 }
 
+# Resolve what Windows actually knows, not what a countdown suggests.
+# A zero Task Scheduler exit code without a worker outcome does NOT prove
+# Codex completed the requested continuation.
+function Get-CodexTaskDisplayState {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][datetime]$When,
+        [Parameter(Mandatory)][string]$TaskState,
+        $TaskInfo = $null,
+        $Outcome = $null,
+        [datetime]$Now = (Get-Date)
+    )
+    if ($TaskState -eq 'Running') { return 'Running' }
+    if ($Outcome -and $Outcome.status -in @('completed','failed','blocked','deferred','cancelled')) {
+        return ([string]$Outcome.status).Substring(0,1).ToUpperInvariant() + ([string]$Outcome.status).Substring(1)
+    }
+    if ($When -gt $Now) { return 'Scheduled' }
+    if ($TaskInfo) {
+        $lastRun = [datetime]$TaskInfo.LastRunTime
+        if ($lastRun.Year -ge 2000 -and $lastRun -ge $When.AddMinutes(-2)) {
+            if ([long]$TaskInfo.LastTaskResult -eq 0) { return 'Ended (no result recorded)' }
+            return "Failed (task exit $([long]$TaskInfo.LastTaskResult))"
+        }
+    }
+    return 'Overdue (execution unconfirmed)'
+}
+
 function Get-UpcomingCodexTasks {
+    param([Parameter(Mandatory)][string]$AppDirectory)
     $items = @()
-    # Query our task prefixes rather than enumerate every Windows scheduled task.
+    $now = Get-Date
+    $recentSince = $now.AddHours(-48)
+    # Only enumerate the Scheduler's named Windows tasks. Retain live and
+    # recent executions so the interface can explain what happened.
     $tasks = @(Get-ScheduledTask -TaskName 'CodexResume-*' -ErrorAction SilentlyContinue) +
              @(Get-ScheduledTask -TaskName 'BP*-Codex-*' -ErrorAction SilentlyContinue)
     foreach ($task in $tasks) {
         if ($task.TaskName -notmatch '^(CodexResume-|BP\d+-Codex-(?:Resume|Test)$)') { continue }
-        if ($task.State -eq 'Disabled' -or $task.State -eq 'Running') { continue }
+        if ($task.State -eq 'Disabled') { continue }
         $trig = @($task.Triggers | Where-Object { $_.StartBoundary }) | Select-Object -First 1
         if (-not $trig) { continue }
         try { $when = [datetime]$trig.StartBoundary } catch { continue }
-        if ($when -le (Get-Date)) { continue }
+        if ($when -lt $recentSince -and $task.State -ne 'Running') { continue }
         $name = [string]$task.TaskName
-        $json = Join-Path $appDir ($name + '.json')
+        $json = Join-Path $AppDirectory ($name + '.json')
         $description = 'Existing scheduled task'
         $session = '-'
         $repo = '-'
@@ -150,7 +184,7 @@ function Get-UpcomingCodexTasks {
                 if ([string]$job.createdAt -match '^\d{9,12}$') { $createdAt = [long]$job.createdAt }
             } catch { $description = 'Scheduled task (job data unreadable)' }
         } elseif ($name -match '^BP\d+-Codex-') {
-            # Surface existing BPxx tasks without modifying their definitions.
+            # Older manually registered BP tasks remain visible, read-only.
             $repo = [string]$task.Actions[0].WorkingDirectory
             $match = [regex]::Match([string]$task.Actions[0].Arguments, '-File\s+"([^"]+)"')
             if ($match.Success -and (Test-Path -LiteralPath $match.Groups[1].Value -PathType Leaf)) {
@@ -165,10 +199,29 @@ function Get-UpcomingCodexTasks {
                 } catch { }
             }
         }
-        $items += [pscustomobject]@{ Name = $name; When = $when; Repo = $repo; Session = $session;
-            Description = $description; Model = $model; CreatedAt = $createdAt }
+        $taskInfo = $null
+        if ($when -le $now -and $task.State -ne 'Running') {
+            try {
+                $taskInfo = Get-ScheduledTaskInfo -TaskName $name -TaskPath $task.TaskPath -ErrorAction Stop
+            } catch { }
+        }
+        $outcome = $null
+        $resultPath = Join-Path $AppDirectory ($name + '.result.json')
+        if (Test-Path -LiteralPath $resultPath -PathType Leaf) {
+            try { $outcome = Read-JobOutcome -Path $resultPath } catch { }
+        }
+        $runState = Get-CodexTaskDisplayState -When $when -TaskState ([string]$task.State) -TaskInfo $taskInfo -Outcome $outcome -Now $now
+        $items += [pscustomobject]@{
+            Name = $name; When = $when; Repo = $repo; Session = $session
+            Description = $description; Model = $model; CreatedAt = $createdAt
+            Status = $runState
+        }
     }
-    return ($items | Sort-Object When)
+    # Active work must be shown FIRST; next scheduled jobs precede history.
+    $active = @($items | Where-Object Status -eq 'Running' | Sort-Object When -Descending)
+    $future = @($items | Where-Object Status -eq 'Scheduled' | Sort-Object When)
+    $recent = @($items | Where-Object { $_.Status -notin @('Running','Scheduled') } | Sort-Object When -Descending)
+    return @($active) + @($future) + @($recent)
 }
 
 function Read-SessionModel {
@@ -184,26 +237,14 @@ function Read-SessionModel {
     } catch { return $null }
 }
 
-# UI draft settings are local to this Windows account, not part of a scheduled job.
+# App-specific facade over the reusable JSON settings store.
 function Read-CodexUiSettings {
     param([string]$Directory)
-    $file = Join-Path $Directory 'settings.json'
-    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { return $null }
-    try { return (Get-Content -LiteralPath $file -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop) }
-    catch { return $null }
+    return Read-JsonSettings -Path (Join-Path $Directory 'settings.json')
 }
-
 function Write-CodexUiSettings {
     param([string]$Directory, $State)
-    [void](New-Item -ItemType Directory -Path $Directory -Force -ErrorAction Stop)
-    $destination = Join-Path $Directory 'settings.json'
-    $temporary = Join-Path $Directory ('.settings-' + [guid]::NewGuid().ToString('N') + '.tmp')
-    try {
-        $State | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $temporary -Encoding utf8 -ErrorAction Stop
-        [System.IO.File]::Move($temporary, $destination, $true)
-    } finally {
-        if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }
-    }
+    Write-JsonSettings -Path (Join-Path $Directory 'settings.json') -Value $State
 }
 
 function Get-RestoredRunTime {

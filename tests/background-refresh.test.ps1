@@ -1,7 +1,9 @@
 # Verify costly data reads are dispatched to background jobs, never from refresh handlers.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$gui = Get-Content -LiteralPath (Join-Path $root 'CodexResumeScheduler.ps1') -Raw
+. (Join-Path $root 'CodexUiState.ps1')
+$script:ui = New-CodexUiState
+$gui = @('CodexUiRefresh.ps1','CodexUiSelection.ps1','CodexUiPending.ps1','CodexUiUsage.ps1') | ForEach-Object { Get-Content -LiteralPath (Join-Path $root $_) -Raw } | Out-String
 $data = Get-Content -LiteralPath (Join-Path $root 'CodexData.ps1') -Raw
 $tokens = $null; $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($gui, [ref]$tokens, [ref]$parseErrors)
@@ -12,19 +14,40 @@ if ($gui -notmatch 'Get-ReportedThreadDirectory' -or $gui -notmatch 'Find-Sessio
 if ($data -notmatch 'thread/read' -or $data -notmatch 'Get-ReportedThreadDirectory') { throw 'Codex metadata lookup missing from the data helper.' }
 if ($gui -notmatch 'Start-ThreadJob' -or $gui -notmatch '\$dataPoll\.Add_Tick') { throw 'Background refresh and result polling missing.' }
 if ($data -notmatch "Get-ScheduledTask -TaskName 'CodexResume-\*'") { throw 'Pending refresh must use task name filtering.' }
-if ($gui -notmatch "'CodexUsage.js','CodexRetry.js','CodexData.ps1','CodexDashboard.ps1','CodexFlowingBar.ps1','CodexRunJob.vbs'") { throw 'Scheduled runner needs all helper files installed.' }
-$definitions = @($ast.FindAll({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -in @('Refresh-SessionList','Refresh-PendingList','Request-SelectionLookup','Start-DataRead')}, $true))
-if ($definitions.Count -ne 4) { throw 'Expected four async data-refresh entrypoints.' }
+$worker = Get-Content -LiteralPath (Join-Path $root 'CodexRunEngine.ps1') -Raw
+if ($worker -notmatch 'Get-CodexRuntimeFiles' -or $worker -notmatch 'Assert-RuntimeFingerprint') { throw 'Scheduled runner must use an immutable runtime snapshot.' }
+$definitions = @($ast.FindAll({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -in @('Refresh-SessionList','Refresh-PendingList','Request-SelectionLookup','Start-DataRead','Request-SystemRefresh')}, $true))
+if ($definitions.Count -ne 5) { throw 'Expected five async data-refresh entrypoints.' }
 foreach ($definition in $definitions | Where-Object Name -in @('Refresh-SessionList','Refresh-PendingList','Request-SelectionLookup')) {
     if ($definition.Extent.Text -match 'Get-ScheduledTask|Get-Content|Get-RecentCliSessions|Find-SessionRepository|Read-SessionModel') { throw "UI entrypoint $($definition.Name) performs blocking work." }
 }
 # Start-DataRead must coalesce an in-flight request, not start parallel duplicates.
 Invoke-Expression (@($definitions | Where-Object Name -eq 'Start-DataRead')[0].Extent.Text)
-$script:dataJobs = @{}; $script:dataQueued = @{}; $script:startedJobs = 0
+$script:ui.Async.dataJobs = @{}; $script:ui.Async.dataQueued = @{}; $script:startedJobs = 0
 function Start-ThreadJob { param($ArgumentList,$ScriptBlock) $script:startedJobs++; [pscustomobject]@{ State = 'Running' } }
 function Update-Status { param($Text) throw "Unexpected start failure: $Text" }
 $appDir = 'C:\fake'
 Start-DataRead -Kind 'pending'
 Start-DataRead -Kind 'pending'
-if ($script:startedJobs -ne 1 -or -not $script:dataQueued['pending']) { throw 'Duplicate pending refresh was not coalesced.' }
-Write-Host 'Background refresh wiring and coalescing checks passed.'
+if ($script:startedJobs -ne 1 -or -not $script:ui.Async.dataQueued['pending']) { throw 'Duplicate pending refresh was not coalesced.' }
+
+# Exercise the real coordinator, keeping underlying readers mocked. Full
+# refresh updates all sources; fast status checks and model changes are scoped.
+Invoke-Expression (@($definitions | Where-Object Name -eq 'Request-SystemRefresh')[0].Extent.Text)
+$script:sessionCalls=0;$script:pendingCalls=0;$script:usageCalls=0
+function Refresh-SessionList { $script:sessionCalls++ }
+function Refresh-PendingList { $script:pendingCalls++ }
+function Request-UsageRefresh { $script:usageCalls++ }
+Request-SystemRefresh
+if($script:sessionCalls -ne 1 -or $script:pendingCalls -ne 1 -or $script:usageCalls -ne 1 -or
+   $script:ui.Async.lastFullRefresh -eq [datetime]::MinValue){throw 'Full system refresh did not update every source.'}
+Request-SystemRefresh -Scope TaskStatus
+if($script:pendingCalls -ne 2 -or $script:sessionCalls -ne 1 -or $script:usageCalls -ne 1){throw 'Two-second task status check restarted unrelated readers.'}
+Request-SystemRefresh -Scope ModelChanged
+if($script:usageCalls -ne 2 -or $script:sessionCalls -ne 1 -or $script:pendingCalls -ne 2){throw 'Model change refreshed unrelated sources.'}
+$lifecycle=Get-Content -LiteralPath (Join-Path $root 'CodexUiLifecycle.ps1') -Raw
+if($lifecycle -notmatch '\$systemRefreshTimer\.Interval = 2000' -or
+   $lifecycle -notmatch 'Request-SystemRefresh -Scope \$scope' -or
+   $lifecycle -notmatch '\$form\.Add_Activated' -or
+   $lifecycle -match '\$runStatusRefresh|\$autoRefresh'){throw 'Refresh lifecycle uses duplicate timers or lacks resume handling.'}
+Write-Host 'Single refresh coordinator, async deduplication, 2s task status, 60s full refresh and resume wiring PASS.'

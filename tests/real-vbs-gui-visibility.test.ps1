@@ -4,12 +4,25 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $launcher = Join-Path $root 'Start-Codex-Scheduler.vbs'
 $before = @(Get-Process pwsh -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
+$testProfile=Join-Path ([IO.Path]::GetTempPath()) ('scheduler-vbs-test-'+[guid]::NewGuid().ToString('N'))
+[void](New-Item -ItemType Directory -Path $testProfile -Force)
+$startupLog=Join-Path $testProfile 'CodexResumeScheduler\gui-startup.log'
 $started = @()
 try {
     $hostExe = Join-Path $env:WINDIR 'System32\wscript.exe'
-    $hostProcess = Start-Process -FilePath $hostExe -ArgumentList ('//B //Nologo "' + $launcher + '"') -PassThru
-    if (-not $hostProcess.WaitForExit(5000)) { throw 'VBS entrypoint did not return promptly.' }
-    if ($hostProcess.ExitCode -ne 0) { throw "VBS entrypoint failed: $($hostProcess.ExitCode)" }
+    $start=[Diagnostics.ProcessStartInfo]::new()
+    $start.FileName=$hostExe
+    $start.ArgumentList.Add('//B')
+    $start.ArgumentList.Add('//Nologo')
+    $start.ArgumentList.Add($launcher)
+    $start.WorkingDirectory=$root
+    $start.UseShellExecute=$false
+    $start.Environment['LOCALAPPDATA']=$testProfile
+    $hostProcess=[Diagnostics.Process]::Start($start)
+    try {
+        if (-not $hostProcess.WaitForExit(5000)) { throw 'VBS entrypoint did not return promptly.' }
+        if ($hostProcess.ExitCode -ne 0) { throw "VBS entrypoint failed: $($hostProcess.ExitCode)" }
+    } finally { $hostProcess.Dispose() }
     $found = $null
     for ($i = 0; $i -lt 80; $i++) {
         $processes = @(Get-Process pwsh -ErrorAction SilentlyContinue |
@@ -27,11 +40,13 @@ try {
             try { $p = Get-Process -Id $_ -ErrorAction Stop; "PID $_ title='$($p.MainWindowTitle)'" }
             catch { "PID $_ exited" }
         }) -join '; '
-        throw "Double-click launcher did not display the scheduler window. Child processes: $details"
+        $diagnostic=if(Test-Path -LiteralPath $startupLog){(Get-Content -LiteralPath $startupLog -Tail 3) -join ' | '}else{'No startup log recorded'}
+        throw "Double-click launcher did not display the scheduler window. Startup: $diagnostic. Child processes: $details"
     }
     Write-Host "Visible application window from the real VBS launcher: $($found.MainWindowTitle)"
 } finally {
     foreach ($processId in $started) {
         Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
     }
+    if(Test-Path -LiteralPath $testProfile){Remove-Item -LiteralPath $testProfile -Recurse -Force -ErrorAction SilentlyContinue}
 }

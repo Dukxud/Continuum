@@ -2,17 +2,23 @@
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+$env:CODEX_BAR_RENDERER = 'wpf'
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexFlowingBar.ps1')
-$source = Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexResumeScheduler.ps1'
-$tokens = $null; $parseErrors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile($source,[ref]$tokens,[ref]$parseErrors)
-if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
-foreach ($name in @('New-UsageCard','Render-UsageCard')) {
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexAeroBar.ps1')
+$root = Split-Path -Parent $PSScriptRoot
+foreach ($spec in @(
+    @('New-UsageCard','CodexUiForms.ps1'),
+    @('Render-UsageCard','CodexUiUsage.ps1')
+)) {
+    $tokens = $null; $parseErrors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+        (Join-Path $root $spec[1]),[ref]$tokens,[ref]$parseErrors)
+    if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
     $matches = @($ast.FindAll({
         param($node)
-        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $spec[0]
     },$true))
-    if ($matches.Count -ne 1) { throw "Expected one function: $name" }
+    if ($matches.Count -ne 1) { throw "Expected one function: $($spec[0])" }
     Invoke-Expression $matches[0].Extent.Text
 }
 function Format-ResetTime { param($Seconds) return 'Reset display' }
@@ -20,13 +26,17 @@ function Require($Condition,[string]$Message) { if (-not $Condition) { throw $Me
 
 $form = [System.Windows.Forms.Form]::new()
 try {
-    $first = New-UsageCard 18 'Primary window'
-    $second = New-UsageCard 470 'Secondary window'
+    $first = New-UsageCard 18 'Primary window' 'quota'
+    $second = New-UsageCard 470 'Secondary window' 'weekly'
+    Require ($first.Bar.Tag.Kind -eq 'quota' -and $second.Bar.Tag.Kind -eq 'weekly') 'Usage cards must bind independently to 5-hour and weekly color roles.'
     foreach ($card in @($first,$second)) {
         Require ($card.Bar -is [System.Windows.Forms.Integration.ElementHost]) 'Usage must be WPF hosted in WinForms.'
         Require ($card.Bar.Child -is [System.Windows.Controls.ProgressBar]) 'Usage must be a real WPF percentage bar.'
         Require ($card.Bar.Width -eq 400 -and $card.Bar.Height -eq 17) 'Usage bars must preserve layout.'
         Require ($card.Bar.Parent -eq $card.Panel) 'Usage bar must stay inside its card.'
+        Require ($card.PSObject.Properties.Name -cnotcontains 'Updated') 'Usage-card timestamps must be removed.'
+        Require ($card.Reset.Bottom -le $card.Panel.Height) 'Reset details must remain inside the card.'
+        Require ($card.Panel.Controls.Count -eq 4) 'Unexpected additional labels below the usage bar.'
     }
     $window = [pscustomobject]@{ label='5-hour usage'; remainingPercent=62.6; resetsAt=$null }
     Render-UsageCard $first $window 'Primary window'

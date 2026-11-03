@@ -1,0 +1,257 @@
+if (-not $IsWindows) { throw 'This application requires Windows and PowerShell 7.' }
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+Import-Module (Join-Path $PSScriptRoot 'components/WindowShell/WindowShell.psm1') -Force -ErrorAction Stop
+[System.Windows.Forms.Application]::EnableVisualStyles()
+# WScript launches PowerShell with its console hidden. The first window show
+# request inherits that startup setting, so explicitly show the Forms window.
+Add-Type -Namespace CodexScheduler -Name NativeWindow -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("user32.dll")]
+public static extern bool ShowWindow(System.IntPtr handle, int command);
+'@
+
+
+
+
+# Repository candidates must be compared across the selected conversation.
+# A valid startup repository is not necessarily the checkout with unfinished work.
+# Ambiguous evidence must require an explicit Browse choice, never a guess.
+
+
+
+function Get-SavedAccessPreference {
+    if ($script:ui.Preferences.savedDraft -and $script:ui.Preferences.savedDraft.access -in @('workspace-write','yolo','read-only')) { return [string]$script:ui.Preferences.savedDraft.access }
+    if ($script:ui.Preferences.uiSettings -and $script:ui.Preferences.uiSettings.lastAccess -in @('workspace-write','yolo','read-only')) { return [string]$script:ui.Preferences.uiSettings.lastAccess }
+    return 'workspace-write'
+}
+
+$form = New-DesktopWindow -Title 'Codex Resume Scheduler v1.16.0' -Width 920 -Height 865 -MinimumWidth 940 -MinimumHeight 875
+function Add-Label {
+    param([string]$Text,[int]$X,[int]$Y,[int]$W=130)
+    return Add-DesktopLabel -Parent $form -Text $Text -X $X -Y $Y -Width $W
+}
+function Add-Button {
+    param([string]$Text,[int]$X,[int]$Y,[int]$W=110)
+    return Add-DesktopButton -Parent $form -Text $Text -X $X -Y $Y -Width $W
+}
+
+$heading = Add-Label 'Schedule a continuation' 18 14 500
+$heading.Font = [System.Drawing.Font]::new('Segoe UI',15,[System.Drawing.FontStyle]::Bold)
+$heading.Height = 34
+
+[void](Add-Label 'Conversation' 18 65)
+$sessionBox = New-Object System.Windows.Forms.ComboBox
+$sessionBox.Location = [System.Drawing.Point]::new(155,61)
+$sessionBox.Size = [System.Drawing.Size]::new(743,30)
+$sessionBox.DropDownStyle = 'DropDownList'
+$sessionBox.DisplayMember = 'Display'
+$form.Controls.Add($sessionBox)
+
+[void](Add-Label 'Repository root' 18 111)
+$repoBox = New-Object System.Windows.Forms.TextBox
+$repoBox.Location = [System.Drawing.Point]::new(155,108)
+$repoBox.Size = [System.Drawing.Size]::new(605,30)
+$form.Controls.Add($repoBox)
+$browse = Add-Button 'Browse' 773 106 125
+
+[void](Add-Label 'Run at (local)' 18 157)
+$whenBox = New-Object System.Windows.Forms.DateTimePicker
+$whenBox.Location = [System.Drawing.Point]::new(202,154)
+$whenBox.Size = [System.Drawing.Size]::new(237,30)
+$whenBox.Format = 'Custom'
+$whenBox.CustomFormat = 'ddd MMM dd, yyyy  hh:mm tt'
+# The default is two minutes ahead, rounded to the next displayed minute.
+# A restored future time is considered explicitly chosen and never auto-shifted.
+. (Join-Path $PSScriptRoot 'CodexScheduleTime.ps1')
+$whenBox.Value = Get-CodexSuggestedRunTime
+if ($script:ui.Preferences.savedDraft) {
+    $restoredTime = Get-RestoredRunTime ([string]$script:ui.Preferences.savedDraft.runAt) (Get-Date)
+    if ($restoredTime) {
+        $whenBox.Value = $restoredTime
+        $script:ui.Preferences.scheduleTimeEdited=$true
+    }
+}
+$form.Controls.Add($whenBox)
+$minusTime = Add-Button '−' 155 154 38
+$minusTime.AccessibleName='Schedule one minute earlier'
+$plusTime = Add-Button '+' 446 154 38
+$plusTime.AccessibleName='Schedule one minute later'
+$nowPlusTwo = Add-Button 'Now +2' 637 154 112
+$nowPlusTwo.AccessibleName='Schedule two minutes from now'
+$useReset = Add-Button 'Reset +2' 761 154 137
+$useReset.AccessibleName='Schedule two minutes after verified quota reset'
+$useReset.Enabled = $false
+
+[void](Add-Label 'Reasoning' 361 202 86)
+$effortBox = New-Object System.Windows.Forms.ComboBox
+$effortBox.Location = [System.Drawing.Point]::new(450,199)
+$effortBox.Size = [System.Drawing.Size]::new(122,30)
+$effortBox.DropDownStyle = 'DropDownList'
+$form.Controls.Add($effortBox)
+
+[void](Add-Label 'Access' 586 202 60)
+$accessBox = New-Object System.Windows.Forms.ComboBox
+$accessBox.Location = [System.Drawing.Point]::new(652,199)
+$accessBox.Size = [System.Drawing.Size]::new(246,30)
+$accessBox.DropDownStyle = 'DropDownList'
+[void]$accessBox.Items.AddRange([object[]]@('Workspace write','Full access (YOLO)','Read-only test'))
+$script:ui.Preferences.lastAccessPreference = Get-SavedAccessPreference
+$accessBox.SelectedIndex = switch ($script:ui.Preferences.lastAccessPreference) { 'yolo' { 1 } 'read-only' { 2 } default { 0 } }
+$form.Controls.Add($accessBox)
+[void](Add-Label 'Model' 18 202 70)
+$modelBox = New-Object System.Windows.Forms.ComboBox
+$modelBox.Location = [System.Drawing.Point]::new(90,199)
+$modelBox.Size = [System.Drawing.Size]::new(258,30)
+$modelBox.DropDownStyle = 'DropDownList'
+$modelBox.DisplayMember = 'Display'
+$form.Controls.Add($modelBox)
+
+[void](Add-Label 'Instruction' 18 247)
+$messageBox = New-Object System.Windows.Forms.TextBox
+$messageBox.Location = [System.Drawing.Point]::new(155,243)
+$messageBox.Size = [System.Drawing.Size]::new(743,30)
+$messageBox.Text = if ($script:ui.Preferences.savedDraft -and $null -ne $script:ui.Preferences.savedDraft.message) { [string]$script:ui.Preferences.savedDraft.message } else { 'Resume.' }
+$form.Controls.Add($messageBox)
+$schedule = Add-Button 'Schedule once' 720 274 178
+$schedule.Height = 31
+$schedule.Font = [System.Drawing.Font]::new('Segoe UI',10,[System.Drawing.FontStyle]::Bold)
+$schedule.Enabled = $false
+$separator = New-Object System.Windows.Forms.Label
+$separator.BorderStyle = 'Fixed3D'
+$separator.Location = [System.Drawing.Point]::new(18,309)
+$separator.Size = [System.Drawing.Size]::new(880,2)
+$form.Controls.Add($separator)
+
+$usageHeading = Add-Label 'Usage remaining' 18 322 280
+$usageHeading.Font = [System.Drawing.Font]::new('Segoe UI',12,[System.Drawing.FontStyle]::Bold)
+$usageHeading.Height = 30
+
+. (Join-Path $PSScriptRoot 'CodexFlowingBar.ps1')
+. (Join-Path $PSScriptRoot 'CodexAeroBar.ps1')
+. (Join-Path $PSScriptRoot 'CodexBarAppearance.ps1')
+Initialize-AeroAppearance $script:ui.Preferences.uiSettings
+. (Join-Path $PSScriptRoot 'CodexDashboard.ps1')
+
+function New-UsageCard {
+    param([int]$X, [string]$InitialTitle,[string]$Kind)
+    $card = New-Object System.Windows.Forms.Panel
+    $card.Location = [System.Drawing.Point]::new($X,358)
+    $card.Size = [System.Drawing.Size]::new(428,108)
+    $card.BackColor = [System.Drawing.Color]::FromArgb(247,249,252)
+    $card.BorderStyle = 'FixedSingle'
+    $form.Controls.Add($card)
+    $name = New-Object System.Windows.Forms.Label
+    $name.Location = [System.Drawing.Point]::new(12,10)
+    $name.Size = [System.Drawing.Size]::new(225,27)
+    $name.Text = $InitialTitle
+    $name.Font = [System.Drawing.Font]::new('Segoe UI',10,[System.Drawing.FontStyle]::Bold)
+    $card.Controls.Add($name)
+    $remaining = New-Object System.Windows.Forms.Label
+    $remaining.Location = [System.Drawing.Point]::new(237,7)
+    $remaining.Size = [System.Drawing.Size]::new(176,32)
+    $remaining.TextAlign = 'MiddleRight'
+    $remaining.Text = '—'
+    $remaining.Font = [System.Drawing.Font]::new('Segoe UI',12,[System.Drawing.FontStyle]::Bold)
+    $card.Controls.Add($remaining)
+    $bar = New-AeroProgressBar $card 12 44 400 17 $Kind
+    $reset = New-Object System.Windows.Forms.Label
+    $reset.Location = [System.Drawing.Point]::new(12,72)
+    $reset.Size = [System.Drawing.Size]::new(400,24)
+    $reset.Text = 'Waiting for Codex usage...'
+    $reset.ForeColor = [System.Drawing.Color]::DimGray
+    $card.Controls.Add($reset)
+    return [pscustomobject]@{ Panel = $card; Title = $name; Remaining = $remaining; Bar = $bar; Reset = $reset }
+}
+$usageCards = @((New-UsageCard 18 'Primary window' 'quota'), (New-UsageCard 470 'Secondary window' 'weekly'))
+$separator2 = New-Object System.Windows.Forms.Label
+$separator2.BorderStyle = 'Fixed3D'
+$separator2.Location = [System.Drawing.Point]::new(18,485)
+$separator2.Size = [System.Drawing.Size]::new(880,2)
+$form.Controls.Add($separator2)
+
+$pending = Add-Label 'Upcoming runs' 18 499 400
+$pending.Font = [System.Drawing.Font]::new('Segoe UI',12,[System.Drawing.FontStyle]::Bold)
+$pending.Height = 30
+
+$grid = New-Object System.Windows.Forms.DataGridView
+$grid.Location = [System.Drawing.Point]::new(18,536)
+$grid.Size = [System.Drawing.Size]::new(880,195)
+$grid.ReadOnly = $true
+$grid.AllowUserToAddRows = $false
+$grid.AllowUserToDeleteRows = $false
+$grid.AllowUserToResizeRows = $false
+$grid.MultiSelect = $false
+$grid.SelectionMode = 'FullRowSelect'
+$grid.RowHeadersVisible = $false
+$grid.AutoSizeColumnsMode = 'Fill'
+$grid.BackgroundColor = [System.Drawing.Color]::White
+[void]$grid.Columns.Add('When','Scheduled (local)')
+[void]$grid.Columns.Add('Countdown','Time to run')
+[void]$grid.Columns.Add('Project','Project')
+[void]$grid.Columns.Add('Details','Model / access / instruction')
+[void]$grid.Columns.Add('Session','Session')
+$grid.Columns[0].FillWeight = 149
+$grid.Columns[1].FillWeight = 205
+$grid.Columns[2].FillWeight = 145
+$grid.Columns[3].FillWeight = 290
+$grid.Columns[4].FillWeight = 85
+$grid.RowTemplate.Height = 40
+$grid.ShowCellToolTips = $true
+$form.Controls.Add($grid)
+$emptyRuns = New-Object System.Windows.Forms.Label
+$emptyRuns.Text = 'No upcoming runs'
+$emptyRuns.ForeColor = [System.Drawing.Color]::DimGray
+$emptyRuns.TextAlign = 'MiddleCenter'
+$emptyRuns.Dock = 'Fill'
+$grid.Controls.Add($emptyRuns)
+$grid.Add_SelectionChanged({
+    $cancelRun.Enabled = $false
+    if ($grid.SelectedRows.Count -eq 1) {
+        $key = [string]$grid.SelectedRows[0].Tag
+        if ($key -and $script:ui.Dashboard.pendingIndex.ContainsKey($key)) {
+            $item = $script:ui.Dashboard.pendingIndex[$key]
+            $cancelRun.Enabled = (-not $item.Status -or $item.Status -eq 'Scheduled')
+        }
+    }
+})
+
+$cancelRun = Add-Button 'Cancel selected' 18 744 154
+$cancelRun.Enabled = $false
+$openFolder = Add-Button 'Open logs folder' 185 744 154
+$recentResults = Add-Button 'Recent runs' 352 744 178
+# Only actionable warnings/errors deserve space; no permanent status footer.
+$status = Add-Label '' 18 783 880
+$status.ForeColor = [System.Drawing.Color]::FromArgb(138,49,33)
+$status.AutoEllipsis = $true
+$status.Visible = $false
+$status.Cursor = [System.Windows.Forms.Cursors]::Hand
+$status.Add_Click({Clear-SchedulerAlert})
+function Clear-SchedulerAlert {
+    $script:ui.Preferences.alertMessage = ''
+    $status.Visible = $false
+    if ($script:ui.Dashboard.compactToggle) { Update-DashboardLayout }
+}
+function Update-Status {
+    param([string]$Text,[switch]$Alert)
+    if (-not $Alert) { return }
+    $script:ui.Preferences.alertMessage = $Text
+    $status.Text = $Text
+    $status.Visible = $true
+    if ($script:ui.Dashboard.compactToggle) { Update-DashboardLayout }
+}
+
+$repoHints = [System.Windows.Forms.ToolTip]::new()
+$usageHints = [System.Windows.Forms.ToolTip]::new()
+$actionHints = [System.Windows.Forms.ToolTip]::new()
+$actionHints.SetToolTip($schedule, 'Creates one Windows Task Scheduler run. Your settings are rechecked when the task starts.')
+$actionHints.SetToolTip($pending, 'Only scheduled and actively running tasks appear here. See Recent runs for finished results and their responses.')
+$actionHints.SetToolTip($useReset, 'Uses the applicable exhausted quota reset time plus two minutes, when Codex reports one.')
+$actionHints.SetToolTip($status, 'Click to dismiss this warning.')
+
+# Add these before Initialize-Dashboard captures the full-layout-only controls.
+. (Join-Path $PSScriptRoot 'CodexUiPixelTheme.ps1')
+Initialize-SchedulerPixelTheme -Form $form -Inputs @($sessionBox,$repoBox,$whenBox,$modelBox,$effortBox,$accessBox,$messageBox) -Actions @{
+    Browse=$browse; Minus=$minusTime; Plus=$plusTime; Now=$nowPlusTwo; Reset=$useReset
+    Schedule=$schedule; Cancel=$cancelRun; Logs=$openFolder; Recent=$recentResults
+} -UsageCards $usageCards -Heading $heading -UsageHeading $usageHeading -PendingHeading $pending
+

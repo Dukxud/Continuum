@@ -5,3 +5,8 @@ CodexResume-*.json
 BP*-Codex-*.ps1
 node_modules/
 .DS_Store
+
+# Generated acceptance artifacts and pinned Microsoft SDK binaries
+AeroWebView2/
+AeroScreenshots/
+QA-results-local-*/
