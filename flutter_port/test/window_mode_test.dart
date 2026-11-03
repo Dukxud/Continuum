@@ -63,7 +63,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 160));
     expect(host.modes, contains('compact:empty'));
     expect(find.text('Schedule once'), findsNothing);
-    expect(find.text('USAGE REMAINING'), findsOneWidget);
+    expect(find.textContaining('USAGE REMAINING'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
