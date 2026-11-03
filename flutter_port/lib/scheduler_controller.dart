@@ -25,6 +25,7 @@ class SchedulerController extends ChangeNotifier {
   bool ready = false;
   bool busy = false;
   bool readingUsage = false;
+  bool _usageQueued = false;
   bool editedTime = false;
   DateTime runAt = suggestedRunAt();
   DateTime? quotaAt;
@@ -138,7 +139,10 @@ class SchedulerController extends ChangeNotifier {
   }
 
   Future<void> readUsage() async {
-    if (readingUsage) return;
+    if (readingUsage) {
+      _usageQueued = true;
+      return;
+    }
     readingUsage = true;
     _changed();
     final requested = model ?? '';
@@ -169,6 +173,10 @@ class SchedulerController extends ChangeNotifier {
     } finally {
       readingUsage = false;
       _changed();
+      if (_usageQueued && !_disposed) {
+        _usageQueued = false;
+        unawaited(readUsage());
+      }
     }
   }
 
