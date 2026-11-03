@@ -7,7 +7,8 @@ $tokens=$null;$errors=$null
 [void][System.Management.Automation.Language.Parser]::ParseFile($bridge,[ref]$tokens,[ref]$errors)
 if(@($errors).Count){throw "Flutter bridge does not parse: $($errors[0].Message)"}
 foreach($relative in @('pubspec.yaml','lib/main.dart','lib/aero_bar.dart',
-        'lib/bridge.dart','lib/scheduler_controller.dart','test/widget_test.dart',
+        'lib/bridge.dart','lib/scheduler_controller.dart','lib/desktop_window.dart',
+        'lib/aero_appearance.dart','lib/appearance_dialog.dart','test/appearance_test.dart','test/widget_test.dart',
         'test/logic_test.dart','Run-WindowsReview.ps1','README.md')){
     if(-not (Test-Path -LiteralPath (Join-Path $folder $relative) -PathType Leaf)){throw "Missing Flutter file: $relative"}
 }
@@ -18,4 +19,37 @@ foreach($contract in @('Test-CanonicalWorkspaceIdentity','Assert-ModelEffortSupp
     if(-not $source.Contains($contract)){throw "Flutter Windows adapter lost safety contract: $contract"}
 }
 if($source -match 'Register-ScheduledTask|codex exec resume|autoResume\s*='){throw 'Flutter bridge duplicated worker policy.'}
-Write-Host 'Flutter bridge syntax, source inventory and security boundary PASS.'
+
+# The port must preserve the EXACT approved v1.16 optics and native pixels
+# except for Flutter fragment coordinates and premultiplied alpha.
+$lf=[string][char]10
+$html=(Get-Content -LiteralPath (Join-Path $root 'assets/AeroBar.html') -Raw).Replace([string][char]13,'')
+$match=[regex]::Match($html,'(?s)<script id="hybridfrag" type="x-shader/x-fragment">(?<code>.*?)</script>')
+if(-not $match.Success){throw 'Approved Aero v3 shader missing.'}
+$original=$match.Groups['code'].Value
+$adapted=$original -replace '^#version 300 es\n','' -replace '^precision highp float;\n',''
+$adapted=$adapted.Replace('vec2 uv=gl_FragCoord.xy/uRes.xy;', "vec2 uv=FlutterFragCoord().xy/uRes.xy;$lf    uv.y=1.-uv.y;")
+$adapted=$adapted.Replace('fragColor=vec4(liquid,alpha);','fragColor=vec4(liquid*alpha,alpha);')
+$expected="#version 460 core$lf#include <flutter/runtime_effect.glsl>$lf// Derived from the approved Aero v3 v2.0.1 fragment shader in assets/AeroBar.html.$lf// Only coordinate and premultiplied-alpha adaptation for Flutter are changed.$lf"+$adapted
+$actual=(Get-Content -LiteralPath (Join-Path $folder 'shaders/aero_liquid.frag') -Raw).Replace([string][char]13,'')
+if($actual -cne $expected){throw 'Flutter shader drifted from approved v1.16 Aero source.'}
+$native=[regex]::Match($html,'(?s)<script id="native-images" type="application/json">(?<json>.*?)</script>')
+if(-not $native.Success){throw 'Approved Windows sprites missing.'}
+$sprites=ConvertFrom-Json -InputObject $native.Groups['json'].Value -AsHashtable
+foreach($key in @('green','blue','cyan','violet','amber','red')){
+    $uri=[string]$sprites[$key]
+    if(-not $uri.StartsWith('data:image/png;base64,')){throw "Original sprite missing: $key"}
+    $bytes=[Convert]::FromBase64String($uri.Substring('data:image/png;base64,'.Length))
+    $file=Join-Path $folder "assets/native/$key.png"
+    if(-not (Test-Path -LiteralPath $file -PathType Leaf)){throw "Flutter sprite missing: $key"}
+    $actualBytes=[IO.File]::ReadAllBytes($file)
+    $expectedHash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes))
+    $actualHash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($actualBytes))
+    if($expectedHash -cne $actualHash){throw "Flutter Windows sprite differs: $key"}
+}
+$pubspec=Get-Content -LiteralPath (Join-Path $folder 'pubspec.yaml') -Raw
+if(-not $pubspec.Contains('shaders/aero_liquid.frag') -or -not $pubspec.Contains('assets/native/')) {
+    throw 'Shader or native sprites not packaged.'
+}
+Write-Host 'Flutter bridge, approved Aero optics and exact Windows pixels PASS.'
+
