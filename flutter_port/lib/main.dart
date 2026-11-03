@@ -370,10 +370,21 @@ class _SchedulerHomeState extends State<SchedulerHome> {
     final windows = recordList(field(controller!.quota, 'windows'));
     final first = quotaCard(windows.isNotEmpty ? windows[0] : null, 'Primary window', 'quota');
     final second = quotaCard(windows.length > 1 ? windows[1] : null, 'Secondary window', 'weekly');
-    return LayoutBuilder(builder: (context, constraints) => constraints.maxWidth < 590
-      ? Column(children: [first, const SizedBox(height: 10), second])
-      : Row(children: [
-          Expanded(child: first), const SizedBox(width: 12), Expanded(child: second)]));
+    return LayoutBuilder(builder: (context, constraints) {
+      final sideBySide = constraints.maxWidth >= 590 ||
+        (controller!.compact && constraints.maxWidth >= 420);
+      return sideBySide
+        ? Row(children: [
+            Expanded(child: first),
+            const SizedBox(width: 12),
+            Expanded(child: second),
+          ])
+        : Column(children: [
+            first,
+            const SizedBox(height: 10),
+            second,
+          ]);
+    });
   }
 
   Widget runCountdown(Map<String, dynamic> run) {

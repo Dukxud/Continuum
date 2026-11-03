@@ -37,7 +37,7 @@ class DesktopWindowHost implements SchedulerWindowHost {
     if (compact) {
       if (!_lastCompact) _fullSize = await windowManager.getSize();
       await windowManager.setMinimumSize(const Size(475, 395));
-      await windowManager.setSize(Size(515, hasRun ? 640 : 455));
+      await windowManager.setSize(Size(515, hasRun ? 555 : 370));
     } else {
       await windowManager.setSize(_fullSize);
       await windowManager.setMinimumSize(const Size(800, 570));
