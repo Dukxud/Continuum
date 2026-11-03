@@ -27,6 +27,25 @@ class StubAdapter implements SchedulerAdapter {
 }
 
 void main() {
+  testWidgets('compact and full modes remain top-aligned', (tester) async {
+    tester.view.physicalSize = const Size(1120, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: StubAdapter())));
+    await tester.pump(const Duration(milliseconds: 150));
+    final heading = find.text('CODEX RESUME SCHEDULER');
+    expect(tester.getTopLeft(heading).dy, lessThan(90));
+    await tester.tap(find.byType(Switch));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(tester.getTopLeft(heading).dy, lessThan(90));
+    expect(tester.getTopLeft(find.text('USAGE REMAINING')).dy, lessThan(200));
+    expect(tester.takeException(), isNull);
+  });
+
   for (final width in [320.0, 800.0, 1024.0]) {
     testWidgets('Scheduler has no overflow at width '+width.toString(), (tester) async {
       tester.view.physicalSize = Size(width, 900);

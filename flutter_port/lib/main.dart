@@ -589,7 +589,9 @@ class _SchedulerHomeState extends State<SchedulerHome> {
         child: Text(startupError ?? 'Platform adapter unavailable'))));
     }
     final state = controller!;
-    return Scaffold(body: SafeArea(child: Center(child: ConstrainedBox(
+    return Scaffold(body: SafeArea(child: Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 1110),
       child: SingleChildScrollView(padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -623,7 +625,7 @@ class _SchedulerHomeState extends State<SchedulerHome> {
                 ])
               : Row(children: [
                   Expanded(child: heading), const SizedBox(width: 12),
-                  ...controls,
+                  controls.first, const SizedBox(width: 12), controls.last,
                 ]);
           }),
           const SizedBox(height: 16),
