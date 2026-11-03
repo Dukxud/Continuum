@@ -36,10 +36,8 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
     final current = draft.selection(kind);
     final existing = current.startsWith('#') ? current :
       '#' + draft.color(kind).toARGB32().toRadixString(16).substring(2).toUpperCase();
-    final controller = TextEditingController(text: existing);
     String? candidate = existing;
-    try {
-      final selected = await showDialog<String>(
+    final selected = await showDialog<String>(
         context: context,
         builder: (dialog) => StatefulBuilder(builder: (context, repaint) {
           final valid = candidate != null &&
@@ -49,7 +47,7 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
             content: SizedBox(width: 250, child: Column(
               mainAxisSize: MainAxisSize.min, children: [
                 TextField(
-                  controller: controller,
+                  initialValue: existing,
                   autofocus: true,
                   maxLength: 7,
                   inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9a-fA-F#]'))],
@@ -70,13 +68,8 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
           );
         }),
       );
-      if (selected != null && mounted) {
-        preview(draft.withColor(kind, selected));
-      }
-    } finally {
-      // Dialog TextField stays mounted until after route exit animation.
-      // Dispose after the route's future has completed, not during editing.
-      controller.dispose();
+    if (selected != null && mounted) {
+      preview(draft.withColor(kind, selected));
     }
   }
 
