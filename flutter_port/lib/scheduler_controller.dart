@@ -15,6 +15,7 @@ class SchedulerController extends ChangeNotifier {
   List<Map<String, dynamic>> models = [];
   Map<String, dynamic>? quota;
   AeroAppearance appearance = AeroAppearance.defaults;
+  AeroAppearance? _appearanceBeforeDraft;
   String? repositoryWarning;
   List<String> repositoryAlternatives = [];
   String logDirectory = '';
@@ -253,13 +254,24 @@ class SchedulerController extends ChangeNotifier {
     }
   }
 
+  void beginAppearancePreview() {
+    _appearanceBeforeDraft = appearance;
+  }
+
   void previewAppearance(AeroAppearance value) {
     appearance = value;
     _changed();
   }
 
+  void cancelAppearancePreview() {
+    appearance = _appearanceBeforeDraft ?? appearance;
+    _appearanceBeforeDraft = null;
+    _changed();
+  }
+
   void commitAppearance(AeroAppearance value) {
     appearance = value;
+    _appearanceBeforeDraft = null;
     _changed();
     _queueSave();
   }
@@ -275,7 +287,7 @@ class SchedulerController extends ChangeNotifier {
     try {
       await adapter.call('save', {
         'compactMode': compact,
-        'barAppearance': appearance.toJson(),
+        'barAppearance': (_appearanceBeforeDraft ?? appearance).toJson(),
         'draft': {
           'sessionId': sessionId ?? '', 'repo': repo, 'model': model ?? '',
           'effort': effort ?? '', 'access': access, 'message': message,
