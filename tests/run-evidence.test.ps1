@@ -19,6 +19,18 @@ try {
     $evidence=Get-CodexRunEvidence -Directory $temp -Name $name
     Require ($evidence.Response -eq 'SCHEDULER_QA_COMPLETED') 'Completed turn did not override a transient error.'
     Require ($evidence.Transcript -match 'Codex exit code: 0') 'Worker log missing.'
+    # UTF-8 is a file-boundary contract; normal non-English Codex replies must
+    # not acquire mojibake or be ASCII-stripped to fix the label separator.
+    $unicodeReply='Café | 日本語 | résumé'
+    @(
+      (@{type='item.completed';item=@{type='agent_message';text=$unicodeReply}} | ConvertTo-Json -Depth 5 -Compress)
+      '{"type":"turn.completed"}'
+    ) | Set-Content -LiteralPath $events -Encoding utf8
+    $unicode=Get-CodexRunEvidence -Directory $temp -Name $name
+    Require ($unicode.Response -ceq $unicodeReply) 'UTF-8 Codex response changed during evidence reading.'
+    'Überprüfung' | Set-Content -LiteralPath $log -Encoding utf8
+    $unicode=Get-CodexRunEvidence -Directory $temp -Name $name
+    Require ($unicode.Transcript -match 'Überprüfung') 'UTF-8 worker log changed during reading.'
     @(
         '{"type":"item.completed","item":{"type":"agent_message","text":"Partial response"}}'
         '{"type":"turn.failed","error":{"message":"Usage limit reached"}}'

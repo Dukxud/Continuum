@@ -79,7 +79,7 @@ function Get-CodexRunEvidence {
         $lastReply=$null
         $lastFailure=$null
         try {
-            foreach($line in @(Get-Content -LiteralPath $events -Tail 1200 -ErrorAction Stop)){
+            foreach($line in @(Get-Content -LiteralPath $events -Encoding utf8 -Tail 1200 -ErrorAction Stop)){
                 try {$entry=$line | ConvertFrom-Json -ErrorAction Stop} catch {continue}
                 if($entry.type -eq 'item.completed' -and $entry.item.type -eq 'agent_message' -and $entry.item.text -is [string]){
                     $lastReply=[string]$entry.item.text
@@ -98,7 +98,7 @@ function Get-CodexRunEvidence {
     }
     $transcript=Join-Path $Directory ($Name+'.log')
     if(Test-Path -LiteralPath $transcript -PathType Leaf){
-        try {$result.Transcript=(Get-Content -LiteralPath $transcript -Tail 350 -ErrorAction Stop | Out-String)}
+        try {$result.Transcript=(Get-Content -LiteralPath $transcript -Encoding utf8 -Tail 350 -ErrorAction Stop | Out-String)}
         catch {$result.Transcript='Worker transcript could not be read.'}
     }
     return [pscustomobject]$result

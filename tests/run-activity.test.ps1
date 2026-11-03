@@ -29,7 +29,7 @@ try {
         Set-Content -LiteralPath (Join-Path $temp ($name+'.jsonl'))
     Update-DashboardActivity -Items @() -Directory $temp
     Require ($script:ui.Dashboard.activityPanel.Visible) 'Latest result must appear after work ends.'
-    Require ($script:ui.Dashboard.activityLabel.Text -match 'COMPLETED' -and $script:ui.Dashboard.activityLabel.Text -match 'SCHEDULER_QA_COMPLETED') 'Latest completed result must be visible.'
+    Require ($script:ui.Dashboard.activityLabel.Text -ceq "Latest: COMPLETED | $name | SCHEDULER_QA_COMPLETED") 'Latest result must be readable with ASCII separators and the exact Codex reply.'
     $next=[pscustomobject]@{Name='CodexResume-20261102-1700-abc12345';Repo='C:\sandbox\example';Status='Scheduled'}
     Update-DashboardActivity -Items @($next) -Directory $temp
     Require ($script:ui.Dashboard.activityPanel.Visible) 'Scheduled-but-not-running task must not suppress latest results.'

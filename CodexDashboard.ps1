@@ -246,9 +246,11 @@ function Update-DashboardActivity {
         $script:ui.Dashboard.latestResultPreview=$preview
         $script:ui.Dashboard.latestResultKey=$key
     }
-    $summary='Latest: '+([string]$result.Status).ToUpperInvariant()+' — '+[string]$result.Name
+    # Plain delimiters avoid locale-dependent mojibake in the compact
+    # single-line summary. Preserve the Codex response text verbatim.
+    $summary='Latest: '+([string]$result.Status).ToUpperInvariant()+' | '+[string]$result.Name
     $preview=[string]$script:ui.Dashboard.latestResultPreview
-    if($preview){$summary+=' — '+$preview}
+    if($preview){$summary+=' | '+$preview}
     $label.Text=$summary
     $label.AccessibleName=$summary
 }

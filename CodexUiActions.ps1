@@ -214,7 +214,8 @@ $schedule.Add_Click({
             Update-Status "Scheduled $name, but the task list could not refresh: $($_.Exception.Message)"
         }
         try { Request-UsageRefresh } catch { }
-        [System.Windows.Forms.MessageBox]::Show("Scheduled $($when.ToString('MMM dd, yyyy h:mm tt')).`nSession: $sessionId`nBranch: $branch`nInstruction: $message",'Codex task scheduled') | Out-Null
+        # Scheduling success is already reflected in the status line and
+        # Upcoming runs. Avoid a redundant modal acknowledgment.
     } catch {
         # A task may have been registered before a later check failed. Surface it,
         # rather than leaving an empty list that encourages duplicate schedules.

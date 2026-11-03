@@ -29,6 +29,16 @@ test('model and effort are grouped and schedule action is distinct', () => {
   assert.match(source, /\$plusTime\.Add_Click/);
 });
 
+test('normal scheduling has no redundant success dialog, but preserves safety warnings', () => {
+  const schedule = source.slice(source.indexOf('$schedule.Add_Click({'));
+  assert.ok(schedule.length > 0);
+  assert.doesNotMatch(schedule, /'Codex task scheduled'/);
+  assert.match(schedule, /Update-Status "Scheduled once for/);
+  assert.match(schedule, /'Unrestricted access'/);
+  assert.match(schedule, /'Existing scheduled work'/);
+  assert.match(schedule, /'Scheduling check failed'/);
+});
+
 test('pending list shows recognizable project and preserves full task identity', () => {
   const fn = namedFunction('Apply-PendingList');
   assert.match(fn, /\$project=if\(\$path/);
