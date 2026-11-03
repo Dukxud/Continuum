@@ -1,15 +1,24 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'aero_bar.dart';
+import 'aero_appearance.dart';
+import 'appearance_dialog.dart';
+import 'desktop_window.dart';
 import 'bridge.dart';
 import 'scheduler_controller.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const SchedulerApp());
+  DesktopWindowHost? host;
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    host = DesktopWindowHost();
+    await host.initialize();
+  }
+  runApp(SchedulerApp(windowHost: host));
 }
 
 const ink = Color(0xff21334b);
@@ -20,7 +29,8 @@ const surface = Color(0xffedf3fa);
 const edge = Color(0xffc9d7e9);
 
 class SchedulerApp extends StatelessWidget {
-  const SchedulerApp({super.key});
+  const SchedulerApp({super.key, this.windowHost});
+  final SchedulerWindowHost? windowHost;
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Codex Resume Scheduler — Flutter preview',
@@ -38,13 +48,14 @@ class SchedulerApp extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(9), side: const BorderSide(color: edge))),
     ),
-    home: const SchedulerHome(),
+    home: SchedulerHome(windowHost: windowHost),
   );
 }
 
 class SchedulerHome extends StatefulWidget {
-  const SchedulerHome({super.key, this.adapter});
+  const SchedulerHome({super.key, this.adapter, this.windowHost});
   final SchedulerAdapter? adapter;
+  final SchedulerWindowHost? windowHost;
   @override
   State<SchedulerHome> createState() => _SchedulerHomeState();
 }
@@ -56,6 +67,23 @@ class _SchedulerHomeState extends State<SchedulerHome> {
   final instruction = TextEditingController();
   bool hydrated = false;
   String? selectedRun;
+  bool _dialogOpen = false;
+  String _lastWindowKey = '';
+
+  void updateWindowSize() {
+    final state = controller;
+    final host = widget.windowHost;
+    if (state == null || host == null || !state.ready || _dialogOpen) return;
+    final key = (state.compact ? 'compact' : 'standard') +
+      (state.upcoming.isEmpty ? '-empty' : '-has-run');
+    if (_lastWindowKey == key) return;
+    _lastWindowKey = key;
+    unawaited(host.setMode(compact: state.compact,
+      hasRun: state.upcoming.isNotEmpty).catchError((Object error) {
+        if (mounted) toast('Unable to resize window: ' + error.toString());
+      }));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +106,7 @@ class _SchedulerHomeState extends State<SchedulerHome> {
     } else if (repository.text.isEmpty && state.repo.isNotEmpty) {
       repository.text = state.repo;
     }
+    updateWindowSize();
     setState(() {});
   }
 
