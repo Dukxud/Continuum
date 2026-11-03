@@ -24,7 +24,11 @@ function New-TestControl {
 }
 function Get-SelectedModel { 'test-model' }
 function Queue-FormStateSave { }
-function Request-UsageRefresh { }
+$script:refreshScopes = [Collections.Generic.List[string]]::new()
+function Request-SystemRefresh {
+    param([ValidateSet('Full','TaskStatus','ModelChanged')][string]$Scope='Full')
+    [void]$script:refreshScopes.Add($Scope)
+}
 
 $form = [System.Windows.Forms.Form]::new()
 try {
@@ -65,6 +69,7 @@ try {
     Require ($script:ui.Dashboard.compactToggle.Text -eq 'Compact mode: OFF') 'Full mode should clearly offer the compact switch.'
 
     $script:ui.Dashboard.compactToggle.Checked = $true
+    Require ($script:refreshScopes.Count -eq 1 -and $script:refreshScopes[0] -ceq 'ModelChanged') 'Compact toggle must request only a model-scoped system refresh.'
     Require ($script:ui.Dashboard.compactToggle.Visible) 'The compact switch must remain visible in compact mode.'
     Require ($script:ui.Dashboard.compactToggle.Text -eq 'Compact mode: ON') 'Compact mode should clearly show its state.'
     Require ($script:ui.Dashboard.compactToggle.Left -gt $heading.Right) 'The compact-mode switch must not overlap the heading.'
@@ -85,6 +90,7 @@ try {
     Require ($script:ui.Dashboard.compactRunPanel.Visible) 'The upcoming-run card must appear when there is a run.'
     Require ($script:ui.Dashboard.compactRunTrack.Visible) 'The blue countdown bar must remain visible.'
     $script:ui.Dashboard.compactToggle.Checked = $false
+    Require ($script:refreshScopes.Count -eq 2 -and $script:refreshScopes[1] -ceq 'ModelChanged') 'Leaving compact mode must use the central model refresh coordinator.'
     Require ($script:ui.Dashboard.compactToggle.Visible) 'The switch must remain visible when returning to full mode.'
     Require ($grid.Visible) 'The full run list should be restored.'
     Require ($recentResults.Visible) 'Run-history control must be available in normal mode.'
