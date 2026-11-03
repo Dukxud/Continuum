@@ -63,6 +63,7 @@ class SchedulerController extends ChangeNotifier {
 
   Future<void> start() async {
     await load(initial: true);
+    if (_disposed) return;
     _statusTimer = Timer.periodic(const Duration(seconds: 2), (_) => poll());
     _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) => load());
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -76,6 +77,7 @@ class SchedulerController extends ChangeNotifier {
     _loading = true;
     try {
       final data = await adapter.call('load');
+      if (_disposed) return;
       sessions = recordList(field(data, 'sessions'));
       runs = recordList(field(data, 'pending'));
       history = recordList(field(data, 'history'));
@@ -123,6 +125,7 @@ class SchedulerController extends ChangeNotifier {
     _polling = true;
     try {
       final data = await adapter.call('pending');
+      if (_disposed) return;
       runs = recordList(field(data, 'pending'));
       history = recordList(field(data, 'history'));
       _changed();
@@ -141,6 +144,7 @@ class SchedulerController extends ChangeNotifier {
     final requested = model ?? '';
     try {
       final data = await adapter.call('usage', requested.isEmpty ? {} : {'model': requested});
+      if (_disposed) return;
       quota = data;
       models = recordList(field(data, 'models'));
       quotaAt = DateTime.now();

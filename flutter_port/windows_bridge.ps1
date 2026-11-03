@@ -10,8 +10,8 @@ try {
     $source=Split-Path -Parent $PSScriptRoot
     $appDir=Join-Path $env:LOCALAPPDATA 'CodexResumeScheduler'
     $request=if($Payload){[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Payload)) | ConvertFrom-Json -ErrorAction Stop}else{[pscustomobject]@{}}
-    $null=. (Join-Path $source 'CodexRunEngine.ps1')
-    $null=. (Join-Path $source 'CodexData.ps1')
+    . (Join-Path $source 'CodexRunEngine.ps1')
+    . (Join-Path $source 'CodexData.ps1')
     $result=$null
     switch($Action){
         'load' {
