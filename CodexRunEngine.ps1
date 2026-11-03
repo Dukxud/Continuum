@@ -206,7 +206,9 @@ function Invoke-CodexScheduledJob {
         # A failing Stop-Transcript is never allowed to strand ownership.
         if ($sessionGuard) {
             try { $sessionGuard.ReleaseMutex() }
-            finally { $sessionGuard.Dispose() }
+            catch { Write-Warning "Worker session lock could not be released: $($_.Exception.Message)" }
+            try { $sessionGuard.Dispose() }
+            catch { Write-Warning "Worker session lock could not be disposed: $($_.Exception.Message)" }
         }
         if ($transcribing) {
             try { Stop-Transcript -ErrorAction Stop | Out-Null }

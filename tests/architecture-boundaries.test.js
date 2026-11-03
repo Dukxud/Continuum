@@ -165,6 +165,8 @@ test('transcript cleanup cannot override the worker exit status',()=>{
  const worker=read('CodexRunEngine.ps1');
  assert.match(worker,/try \{ Stop-Transcript -ErrorAction Stop \| Out-Null \}/);
  assert.match(worker,/catch \{ Write-Warning "Worker transcript could not be closed:/);
+ assert.match(worker,/catch \{ Write-Warning "Worker session lock could not be released:/);
+ assert.match(worker,/catch \{ Write-Warning "Worker session lock could not be disposed:/);
 });
 test('all scheduled executions must bind to a verified selected workspace',()=>{
  const ui=read('CodexUiActions.ps1'), worker=read('CodexRunEngine.ps1');
