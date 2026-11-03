@@ -584,37 +584,35 @@ class _SchedulerHomeState extends State<SchedulerHome> {
 
   Future<void> appearanceDialog() async {
     final state = controller!;
-    final draft = Map<String, int>.from(state.appearance);
-    final swatches = <int>[0xff5baf92, 0xff467dc0, 0xff518d9f,
-      0xffba8fcb, 0xffdb9a46, 0xffbe6b7f];
-    final saved = await showDialog<bool>(context: context,
-      builder: (parent) => StatefulBuilder(builder: (context, refresh) => AlertDialog(
-        title: const Text('Aero Liquid appearance'),
-        content: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 470),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-          for (final name in ['quota', 'time', 'working']) ...[
-            Align(alignment: Alignment.centerLeft, child: Text(
-              name == 'quota' ? 'Usage' : name == 'time' ? 'Countdown' : 'Running',
-              style: const TextStyle(fontWeight: FontWeight.w700))),
-            const SizedBox(height: 6),
-            AeroLiquidBar(amount: name == 'working' ? null : 76,
-              working: name == 'working', tint: Color(draft[name]!)),
-            Wrap(spacing: 5, children: [
-              for (final value in swatches)
-                IconButton(onPressed: () => refresh(() => draft[name] = value),
-                  icon: Icon(value == draft[name] ? Icons.check_circle : Icons.circle,
-                    color: Color(value))),
-            ]),
-          ],
-        ])),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(parent, false),
-            child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(parent, true),
-            child: const Text('Save and close')),
-        ],
-      )));
-    if (saved == true) state.setAppearance(draft);
+    state.beginAppearancePreview();
+    _dialogOpen = true;
+    try {
+      await widget.windowHost?.showDialogWindow(history: false);
+      if (!mounted) {
+        state.cancelAppearancePreview();
+        return;
+      }
+      final chosen = await showDialog<AeroAppearance>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialog) => AeroAppearanceEditor(
+          initial: state.appearance,
+          onPreview: state.previewAppearance,
+        ),
+      );
+      if (chosen == null) {
+        state.cancelAppearancePreview();
+      } else {
+        state.commitAppearance(chosen);
+      }
+    } catch (error) {
+      state.cancelAppearancePreview();
+      toast('Appearance editor: ' + error.toString());
+    } finally {
+      _dialogOpen = false;
+      _lastWindowKey = '';
+      updateWindowSize();
+    }
   }
 
   Future<void> openLogs() async {
