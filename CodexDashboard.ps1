@@ -29,9 +29,10 @@ function Get-RunLabelWidth {
     param([string]$Text,[System.Drawing.Font]$Font,[int]$CellWidth)
     # Measure the actual countdown/status text instead of reserving a wide
     # fixed slot before the bar. Leave a small allowance for native text edges.
+    # The overload without an IDeviceContext ignores NoPadding; use its
+    # supported default metrics in both text painting and bar placement.
     $measured=[System.Windows.Forms.TextRenderer]::MeasureText(
-        $Text,$Font,[System.Drawing.Size]::new(10000,32),
-        [System.Windows.Forms.TextFormatFlags]::NoPadding).Width
+        $Text,$Font,[System.Drawing.Size]::new(10000,32)).Width
     return [math]::Min([math]::Max(24,[int]($CellWidth*.52)),[math]::Max(24,$measured+8))
 }
 

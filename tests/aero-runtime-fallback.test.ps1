@@ -61,13 +61,16 @@ try{
     Sync-DashboardRunBars
     $active=Get-AeroProgressSurface $runBar
     $cell=$grid.GetCellDisplayRectangle(1,0,$true)
-    $labelWidth=[math]::Min(93,[math]::Max(59,[int]($cell.Width*.42)))
-    Require ($active.Left -eq ($cell.X+$labelWidth+12) -and $active.Width -eq ([math]::Max(20,$cell.Right-$active.Left-9))) 'Recovered bar did not occupy the right side of a single-line grid cell.'
+    $labelWidth=Get-RunLabelWidth -Text ([string]$grid.Rows[0].Cells[1].Value) -Font $grid.Font -CellWidth $cell.Width
+    $expectedLeft=$cell.X+6+$labelWidth+6
+    Require ($labelWidth -lt 70) 'Short countdown text retained the old fixed-width gap.'
+    Require ($active.Left -eq $expectedLeft -and $active.Width -eq ([math]::Max(20,$cell.Right-$expectedLeft-9))) 'Recovered bar did not occupy the right side of a single-line grid cell.'
     $grid.Columns[1].Width+=27
     Sync-DashboardRunBars
     $cell=$grid.GetCellDisplayRectangle(1,0,$true)
-    $labelWidth=[math]::Min(93,[math]::Max(59,[int]($cell.Width*.42)))
-    Require ($active.Left -eq ($cell.X+$labelWidth+12) -and $active.Width -eq ([math]::Max(20,$cell.Right-$active.Left-9))) 'Recovered bar did not resize alongside the countdown text.'
+    $labelWidth=Get-RunLabelWidth -Text ([string]$grid.Rows[0].Cells[1].Value) -Font $grid.Font -CellWidth $cell.Width
+    $expectedLeft=$cell.X+6+$labelWidth+6
+    Require ($active.Left -eq $expectedLeft -and $active.Width -eq ([math]::Max(20,$cell.Right-$expectedLeft-9))) 'Recovered bar did not resize alongside the countdown text.'
     $grid.Rows.Clear()
     Sync-DashboardRunBars
     Require ($runBar.IsDisposed -and $active.IsDisposed) 'Deleting the row must dispose both renderer and WPF fallback.'
