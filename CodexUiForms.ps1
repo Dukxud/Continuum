@@ -76,9 +76,9 @@ $minusTime = Add-Button '−' 155 154 38
 $minusTime.AccessibleName='Schedule one minute earlier'
 $plusTime = Add-Button '+' 446 154 38
 $plusTime.AccessibleName='Schedule one minute later'
-$nowPlusTwo = Add-Button 'Now +2' 494 154 112
+$nowPlusTwo = Add-Button 'Now +2' 637 154 112
 $nowPlusTwo.AccessibleName='Schedule two minutes from now'
-$useReset = Add-Button 'Reset +2' 618 154 137
+$useReset = Add-Button 'Reset +2' 761 154 137
 $useReset.AccessibleName='Schedule two minutes after verified quota reset'
 $useReset.Enabled = $false
 

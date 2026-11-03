@@ -30,8 +30,14 @@ test('model and effort are grouped and schedule action is distinct', () => {
   assert.match(source, /\$plusTime = Add-Button/);
   assert.match(source, /\$minusTime\.Add_Click/);
   assert.match(source, /\$plusTime\.Add_Click/);
-  assert.match(source, /\$nowPlusTwo = Add-Button 'Now \+2' 494 154 112/);
-  assert.match(source, /\$useReset = Add-Button 'Reset \+2' 618 154 137/);
+  const now=source.match(/\$nowPlusTwo = Add-Button 'Now \+2' (\d+) (\d+) (\d+)/);
+  const reset=source.match(/\$useReset = Add-Button 'Reset \+2' (\d+) (\d+) (\d+)/);
+  assert.ok(now&&reset,'Both scheduling shortcuts must exist');
+  const [nowX,nowY,nowW]=now.slice(1).map(Number);
+  const [resetX,resetY,resetW]=reset.slice(1).map(Number);
+  assert.equal(nowY,resetY,'Shortcuts must share a row');
+  assert.ok(resetX >= nowX+nowW+12,'Shortcuts must have at least 12px separation');
+  assert.equal(resetX+resetW,898,'Shortcut group must align with the main form right edge');
   assert.match(source, /\$nowPlusTwo\.Add_Click/);
   assert.match(source, /\$useReset\.Add_Click/);
 });

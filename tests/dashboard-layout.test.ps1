@@ -10,6 +10,12 @@ $env:CODEX_BAR_RENDERER = 'wpf'
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexAeroBar.ps1')
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexDashboard.ps1')
 function Require($Condition, $Message) { if (-not $Condition) { throw $Message } }
+function Require-CompactActionSpacing {
+    $appearance = $script:ui.Dashboard.appearanceButton
+    Require ($recentResults.Right + 12 -le $appearance.Left) 'Compact Recent runs overlaps Appearance or has less than 12px separation.'
+    Require ($appearance.Right -le $form.ClientSize.Width - 18) 'Compact Appearance extends beyond the right margin.'
+    Require ($recentResults.Left -ge 18) 'Compact Recent runs extends beyond the left margin.'
+}
 function New-TestControl {
     param([string]$Kind,[int]$X,[int]$Y,[int]$Width,[int]$Height)
     $control = switch ($Kind) {
@@ -76,6 +82,7 @@ try {
     Require ($script:ui.Dashboard.compactToggle.Right -le $form.ClientSize.Width) 'Compact-mode switch must not be clipped.'
     Require (-not $script:ui.Dashboard.compactRunPanel.Visible) 'An empty queue must not render a run placeholder.'
     Require (-not $status.Visible) 'Compact mode must not contain a permanent status footer.'
+    Require-CompactActionSpacing
     $script:ui.Usage.usageReadFailed=$true
     Update-DashboardLayout
     Require ($first.Visible -and -not $script:ui.Dashboard.compactUsageStatus.Visible) 'Compact usage errors must remain inside the usage card.'
@@ -89,6 +96,7 @@ try {
     Update-DashboardLayout
     Require ($script:ui.Dashboard.compactRunPanel.Visible) 'The upcoming-run card must appear when there is a run.'
     Require ($script:ui.Dashboard.compactRunTrack.Visible) 'The blue countdown bar must remain visible.'
+    Require-CompactActionSpacing
     $script:ui.Dashboard.compactToggle.Checked = $false
     Require ($script:refreshScopes.Count -eq 2 -and $script:refreshScopes[1] -ceq 'ModelChanged') 'Leaving compact mode must use the central model refresh coordinator.'
     Require ($script:ui.Dashboard.compactToggle.Visible) 'The switch must remain visible when returning to full mode.'

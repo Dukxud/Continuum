@@ -302,10 +302,13 @@ function Update-DashboardLayout {
     $status.Location=[System.Drawing.Point]::new(18,$height)
     $status.Width=428
     $form.ClientSize=[System.Drawing.Size]::new(464,[math]::Max(166,$height+40+$(if($hasAlert){31}else{0})))
-    $script:ui.Dashboard.appearanceButton.Location = [System.Drawing.Point]::new(306,$form.ClientSize.Height-37)
-    $recentResults.Location = [System.Drawing.Point]::new(150,$form.ClientSize.Height-37)
+    # Right-align the compact actions with a visible gap at every compact height.
+    $appearanceLeft = $form.ClientSize.Width - 18 - $script:ui.Dashboard.appearanceButton.Width
+    $recentLeft = $appearanceLeft - 12 - $recentResults.Width
+    $actionTop = $form.ClientSize.Height - 37
+    $script:ui.Dashboard.appearanceButton.Location = [System.Drawing.Point]::new($appearanceLeft,$actionTop)
+    $recentResults.Location = [System.Drawing.Point]::new($recentLeft,$actionTop)
     $recentResults.Visible = $true
-    $script:ui.Dashboard.appearanceButton.Size = [System.Drawing.Size]::new(140,32)
     Update-DashboardCountdowns
     Sync-DashboardRunBars
 }
