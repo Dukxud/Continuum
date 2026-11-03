@@ -1,4 +1,9 @@
 # Application-specific, read-only presentation of persisted job outcomes.
+function Copy-CodexEvidenceText {
+    param([string]$Text)
+    if([string]::IsNullOrEmpty($Text)){return}
+    [System.Windows.Forms.Clipboard]::SetText($Text)
+}
 function Show-CodexRunHistoryDialog {
     [CmdletBinding()]
     param([Parameter(Mandatory)][System.Windows.Forms.Form]$Owner,
@@ -49,6 +54,18 @@ function Show-CodexRunHistoryDialog {
     $removeRecord.Location=[Drawing.Point]::new(8,5)
     $removeRecord.Enabled=$false
     $actionPanel.Controls.Add($removeRecord)
+    $copyResponse=[System.Windows.Forms.Button]::new()
+    $copyResponse.Text='Copy response'
+    $copyResponse.AccessibleName='Copy selected Codex response to clipboard'
+    $copyResponse.Bounds=[Drawing.Rectangle]::new(192,5,148,30)
+    $copyResponse.Enabled=$false
+    $actionPanel.Controls.Add($copyResponse)
+    $copyLog=[System.Windows.Forms.Button]::new()
+    $copyLog.Text='Copy worker log'
+    $copyLog.AccessibleName='Copy selected worker log to clipboard'
+    $copyLog.Bounds=[Drawing.Rectangle]::new(352,5,150,30)
+    $copyLog.Enabled=$false
+    $actionPanel.Controls.Add($copyLog)
     $split.Panel1.Controls.Add($actionPanel)
 
     $tabs=[System.Windows.Forms.TabControl]::new()
@@ -69,6 +86,14 @@ function Show-CodexRunHistoryDialog {
     $logBox.Text='Select a run to inspect its worker transcript.'
     $responseTab.Controls.Add($responseBox)
     $logTab.Controls.Add($logBox)
+    $copyResponse.Add_Click({
+        try{Copy-CodexEvidenceText -Text $responseBox.Text}
+        catch{[System.Windows.Forms.MessageBox]::Show($dialog,$_.Exception.Message,'Unable to copy response') | Out-Null}
+    })
+    $copyLog.Add_Click({
+        try{Copy-CodexEvidenceText -Text $logBox.Text}
+        catch{[System.Windows.Forms.MessageBox]::Show($dialog,$_.Exception.Message,'Unable to copy worker log') | Out-Null}
+    })
     [void]$tabs.TabPages.Add($responseTab)
     [void]$tabs.TabPages.Add($logTab)
     $split.Panel2.Controls.Add($tabs)
@@ -104,12 +129,17 @@ function Show-CodexRunHistoryDialog {
             $historyGrid.Rows[$row].Cells['Message'].ToolTipText=[string]$task.Description
         }
         $historyGrid.Add_SelectionChanged({
-            $removeRecord.Enabled=($historyGrid.SelectedRows.Count -eq 1)
-            if($historyGrid.SelectedRows.Count -ne 1){return}
+            $selected=($historyGrid.SelectedRows.Count -eq 1)
+            $removeRecord.Enabled=$selected
+            $copyResponse.Enabled=$false
+            $copyLog.Enabled=$false
+            if(-not $selected){return}
             $name=[string]$historyGrid.SelectedRows[0].Tag
             $evidence=Get-CodexRunEvidence -Directory $Directory -Name $name
             $responseBox.Text=[string]$evidence.Response
             $logBox.Text=[string]$evidence.Transcript
+            $copyResponse.Enabled=-not [string]::IsNullOrEmpty($responseBox.Text)
+            $copyLog.Enabled=-not [string]::IsNullOrEmpty($logBox.Text)
         })
         $removeRecord.Add_Click({
             if($historyGrid.SelectedRows.Count -ne 1){return}
@@ -125,6 +155,8 @@ function Show-CodexRunHistoryDialog {
                 if($historyGrid.Rows.Count -eq 0){
                     $responseBox.Text='No results to display.'
                     $logBox.Text='No worker transcript selected.'
+                    $copyResponse.Enabled=$false
+                    $copyLog.Enabled=$false
                 } else {
                     $historyGrid.CurrentCell=$historyGrid.Rows[0].Cells[0]
                     $historyGrid.Rows[0].Selected=$true
@@ -148,6 +180,8 @@ function Show-CodexRunHistoryDialog {
             $evidence=Get-CodexRunEvidence -Directory $Directory -Name ([string]$selectedRow.Tag)
             $responseBox.Text=[string]$evidence.Response
             $logBox.Text=[string]$evidence.Transcript
+            $copyResponse.Enabled=-not [string]::IsNullOrEmpty($responseBox.Text)
+            $copyLog.Enabled=-not [string]::IsNullOrEmpty($logBox.Text)
         }
         [void]$dialog.ShowDialog($Owner)
     } finally {$dialog.Dispose()}

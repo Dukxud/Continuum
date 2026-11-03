@@ -14,6 +14,12 @@ $timer.Interval=120
 $script:historySeen=$false
 $script:historyError=''
 $script:historyStart=Get-Date
+$script:capturedCopies=[Collections.Generic.List[string]]::new()
+# Intercept the clipboard boundary so tests never replace the user's clipboard.
+function Copy-CodexEvidenceText {
+    param([string]$Text)
+    [void]$script:capturedCopies.Add($Text)
+}
 try {
     [void](Write-JobOutcome -Path (Join-Path $temp 'CodexResume-20260101-1000-abcdef01.result.json') -Status 'completed' -ExitCode 0 -Message 'Complete.')
     [void](Write-JobOutcome -Path (Join-Path $temp 'CodexResume-20260101-1100-abcdef02.result.json') -Status 'deferred' -ExitCode 17 -Attempt 1 -NextJob 'CodexResume-20260101-1200-abcdef03' -Message 'Rescheduled.')
@@ -48,7 +54,13 @@ try {
             $actions=@($split.Panel1.Controls | Where-Object { $_ -is [System.Windows.Forms.Panel] }) | Select-Object -First 1
             $remove=@($actions.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq 'Remove from history' }) | Select-Object -First 1
             if(-not $remove){throw 'History does not offer removal from the list.'}
-            if($remove.Top -lt 0 -or $remove.Bottom -gt $actions.Height){throw 'History removal control is clipped.'}
+            $copyResponse=@($actions.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq 'Copy response' }) | Select-Object -First 1
+            $copyLog=@($actions.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq 'Copy worker log' }) | Select-Object -First 1
+            if(-not $copyResponse -or -not $copyLog){throw 'Both history copy actions must be present.'}
+            foreach($button in @($remove,$copyResponse,$copyLog)){
+                if($button.Top -lt 0 -or $button.Bottom -gt $actions.Height){throw 'History action is clipped.'}
+            }
+            if($copyResponse.Left -lt $remove.Right+8 -or $copyLog.Left -lt $copyResponse.Right+8){throw 'History action buttons overlap.'}
             $grid=@($split.Panel1.Controls | Where-Object { $_ -is [System.Windows.Forms.DataGridView] }) | Select-Object -First 1
             $tabs=@($split.Panel2.Controls | Where-Object { $_ -is [System.Windows.Forms.TabControl] }) | Select-Object -First 1
             if(-not $tabs -or $tabs.TabPages.Count -ne 2){throw 'Codex response and worker-log tabs are missing.'}
@@ -96,11 +108,18 @@ try {
             $completed.Selected=$true
             if($response.Text -ne 'SCHEDULER_QA_COMPLETED'){throw "Completed run's actual Codex reply was not visible: $($response.Text)"}
             if($transcript.Text -notmatch 'Codex exit code: 0'){throw 'Recorded worker transcript was not visible.'}
+            if(-not $copyResponse.Enabled -or -not $copyLog.Enabled){throw 'Evidence copy actions must be enabled for a selected result.'}
+            $copyResponse.PerformClick()
+            $copyLog.PerformClick()
+            if($script:capturedCopies.Count -ne 2 -or $script:capturedCopies[0] -cne 'SCHEDULER_QA_COMPLETED' -or
+               $script:capturedCopies[1] -notmatch 'Codex exit code: 0'){throw 'Copy actions did not capture exact response and worker log.'}
             $deferred=@($grid.Rows | Where-Object { [string]$_.Cells['Status'].Value -eq 'deferred' })[0]
             $grid.ClearSelection()
             $grid.CurrentCell=$deferred.Cells[0]
             $deferred.Selected=$true
             if($response.Text -ne 'Usage limit reached'){throw 'Failed-run error was not visible.'}
+            $copyResponse.PerformClick()
+            if($script:capturedCopies.Count -ne 3 -or $script:capturedCopies[2] -cne 'Usage limit reached'){throw 'Copy response retained stale evidence after selection changed.'}
             $script:historySeen=$true
         } catch {
             $script:historyError=$_.Exception.Message
