@@ -46,7 +46,7 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
             title: const Text('Choose custom RGB color'),
             content: SizedBox(width: 250, child: Column(
               mainAxisSize: MainAxisSize.min, children: [
-                TextField(
+                TextFormField(
                   initialValue: existing,
                   autofocus: true,
                   maxLength: 7,
