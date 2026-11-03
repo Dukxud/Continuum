@@ -29,6 +29,12 @@ try{
     Require ([math]::Abs([double](Get-FlowingProgressViewValue $fallbackHost)-91) -lt .001) 'Further percentage updates failed after recovery.'
     Set-AeroProgress $bar $null
     Require ($null -eq (Get-FlowingProgressViewValue $fallbackHost)) 'Unknown percentage must remain unknown after recovery.'
+    Set-AeroWorking $bar
+    Require ($bar.Tag.Working -and $null -eq $bar.Tag.Percent) 'Fallback must not claim an execution percentage.'
+    Require ($fallbackHost.AccessibleName -eq 'Codex working; completion unknown') 'Working state lacks an accessible indeterminate label.'
+    Require ($fallbackHost.Child.Value -eq 100) 'Fixed WPF tube must support a continuous glint without moving its end.'
+    Set-AeroProgress $bar $null
+    Require (-not $bar.Tag.Working -and $null -eq (Get-FlowingProgressViewValue $fallbackHost)) 'Fallback did not leave working mode safely.'
     Ensure-AeroFallback $bar
     Require ([object]::ReferenceEquals($fallbackHost,(Get-AeroProgressSurface $bar))) 'Recovery created duplicate controls.'
     Update-AeroAppearance ([ordered]@{quota='violet';time='amber';finish=0;lighting=0;shimmer=100;speed=100;aero=$true})
@@ -55,11 +61,13 @@ try{
     Sync-DashboardRunBars
     $active=Get-AeroProgressSurface $runBar
     $cell=$grid.GetCellDisplayRectangle(1,0,$true)
-    Require ($active.Left -eq ($cell.X+8) -and $active.Width -eq ($cell.Width-16)) 'Recovered bar did not follow the grid cell.'
+    $labelWidth=[math]::Min(93,[math]::Max(59,[int]($cell.Width*.42)))
+    Require ($active.Left -eq ($cell.X+$labelWidth+12) -and $active.Width -eq ([math]::Max(20,$cell.Right-$active.Left-9))) 'Recovered bar did not occupy the right side of a single-line grid cell.'
     $grid.Columns[1].Width+=27
     Sync-DashboardRunBars
     $cell=$grid.GetCellDisplayRectangle(1,0,$true)
-    Require ($active.Width -eq ($cell.Width-16)) 'Recovered bar did not resize with the cell.'
+    $labelWidth=[math]::Min(93,[math]::Max(59,[int]($cell.Width*.42)))
+    Require ($active.Left -eq ($cell.X+$labelWidth+12) -and $active.Width -eq ([math]::Max(20,$cell.Right-$active.Left-9))) 'Recovered bar did not resize alongside the countdown text.'
     $grid.Rows.Clear()
     Sync-DashboardRunBars
     Require ($runBar.IsDisposed -and $active.IsDisposed) 'Deleting the row must dispose both renderer and WPF fallback.'

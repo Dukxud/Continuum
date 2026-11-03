@@ -100,55 +100,29 @@ function Initialize-Dashboard {
     $script:ui.Dashboard.countdownTimer.Interval = 1000
     $script:ui.Dashboard.countdownTimer.Add_Tick({ Update-DashboardCountdowns })
 
-    # One modest activity strip belongs to both layouts. The spinner means
-    # Windows confirms a Running task; it is not an execution percentage.
+    # The status strip is for the latest finished result only. Active work
+    # animates IN the countdown cell and compact run card, not in a ticker.
     $activity=[System.Windows.Forms.Panel]::new()
     $activity.Size=[System.Drawing.Size]::new(880,29)
     $activity.BackColor=[System.Drawing.Color]::FromArgb(240,245,251)
     $form.Controls.Add($activity)
     $script:ui.Dashboard.activityPanel=$activity
-    $indicator=[System.Windows.Forms.Panel]::new()
-    $indicator.Size=[System.Drawing.Size]::new(26,26)
-    $indicator.Location=[System.Drawing.Point]::new(4,1)
-    $indicator.Visible=$false
-    $indicator.Add_Paint({
-        param($sender,$e)
-        $e.Graphics.SmoothingMode=[System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-        for($i=0;$i -lt 8;$i++){
-            $age=($script:ui.Dashboard.activityFrame-$i+8)%8
-            $alpha=[int](42+213*(8-$age)/8)
-            $angle=$i*[math]::PI/4.0
-            $x=[single](11+8*[math]::Cos($angle))
-            $y=[single](11+8*[math]::Sin($angle))
-            $brush=[System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb($alpha,48,100,173))
-            try {$e.Graphics.FillEllipse($brush,$x,$y,[single]4,[single]4)}
-            finally {$brush.Dispose()}
-        }
-    })
-    $activity.Controls.Add($indicator)
-    $script:ui.Dashboard.activitySpinner=$indicator
-    $label=New-DashboardLabel $activity 'No recorded runs yet.' 33 2 820 25
+    $label=New-DashboardLabel $activity 'No recorded runs yet.' 9 2 858 25
     $label.TextAlign='MiddleLeft'
     $label.ForeColor=[System.Drawing.Color]::FromArgb(48,69,91)
     $script:ui.Dashboard.activityLabel=$label
-    $activityTimer=[System.Windows.Forms.Timer]::new()
-    $activityTimer.Interval=110
-    $activityTimer.Add_Tick({
-        $script:ui.Dashboard.activityFrame=($script:ui.Dashboard.activityFrame+1)%8
-        $script:ui.Dashboard.activitySpinner.Invalidate()
-    })
-    $script:ui.Dashboard.activityTimer=$activityTimer
 
-    # Standard view displays the time label in the native grid, with a real
-    # WPF progress control below it. The WPF compositor animates without timers.
+    # Standard view uses a single horizontal line: time text and Aero track
+    # side by side. Never stack an execution percentage beneath Running.
     $script:ui.Dashboard.runBarHosts = [System.Collections.Generic.List[System.Windows.Forms.Control]]::new()
     $grid.Add_CellPainting({
         param($sender,$e)
         if ($e.RowIndex -lt 0 -or $e.ColumnIndex -ne 1) { return }
         $e.PaintBackground($e.CellBounds,$true)
         $cell = $sender.Rows[$e.RowIndex].Cells[1]
+        $labelWidth=[math]::Min(93,[math]::Max(59,[int]($e.CellBounds.Width*.42)))
         $bounds = [System.Drawing.Rectangle]::new(
-            $e.CellBounds.X+8,$e.CellBounds.Y+2,$e.CellBounds.Width-16,23)
+            $e.CellBounds.X+6,$e.CellBounds.Y+2,$labelWidth,$e.CellBounds.Height-4)
         $color = if (($e.State -band [System.Windows.Forms.DataGridViewElementStates]::Selected) -ne 0) {
             $e.CellStyle.SelectionForeColor
         } else { $e.CellStyle.ForeColor }
@@ -201,9 +175,15 @@ function Sync-DashboardRunBars {
         $entry=$visible[$index]
         $bar=$hosts[$index]
         $cell=$entry.Cell
-        $bounds=[System.Drawing.Rectangle]::new($cell.X+8,$cell.Bottom-19,$cell.Width-16,15)
+        $labelWidth=[math]::Min(93,[math]::Max(59,[int]($cell.Width*.42)))
+        $barX=$cell.X+$labelWidth+12
+        $bounds=[System.Drawing.Rectangle]::new($barX,$cell.Y+[int](($cell.Height-15)/2),[math]::Max(20,$cell.Right-$barX-9),15)
         Set-ProgressHostLayout -Primary $bar -Bounds $bounds -Visible $true
-        Set-AeroProgress $bar $grid.Rows[$entry.Row].Cells[1].Tag
+        $row=$grid.Rows[$entry.Row]
+        $taskName=[string]$row.Tag
+        $task=if($script:ui.Dashboard.pendingIndex.ContainsKey($taskName)){$script:ui.Dashboard.pendingIndex[$taskName]}else{$null}
+        if($task -and $task.Status -eq 'Running'){Set-AeroWorking $bar}
+        else{Set-AeroProgress $bar $row.Cells[1].Tag}
     }
 }
 
@@ -233,32 +213,25 @@ function Update-DashboardCountdowns {
     $script:ui.Dashboard.compactRunDetails.Text = [string]$next.Description
     $script:ui.Dashboard.compactRunDate.Text = 'Scheduled ' + $next.When.ToString('ddd MMM d, h:mm tt')
     $percent = if (-not $next.Status -or $next.Status -eq 'Scheduled') { Get-RunCountdownPercent $next.When $next.CreatedAt $now } else { $null }
-    Set-AeroProgress $script:ui.Dashboard.compactRunTrack $percent
-    $script:ui.Dashboard.compactRunTrack.AccessibleName = $script:ui.Dashboard.compactRunEta.Text + $(if ($null -ne $percent) { ", $percent% of time to scheduled trigger elapsed" } else { ', no execution-progress estimate' })
+    if($next.Status -eq 'Running'){
+        Set-AeroWorking $script:ui.Dashboard.compactRunTrack
+        $script:ui.Dashboard.compactRunTrack.AccessibleName='Codex working; completion unknown'
+    }else{
+        Set-AeroProgress $script:ui.Dashboard.compactRunTrack $percent
+        $script:ui.Dashboard.compactRunTrack.AccessibleName=$script:ui.Dashboard.compactRunEta.Text + ", $percent% of time to scheduled trigger elapsed"
+    }
 }
 
 
 function Update-DashboardActivity {
     param([object[]]$Items,[string]$Directory)
-    $indicator=$script:ui.Dashboard.activitySpinner
     $label=$script:ui.Dashboard.activityLabel
-    $timer=$script:ui.Dashboard.activityTimer
     $running=@($Items | Where-Object { $_.Status -eq 'Running' })
-    if($running.Count -gt 0){
-        $target=$running[0]
-        $repo=[string]$target.Repo
-        $project=if($repo -and $repo -ne '-') {[IO.Path]::GetFileName($repo.TrimEnd([char[]]@('/','\')))} else {'scheduled continuation'}
-        $label.Text='Codex running: '+$project+' — execution in progress'
-        $label.AccessibleName=$label.Text
-        $indicator.Visible=$true
-        $timer.Start()
-        return
-    }
-    $timer.Stop()
-    $indicator.Visible=$false
+    $script:ui.Dashboard.activityPanel.Visible=($running.Count -eq 0)
+    if($running.Count -gt 0){return}
     $latest=@(Get-CodexRunHistory -Directory $Directory -Limit 1)
     if($latest.Count -eq 0){
-        $label.Text='No recorded runs yet. Use Recent results to inspect past runs.'
+        $label.Text='No recorded runs yet. Use Recent runs to inspect past runs.'
         $label.AccessibleName=$label.Text
         return
     }
@@ -314,7 +287,7 @@ function Update-DashboardLayout {
         $recentResults.Visible = $true
         $script:ui.Dashboard.activityPanel.Location = [System.Drawing.Point]::new(18,$(if ($hasRuns) { 817 } else { 574 }))
         $script:ui.Dashboard.activityPanel.Size = [System.Drawing.Size]::new(880,29)
-        $script:ui.Dashboard.activityLabel.Width = 840
+        $script:ui.Dashboard.activityLabel.Width = 858
         $status.Location = [System.Drawing.Point]::new(18,$(if ($hasRuns) { 853 } else { 610 }))
         $form.MinimumSize = [System.Drawing.Size]::new(940,$(if ($hasRuns) { 933 } else { 690 }))
         $form.ClientSize = [System.Drawing.Size]::new(920,$(if ($hasRuns) { 922 } else { 680 }))
@@ -368,7 +341,7 @@ function Update-DashboardLayout {
     # Keep live activity and latest result visible even in compact mode.
     $script:ui.Dashboard.activityPanel.Location = [System.Drawing.Point]::new(18,$height)
     $script:ui.Dashboard.activityPanel.Size = [System.Drawing.Size]::new(428,29)
-    $script:ui.Dashboard.activityLabel.Width = 388
+    $script:ui.Dashboard.activityLabel.Width = 406
     $form.ClientSize = [System.Drawing.Size]::new(464,[math]::Max(166,$height+78))
     $script:ui.Dashboard.appearanceButton.Location = [System.Drawing.Point]::new(306,$form.ClientSize.Height-37)
     $recentResults.Location = [System.Drawing.Point]::new(150,$form.ClientSize.Height-37)

@@ -61,16 +61,25 @@ $browse = Add-Button 'Browse' 773 106 125
 [void](Add-Label 'Run at (local)' 18 157)
 $whenBox = New-Object System.Windows.Forms.DateTimePicker
 $whenBox.Location = [System.Drawing.Point]::new(155,154)
-$whenBox.Size = [System.Drawing.Size]::new(325,30)
+$whenBox.Size = [System.Drawing.Size]::new(237,30)
 $whenBox.Format = 'Custom'
 $whenBox.CustomFormat = 'ddd MMM dd, yyyy  hh:mm tt'
-$suggested = (Get-Date).AddMinutes(11)
-$whenBox.Value = [datetime]::new($suggested.Year,$suggested.Month,$suggested.Day,$suggested.Hour,$suggested.Minute,0)
+# The default is two minutes ahead, rounded to the next displayed minute.
+# A restored future time is considered explicitly chosen and never auto-shifted.
+. (Join-Path $PSScriptRoot 'CodexScheduleTime.ps1')
+$whenBox.Value = Get-CodexSuggestedRunTime
 if ($script:ui.Preferences.savedDraft) {
     $restoredTime = Get-RestoredRunTime ([string]$script:ui.Preferences.savedDraft.runAt) (Get-Date)
-    if ($restoredTime) { $whenBox.Value = $restoredTime }
+    if ($restoredTime) {
+        $whenBox.Value = $restoredTime
+        $script:ui.Preferences.scheduleTimeEdited=$true
+    }
 }
 $form.Controls.Add($whenBox)
+$minusTime = Add-Button '−' 401 154 38
+$minusTime.AccessibleName='Schedule one minute earlier'
+$plusTime = Add-Button '+' 446 154 38
+$plusTime.AccessibleName='Schedule one minute later'
 
 [void](Add-Label 'Access' 500 157 95)
 $effortBox = New-Object System.Windows.Forms.ComboBox
@@ -133,7 +142,7 @@ Initialize-AeroAppearance $script:ui.Preferences.uiSettings
 . (Join-Path $PSScriptRoot 'CodexDashboard.ps1')
 
 function New-UsageCard {
-    param([int]$X, [string]$InitialTitle)
+    param([int]$X, [string]$InitialTitle,[string]$Kind)
     $card = New-Object System.Windows.Forms.Panel
     $card.Location = [System.Drawing.Point]::new($X,358)
     $card.Size = [System.Drawing.Size]::new(428,108)
@@ -153,7 +162,7 @@ function New-UsageCard {
     $remaining.Text = '—'
     $remaining.Font = [System.Drawing.Font]::new('Segoe UI',12,[System.Drawing.FontStyle]::Bold)
     $card.Controls.Add($remaining)
-    $bar = New-AeroProgressBar $card 12 44 400 17 'quota'
+    $bar = New-AeroProgressBar $card 12 44 400 17 $Kind
     $reset = New-Object System.Windows.Forms.Label
     $reset.Location = [System.Drawing.Point]::new(12,72)
     $reset.Size = [System.Drawing.Size]::new(400,24)
@@ -162,7 +171,7 @@ function New-UsageCard {
     $card.Controls.Add($reset)
     return [pscustomobject]@{ Panel = $card; Title = $name; Remaining = $remaining; Bar = $bar; Reset = $reset }
 }
-$usageCards = @((New-UsageCard 18 'Primary window'), (New-UsageCard 470 'Secondary window'))
+$usageCards = @((New-UsageCard 18 'Primary window' 'quota'), (New-UsageCard 470 'Secondary window' 'weekly'))
 $usageNotice = Add-Label 'Loading account usage...' 18 477 880
 $usageNotice.ForeColor = [System.Drawing.Color]::DimGray
 
@@ -198,7 +207,7 @@ $grid.Columns[1].FillWeight = 150
 $grid.Columns[2].FillWeight = 145
 $grid.Columns[3].FillWeight = 325
 $grid.Columns[4].FillWeight = 85
-$grid.RowTemplate.Height = 54
+$grid.RowTemplate.Height = 40
 $grid.ShowCellToolTips = $true
 $form.Controls.Add($grid)
 $emptyRuns = New-Object System.Windows.Forms.Label

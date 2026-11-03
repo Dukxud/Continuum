@@ -2,7 +2,7 @@
 Import-Module (Join-Path $PSScriptRoot 'components/FlowingProgress/FlowingProgress.psm1') -Force -ErrorAction Stop
 
 function Get-CodexFlowingPalette {
-    param([ValidateSet('quota','time')][string]$Kind,[string]$Color='')
+    param([ValidateSet('quota','weekly','time','working')][string]$Kind,[string]$Color='')
     $defaults = if ($Kind -eq 'quota') {
         @{BaseTop='#5DE0B5';BaseBottom='#14805D';Track='#E5F1EC';Outline='#B3CFC2'}
     } else {
@@ -33,10 +33,15 @@ function Get-CodexFlowingPalette {
 function New-FlowingProgressBar {
     param([System.Windows.Forms.Control]$Parent,
           [int]$X,[int]$Y,[int]$Width,[int]$Height,
-          [ValidateSet('quota','time')][string]$Kind,
+          [ValidateSet('quota','weekly','time','working')][string]$Kind,
           [string]$Color='')
     $palette=Get-CodexFlowingPalette -Kind $Kind -Color $Color
-    $accessible=if($Kind -eq 'quota'){'Usage remaining'}else{'Time until scheduled run'}
+    $accessible=switch($Kind){
+        quota {'Five-hour usage remaining'}
+        weekly {'Weekly usage remaining'}
+        working {'Codex working; completion unknown'}
+        default {'Time until scheduled run'}
+    }
     return New-FlowingProgressView -Parent $Parent -X $X -Y $Y -Width $Width -Height $Height -Colors $palette -AccessibleName $accessible
 }
 function Set-FlowingProgress {
@@ -47,7 +52,7 @@ function Set-FlowingProgress {
 function Set-FlowingProgressColors {
     param(
         [System.Windows.Forms.Integration.ElementHost]$Bar,
-        [ValidateSet('quota','time')][string]$Kind,
+        [ValidateSet('quota','weekly','time','working')][string]$Kind,
         [string]$Color
     )
     Set-FlowingProgressViewColors -Bar $Bar -Colors (Get-CodexFlowingPalette -Kind $Kind -Color $Color)

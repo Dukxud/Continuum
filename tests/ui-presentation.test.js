@@ -22,6 +22,11 @@ test('model and effort are grouped and schedule action is distinct', () => {
   assert.match(source, /\$accessBox\.Location = \[System\.Drawing\.Point\]::new\(597,154\)/);
   assert.match(source, /\$schedule = Add-Button 'Schedule once' 720 274 178/);
   assert.match(source, /\$autoResumeCheck\.Text = 'Retry if Codex hits a usage limit \(max 4\)'/);
+  assert.match(source, /\$whenBox\.Value = Get-CodexSuggestedRunTime/);
+  assert.match(source, /\$minusTime = Add-Button/);
+  assert.match(source, /\$plusTime = Add-Button/);
+  assert.match(source, /\$minusTime\.Add_Click/);
+  assert.match(source, /\$plusTime\.Add_Click/);
 });
 
 test('pending list shows recognizable project and preserves full task identity', () => {
@@ -62,7 +67,7 @@ test('usage reports remaining and keeps reset as an explicit action', () => {
 test('dashboard shares the pending snapshot and renders distinct countdown and quota bars', () => {
   const dash = fs.readFileSync(path.resolve(__dirname, '..', 'CodexDashboard.ps1'), 'utf8');
   assert.match(source, /Columns\.Add\('Countdown','Time to run'\)/);
-  assert.match(source, /\$grid\.RowTemplate\.Height = 54/);
+  assert.match(source, /\$grid\.RowTemplate\.Height = 40/);
   assert.match(source, /\$script:ui\.Usage\.usageRequestedModel = \$chosen/);
   assert.match(source, /compactMode = \[bool\]\$script:ui\.Dashboard\.compactToggle\.Checked/);
   assert.match(dash, /Get-RunCountdownPercent/);
@@ -72,7 +77,13 @@ test('dashboard shares the pending snapshot and renders distinct countdown and q
   assert.match(dash, /Sync-DashboardRunBars/);
   assert.match(dash, /\$script:ui\.Dashboard\.compactRunHeading\.Visible = \$compact -and \$script:ui\.Dashboard\.pendingSnapshot\.Count -gt 0/);
   assert.match(dash, /\$form\.ClientSize/);
-  assert.match(source, /New-AeroProgressBar \$card 12 44 400 17 'quota'/);
+  assert.match(source, /New-AeroProgressBar \$card 12 44 400 17 \$Kind/);
+  assert.match(source, /New-UsageCard 18 'Primary window' 'quota'/);
+  assert.match(source, /New-UsageCard 470 'Secondary window' 'weekly'/);
+  assert.match(dash, /Set-AeroWorking \$bar/);
+  assert.match(dash, /Set-AeroWorking \$script:ui\.Dashboard\.compactRunTrack/);
+  assert.match(dash, /\$barX=\$cell\.X\+\$labelWidth\+12/);
+  assert.doesNotMatch(dash, /activitySpinner|activityTimer/);
   assert.match(source, /Set-AeroProgress \$Card.Bar \$remaining/);
   assert.match(dash, /New-AeroProgressBar \$grid 0 0 100 15 'time'/);
   assert.doesNotMatch(dash, /Draw-SchedulerProgress/);

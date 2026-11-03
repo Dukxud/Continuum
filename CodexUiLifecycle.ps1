@@ -31,7 +31,6 @@ $form.Add_FormClosing({
 })
 $form.Add_FormClosed({
     $script:ui.Dashboard.countdownTimer.Stop()
-    $script:ui.Dashboard.activityTimer.Stop()
     $autoRefresh.Stop()
     $runStatusRefresh.Stop()
     $usagePoll.Stop()
@@ -50,7 +49,6 @@ $form.Add_FormClosed({
 $autoRefresh.Dispose()
 $runStatusRefresh.Dispose()
 $script:ui.Dashboard.countdownTimer.Dispose()
-$script:ui.Dashboard.activityTimer.Dispose()
 $script:ui.Preferences.settingsTimer.Dispose()
 $usagePoll.Dispose()
 $dataPoll.Dispose()

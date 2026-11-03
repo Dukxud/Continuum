@@ -16,33 +16,25 @@ $form=[System.Windows.Forms.Form]::new()
 $script:ui.Dashboard.activityPanel=[System.Windows.Forms.Panel]::new()
 $form.Controls.Add($script:ui.Dashboard.activityPanel)
 $script:ui.Dashboard.activityLabel=[System.Windows.Forms.Label]::new()
-$script:ui.Dashboard.activitySpinner=[System.Windows.Forms.Panel]::new()
 $script:ui.Dashboard.activityPanel.Controls.Add($script:ui.Dashboard.activityLabel)
-$script:ui.Dashboard.activityPanel.Controls.Add($script:ui.Dashboard.activitySpinner)
-$script:ui.Dashboard.activityTimer=[System.Windows.Forms.Timer]::new()
-$script:ui.Dashboard.activityTimer.Interval=110
 try {
     $form.Show()
     $running=[pscustomobject]@{Name='CodexResume-20261102-1501-f0e770de';Repo='C:\sandbox\example';Status='Running'}
     Update-DashboardActivity -Items @($running) -Directory $temp
-    Require ($script:ui.Dashboard.activityTimer.Enabled) 'Running task must animate a spinner.'
-    Require ($script:ui.Dashboard.activitySpinner.Visible) 'Active spinner must be visible.'
-    Require ($script:ui.Dashboard.activityLabel.Text -match 'Codex running') 'Running label missing.'
-    Require ($script:ui.Dashboard.activityLabel.Text -notmatch '%|percent') 'Do not fabricate execution progress.'
+    Require (-not $script:ui.Dashboard.activityPanel.Visible) 'Duplicate running ticker must not compete with the Aero working bar.'
+    Require (-not $script:ui.Dashboard.ContainsKey('activitySpinner')) 'Obsolete spinner must not coexist with indeterminate Aero.'
     $name=[string]$running.Name
     [void](Write-JobOutcome -Path (Join-Path $temp ($name+'.result.json')) -Status 'completed' -ExitCode 0)
     @('{"type":"item.completed","item":{"type":"agent_message","text":"SCHEDULER_QA_COMPLETED"}}','{"type":"turn.completed"}') |
         Set-Content -LiteralPath (Join-Path $temp ($name+'.jsonl'))
     Update-DashboardActivity -Items @() -Directory $temp
-    Require (-not $script:ui.Dashboard.activityTimer.Enabled) 'Spinner must stop when no job is running.'
-    Require (-not $script:ui.Dashboard.activitySpinner.Visible) 'Spinner must disappear after completion.'
+    Require ($script:ui.Dashboard.activityPanel.Visible) 'Latest result must appear after work ends.'
     Require ($script:ui.Dashboard.activityLabel.Text -match 'COMPLETED' -and $script:ui.Dashboard.activityLabel.Text -match 'SCHEDULER_QA_COMPLETED') 'Latest completed result must be visible.'
     $next=[pscustomobject]@{Name='CodexResume-20261102-1700-abc12345';Repo='C:\sandbox\example';Status='Scheduled'}
     Update-DashboardActivity -Items @($next) -Directory $temp
-    Require (-not $script:ui.Dashboard.activitySpinner.Visible) 'Scheduled-but-not-running task must not show active spinner.'
+    Require ($script:ui.Dashboard.activityPanel.Visible) 'Scheduled-but-not-running task must not suppress latest results.'
     Write-Host 'Activity indicator: genuine Running, completed output, and scheduled idle PASS.'
 } finally {
-    $script:ui.Dashboard.activityTimer.Dispose()
     $form.Dispose()
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 }

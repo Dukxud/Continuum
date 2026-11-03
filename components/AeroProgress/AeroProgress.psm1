@@ -55,7 +55,8 @@ function Get-AeroProgressViewStatus {
         Engine = [string]$state.Engine
         ShaderError = [string]$state.ShaderError
         Color = [string]$state.Color
-        Value = if ($null -eq $state.State) { $null } else { [double]$state.State['value'] }
+        Mode = if ($null -eq $state.State) { 'progress' } else { [string]$state.State['mode'] }
+        Value = if ($null -eq $state.State -or $state.State['mode'] -eq 'working') { $null } else { [double]$state.State['value'] }
     }
 }
 
@@ -221,6 +222,8 @@ function Set-AeroProgressViewState {
     if ($State['type'] -cne 'set') { throw 'Invalid Aero message type' }
     $color = [string]$State['color']
     if (-not (Test-AeroProgressColor $color)) { throw 'Invalid Aero color' }
+    $mode=if($State.Contains('mode')){[string]$State['mode']}else{'progress'}
+    if($mode -notin @('progress','working')){throw 'Invalid Aero display mode'}
     $value = [double]$State['value']
     if (-not [double]::IsFinite($value) -or $value -lt 0 -or $value -gt 1) { throw 'Progress out of range' }
     foreach ($k in @('finish','lighting')) {
@@ -231,7 +234,7 @@ function Set-AeroProgressViewState {
     if (-not [double]::IsFinite($shimmer) -or $shimmer -lt 0 -or $shimmer -gt 2) { throw 'Invalid shimmer' }
     if (-not [double]::IsFinite($speed) -or $speed -lt .25 -or $speed -gt 3) { throw 'Invalid speed' }
     $snapshot = [ordered]@{
-        type='set';value=$value;color=$color
+        type='set';value=$value;color=$color;mode=$mode
         finish=[int]$State['finish'];lighting=[int]$State['lighting']
         shimmer=$shimmer;speed=$speed;aero=[bool]$State['aero']
     }

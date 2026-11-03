@@ -41,7 +41,7 @@ try {
     $pending = New-TestControl label 18 527 400 30
     $grid = New-TestControl grid 18 566 880 195
     $grid.AllowUserToAddRows = $false
-    $grid.RowTemplate.Height = 54
+    $grid.RowTemplate.Height = 40
     [void]$grid.Columns.Add('When','When')
     [void]$grid.Columns.Add('Countdown','Time to run')
     [void]$grid.Columns.Add('Project','Project')
@@ -86,7 +86,8 @@ try {
     Require ($script:ui.Dashboard.compactToggle.Visible) 'The switch must remain visible when returning to full mode.'
     Require ($grid.Visible) 'The full run list should be restored.'
     Require ($recentResults.Visible) 'Run-history control must be available in normal mode.'
-    Require ($script:ui.Dashboard.activityPanel.Visible) 'Activity strip must be available in normal mode.'
+    Require ($script:ui.Dashboard.activityPanel.Visible) 'Latest-result summary must be available in normal mode.'
+    Require (-not $script:ui.Dashboard.ContainsKey('activitySpinner')) 'Obsolete spinner should not remain in dashboard state.'
     $script:ui.Dashboard.pendingSnapshot=@()
     Update-DashboardLayout
     Require (-not $grid.Visible -and -not $pending.Visible) 'Historical results must not keep Upcoming runs visible.'
@@ -116,7 +117,6 @@ try {
     Write-Host 'Visible switch, empty state, and per-run WPF bar lifecycle passed.'
 } finally {
     if ($script:ui.Dashboard.countdownTimer) { $script:ui.Dashboard.countdownTimer.Dispose() }
-    if ($script:ui.Dashboard.activityTimer) { $script:ui.Dashboard.activityTimer.Dispose() }
     $form.Dispose()
 }
 Assert-NoUnhandledWinFormsErrors

@@ -5,7 +5,7 @@ function Show-AeroAppearanceDialog {
     param([System.Windows.Forms.Form]$Owner)
 
     $previous = [ordered]@{}
-    foreach ($key in @('quota','time','finish','lighting','shimmer','speed','aero')) {
+    foreach ($key in @('quota','weekly','time','working','finish','lighting','shimmer','speed','aero')) {
         $previous[$key] = $script:aeroAppearance[$key]
     }
     $draft = [ordered]@{}
@@ -13,8 +13,8 @@ function Show-AeroAppearanceDialog {
     $presets = @('green','blue','cyan','violet','amber','red')
     $names = @('Windows green','Aero sapphire','Lagoon cyan','Amethyst','Warm amber','Ruby red','Custom color')
     $sampleHex = @('#14DE8E','#168DFF','#04D5F7','#9D64FF','#FFB328','#FF3B62')
-    $custom = [ordered]@{ quota = '#32BCFF'; time = '#EF78C1' }
-    foreach ($kind in @('quota','time')) {
+    $custom = [ordered]@{ quota = '#32BCFF'; weekly = '#7DBD4D'; time = '#EF78C1'; working = '#FF9C59' }
+    foreach ($kind in @('quota','weekly','time','working')) {
         if ([string]$draft[$kind] -match '^#[0-9a-fA-F]{6}$') {
             $custom[$kind] = ([string]$draft[$kind]).ToUpperInvariant()
         }
@@ -24,7 +24,7 @@ function Show-AeroAppearanceDialog {
     $dialog.Text = 'Customize progress bars'
     $dialog.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
     $dialog.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterParent
-    $dialog.ClientSize = [System.Drawing.Size]::new(566,652)
+    $dialog.ClientSize = [System.Drawing.Size]::new(566,752)
     $dialog.MaximizeBox = $false
     $dialog.MinimizeBox = $false
     $dialog.ShowInTaskbar = $false
@@ -76,11 +76,13 @@ function Show-AeroAppearanceDialog {
         if ($i -ge 0) { return $i }
         return $presets.Count
     }
-    $quota = Add-Select 'Usage color' 78 $names (StartingIndex ([string]$draft['quota']))
-    $time = Add-Select 'Countdown color' 119 $names (StartingIndex ([string]$draft['time']))
+    $quota = Add-Select '5-hour color' 78 $names (StartingIndex ([string]$draft['quota']))
+    $weekly = Add-Select 'Weekly color' 116 $names (StartingIndex ([string]$draft['weekly']))
+    $time = Add-Select 'Countdown color' 154 $names (StartingIndex ([string]$draft['time']))
+    $working = Add-Select 'Working color' 192 $names (StartingIndex ([string]$draft['working']))
 
     # Owner-draw colors so presets are recognizable before the user selects them.
-    foreach ($pair in @(@($quota,'quota'),@($time,'time'))) {
+    foreach ($pair in @(@($quota,'quota'),@($weekly,'weekly'),@($time,'time'),@($working,'working'))) {
         $combo = $pair[0]; $kind = [string]$pair[1]
         $combo.DrawMode = [System.Windows.Forms.DrawMode]::OwnerDrawFixed
         $combo.ItemHeight = 25
@@ -129,65 +131,61 @@ function Show-AeroAppearanceDialog {
         return $button
     }
 
-    # A genuine running pair of 400x17 Aero controls, not a static thumbnail.
+    # Live previews share the identical Aero renderer used in the dashboard.
+    # The working sample has a constant full tube with internal flowing light.
     $preview = [System.Windows.Forms.Panel]::new()
     $preview.Name = 'LiveAeroPreview'
     $preview.BackColor = [System.Drawing.Color]::White
-    $preview.Location = [System.Drawing.Point]::new(19,165)
-    $preview.Size = [System.Drawing.Size]::new(524,146)
+    $preview.Location = [System.Drawing.Point]::new(19,240)
+    $preview.Size = [System.Drawing.Size]::new(524,190)
     $preview.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
     $dialog.Controls.Add($preview)
-    $usageLabel = [System.Windows.Forms.Label]::new()
-    $usageLabel.Text = 'USAGE LIMIT     68%'
-    $usageLabel.Location = [System.Drawing.Point]::new(16,10)
-    $usageLabel.Size = [System.Drawing.Size]::new(475,24)
-    $usageLabel.Font = [System.Drawing.Font]::new('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
-    $preview.Controls.Add($usageLabel)
-    $previewQuota = New-AeroProgressBar $preview 16 37 488 17 'quota'
-    Set-AeroProgress $previewQuota 68
-    $runLabel = [System.Windows.Forms.Label]::new()
-    $runLabel.Text = 'RUN COUNTDOWN     75%'
-    $runLabel.Location = [System.Drawing.Point]::new(16,73)
-    $runLabel.Size = [System.Drawing.Size]::new(475,23)
-    $runLabel.Font = [System.Drawing.Font]::new('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
-    $preview.Controls.Add($runLabel)
-    $previewTime = New-AeroProgressBar $preview 16 99 488 17 'time'
-    Set-AeroProgress $previewTime 75
-    $note = [System.Windows.Forms.Label]::new()
-    $note.Text = 'These are the same animated renderers used in the scheduler.'
-    $note.ForeColor = [System.Drawing.Color]::DimGray
-    $note.Location = [System.Drawing.Point]::new(17,120)
-    $note.Size = [System.Drawing.Size]::new(489,20)
-    $note.Font = [System.Drawing.Font]::new('Segoe UI',8)
-    $preview.Controls.Add($note)
-
-    $material = Add-Select 'Liquid material' 324 @('Optical glass','Mirror enamel','Iridescent pearl') ([int]$draft['finish'])
+    $samples=@(
+        @('5-HOUR   68%','quota',68),
+        @('WEEKLY   50%','weekly',50),
+        @('COUNTDOWN   75%','time',75),
+        @('WORKING   duration unknown','working',$null)
+    )
+    $previewBars=@()
+    for($i=0;$i -lt $samples.Count;$i++){
+        $label=[System.Windows.Forms.Label]::new()
+        $label.Text=[string]$samples[$i][0]
+        $label.Location=[System.Drawing.Point]::new(16,4+$i*45)
+        $label.Size=[System.Drawing.Size]::new(487,23)
+        $label.Font=[System.Drawing.Font]::new('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
+        $preview.Controls.Add($label)
+        $kind=[string]$samples[$i][1]
+        $bar=New-AeroProgressBar $preview 16 (25+$i*45) 488 17 $kind
+        $previewBars+=,$bar
+        if($kind -eq 'working'){Set-AeroWorking $bar}
+        else{Set-AeroProgress $bar $samples[$i][2]}
+    }
+    $material = Add-Select 'Liquid material' 444 @('Optical glass','Mirror enamel','Iridescent pearl') ([int]$draft['finish'])
     $material.Width = 379
-    $lighting = Add-Select 'Studio lighting' 363 @('Product studio','Aero daylight','Neon showroom') ([int]$draft['lighting'])
+    $lighting = Add-Select 'Studio lighting' 483 @('Product studio','Aero daylight','Neon showroom') ([int]$draft['lighting'])
     $lighting.Width = 379
-    $shimmer = Add-Slider 'Reflection strength' 406 0 200 ([int]$draft['shimmer'])
-    $speed = Add-Slider 'Reflection speed' 452 25 300 ([int]$draft['speed'])
+    $shimmer = Add-Slider 'Reflection strength' 524 0 200 ([int]$draft['shimmer'])
+    $speed = Add-Slider 'Reflection speed' 570 25 300 ([int]$draft['speed'])
     $enabled = [System.Windows.Forms.CheckBox]::new()
     $enabled.Name = 'AppearanceAeroEnabled'
     $enabled.Text = 'Enable Aero Liquid optics'
     $enabled.AutoSize = $true
     $enabled.Checked = [bool]$draft['aero']
-    $enabled.Location = [System.Drawing.Point]::new(20,503)
+    $enabled.Location = [System.Drawing.Point]::new(20,618)
     $dialog.Controls.Add($enabled)
-
-    # Do not mistake a successful browser launch for an active liquid shader.
-    # The component receives an explicit engine report from its local page.
-    $rendererStatus=Add-Label 'Aero renderer: initializing...' 20 531 520 23
+    # Do not mistake browser startup for an active liquid shader.
+    $rendererStatusLabelTop=648
+    $rendererStatus=Add-Label 'Aero renderer: initializing...' 20 $rendererStatusLabelTop 520 23
     $rendererStatus.Font=[System.Drawing.Font]::new('Segoe UI',9)
     $rendererStatus.ForeColor=[System.Drawing.Color]::DimGray
     $rendererTimer=[System.Windows.Forms.Timer]::new()
     $rendererTimer.Interval=500
     $rendererTimer.Add_Tick({
         try {
-            if($previewQuota -is [System.Windows.Forms.Integration.ElementHost]){
+            if($previewBars[0] -is [System.Windows.Forms.Integration.ElementHost]){
                 $rendererStatus.Text="Aero renderer: WPF fallback ($script:aeroError)"
             } else {
-                $engine=Get-AeroProgressViewStatus -View $previewQuota
+                $engine=Get-AeroProgressViewStatus -View $previewBars[0]
                 if($engine.Failure){
                     $rendererStatus.Text="Aero renderer failed: $($engine.Failure)"
                 } elseif($engine.Engine -eq 'native-only'){
@@ -205,8 +203,10 @@ function Show-AeroAppearanceDialog {
     # Preview all edits immediately in the dialog and in the underlying app.
     # Settings persistence is intentionally deferred until the user clicks Save.
     $previewChanged = {
-        $draft['quota'] = if ($quota.SelectedIndex -eq $presets.Count) { [string]$custom['quota'] } else { [string]$presets[$quota.SelectedIndex] }
-        $draft['time'] = if ($time.SelectedIndex -eq $presets.Count) { [string]$custom['time'] } else { [string]$presets[$time.SelectedIndex] }
+        foreach($pair in @(@($quota,'quota'),@($weekly,'weekly'),@($time,'time'),@($working,'working'))){
+            $combo=$pair[0];$kind=[string]$pair[1]
+            $draft[$kind]=if($combo.SelectedIndex -eq $presets.Count){[string]$custom[$kind]}else{[string]$presets[$combo.SelectedIndex]}
+        }
         $draft['finish'] = [int]$material.SelectedIndex
         $draft['lighting'] = [int]$lighting.SelectedIndex
         $draft['shimmer'] = [int]$shimmer.Value
@@ -214,7 +214,7 @@ function Show-AeroAppearanceDialog {
         $draft['aero'] = [bool]$enabled.Checked
         Update-AeroAppearance $draft
     }.GetNewClosure()
-    foreach ($control in @($quota,$time,$material,$lighting)) {
+    foreach ($control in @($quota,$weekly,$time,$working,$material,$lighting)) {
         $control.Add_SelectedIndexChanged({ & $previewChanged }.GetNewClosure())
     }
     foreach ($control in @($shimmer,$speed)) {
@@ -222,21 +222,24 @@ function Show-AeroAppearanceDialog {
     }
     $enabled.Add_CheckedChanged({ & $previewChanged }.GetNewClosure())
     [void](Add-Chooser 'quota' 78 $quota)
-    [void](Add-Chooser 'time' 119 $time)
+    [void](Add-Chooser 'weekly' 116 $weekly)
+    [void](Add-Chooser 'time' 154 $time)
+    [void](Add-Chooser 'working' 192 $working)
 
     $separator = [System.Windows.Forms.Label]::new()
     $separator.BorderStyle = [System.Windows.Forms.BorderStyle]::Fixed3D
-    $separator.Location = [System.Drawing.Point]::new(19,564)
+    $separator.Location = [System.Drawing.Point]::new(19,683)
     $separator.Size = [System.Drawing.Size]::new(524,2)
     $dialog.Controls.Add($separator)
 
     $defaults = [System.Windows.Forms.Button]::new()
     $defaults.Name = 'AppearanceDefaults'
     $defaults.Text = 'Defaults'
-    $defaults.Location = [System.Drawing.Point]::new(19,590)
+    $defaults.Location = [System.Drawing.Point]::new(19,699)
     $defaults.Size = [System.Drawing.Size]::new(98,33)
     $defaults.Add_Click({
-        $quota.SelectedIndex=0;$time.SelectedIndex=1
+        $quota.SelectedIndex=0;$weekly.SelectedIndex=2
+        $time.SelectedIndex=1;$working.SelectedIndex=4
         $material.SelectedIndex=0;$lighting.SelectedIndex=0
         $shimmer.Value=100;$speed.Value=100
         $enabled.Checked=$true
@@ -246,14 +249,14 @@ function Show-AeroAppearanceDialog {
     $cancel.Name = 'AppearanceCancel'
     $cancel.Text = 'Cancel'
     $cancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
-    $cancel.Location = [System.Drawing.Point]::new(305,590)
+    $cancel.Location = [System.Drawing.Point]::new(305,699)
     $cancel.Size = [System.Drawing.Size]::new(102,33)
     $dialog.Controls.Add($cancel)
     $save = [System.Windows.Forms.Button]::new()
     $save.Name = 'AppearanceSave'
     $save.Text = 'Save and close'
     $save.DialogResult = [System.Windows.Forms.DialogResult]::OK
-    $save.Location = [System.Drawing.Point]::new(416,590)
+    $save.Location = [System.Drawing.Point]::new(416,699)
     $save.Size = [System.Drawing.Size]::new(126,33)
     $dialog.Controls.Add($save)
     $dialog.AcceptButton = $save
@@ -277,7 +280,7 @@ function Show-AeroAppearanceDialog {
         $rendererTimer.Stop()
         $rendererTimer.Dispose()
         if (-not $accepted) { Update-AeroAppearance $previous }
-        foreach ($bar in @($previewQuota,$previewTime)) {
+        foreach ($bar in @($previewBars)) {
             if ($bar) {
                 Remove-AeroProgressBar $bar
             }

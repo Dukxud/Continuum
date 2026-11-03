@@ -35,7 +35,36 @@ $script:ui.Preferences.settingsTimer.Add_Tick({
     try { Save-CurrentFormState } catch { Update-Status "Settings were not saved: $($_.Exception.Message)" }
 })
 $repoBox.Add_TextChanged({ Queue-FormStateSave })
-$whenBox.Add_ValueChanged({ Queue-FormStateSave })
+function Refresh-SuggestedRunTime {
+    if($script:ui.Preferences.scheduleTimeEdited -or $script:ui.Preferences.scheduleTimeUpdating){return}
+    $next=Get-CodexSuggestedRunTime
+    if($whenBox.Value -ne $next){
+        $script:ui.Preferences.scheduleTimeUpdating=$true
+        try {$whenBox.Value=$next}
+        finally {$script:ui.Preferences.scheduleTimeUpdating=$false}
+    }
+}
+$whenBox.Add_ValueChanged({
+    if(-not $script:ui.Preferences.scheduleTimeUpdating){
+        $script:ui.Preferences.scheduleTimeEdited=$true
+        Queue-FormStateSave
+    }
+})
+function Adjust-CodexScheduledTime {
+    param([int]$Direction)
+    $current=$whenBox.Value
+    $next=Step-CodexScheduledRunTime -Time $current -Direction $Direction
+    if($next -eq $current){Update-Status 'Run time must stay at least 30 seconds in the future.';return}
+    $script:ui.Preferences.scheduleTimeEdited=$true
+    $script:ui.Preferences.scheduleTimeUpdating=$true
+    try {$whenBox.Value=$next}
+    finally {$script:ui.Preferences.scheduleTimeUpdating=$false}
+    Queue-FormStateSave
+}
+$minusTime.Add_Click({ Adjust-CodexScheduledTime -Direction -1 })
+$plusTime.Add_Click({ Adjust-CodexScheduledTime -Direction 1 })
+# Share the existing one-second UI timer; do not add a background scheduler.
+$script:ui.Dashboard.countdownTimer.Add_Tick({ Refresh-SuggestedRunTime })
 $accessBox.Add_SelectedIndexChanged({ Queue-FormStateSave })
 $effortBox.Add_SelectedIndexChanged({
     if (-not $script:ui.Selection.updatingModels) {

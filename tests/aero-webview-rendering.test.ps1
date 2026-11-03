@@ -174,6 +174,33 @@ try {
     Set-AeroProgress $run $null
     PumpUntil { [math]::Abs([double](Evaluate $run 'window.aeroBarProof.getTarget()')) -lt .001 }
     Require ($run.Tag.Percent -eq $null) 'Unknown run value must remain unknown in application state.'
+    # Running is an explicit indeterminate display mode, not an invented 100%
+    # completion estimate. The target and visual shape are fixed instantly.
+    Set-AeroWorking $run
+    PumpUntil { (Evaluate $run 'window.aeroBarProof.getSettings().working') -eq $true }
+    $workingState=Get-AeroProgressViewStatus -View $run
+    Require ($workingState.Mode -eq 'working' -and $null -eq $workingState.Value) 'Running state exposed a completion percentage.'
+    Require ($null -eq $run.Tag.Percent -and $run.Tag.Working) 'Adapter incorrectly stored a work percentage.'
+    Require ([math]::Abs([double](Evaluate $run 'window.aeroBarProof.getTarget()') - 1) -lt .001) 'Working tube is not constantly occupied.'
+    Require ([math]::Abs([double](Evaluate $run 'window.aeroBarProof.getVisual()') - 1) -lt .001) 'Working state animated a false percentage fill.'
+    $workA=Join-Path $captures 'working-frame-a.png'
+    $workB=Join-Path $captures 'working-frame-b.png'
+    [void](Snapshot $run $workA)
+    $workMotion=0
+    foreach($i in 1..15){
+        Start-Sleep -Milliseconds 360
+        [System.Windows.Forms.Application]::DoEvents()
+        [void](Snapshot $run $workB)
+        $workMotion=[math]::Max($workMotion,(Count-VisualChanges $workA $workB))
+        if($workMotion -gt 10){break}
+    }
+    Require ($workMotion -gt 10) 'Indeterminate Aero has no visibly moving liquid.'
+    Require ([math]::Abs([double](Evaluate $run 'window.aeroBarProof.getTarget()') - 1) -lt .001) 'Working flow drifted in fill position.'
+    Set-AeroProgress $run 75
+    PumpUntil { (Evaluate $run 'window.aeroBarProof.getSettings().working') -eq $false }
+    $progressState=Get-AeroProgressViewStatus -View $run
+    Require ($progressState.Mode -eq 'progress' -and [math]::Abs($progressState.Value-.75) -lt .001) 'Returning from Working did not restore measured progress.'
+    Require ($run.Tag.Color -eq 'blue') 'Returning to a countdown did not restore the selected countdown color.'
 
     # A rapid update must retain the last authoritative percentage despite
     # the shader's intentional physical spring lag.
