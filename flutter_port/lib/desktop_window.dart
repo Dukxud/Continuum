@@ -36,7 +36,7 @@ class DesktopWindowHost implements SchedulerWindowHost {
     }
     if (compact) {
       if (!_lastCompact) _fullSize = await windowManager.getSize();
-      await windowManager.setMinimumSize(const Size(475, 395));
+      await windowManager.setMinimumSize(const Size(475, 340));
       await windowManager.setSize(Size(515, hasRun ? 555 : 370));
     } else {
       await windowManager.setSize(_fullSize);
@@ -50,7 +50,7 @@ class DesktopWindowHost implements SchedulerWindowHost {
     if (!_lastCompact) return;
     // Flutter dialogs live in the same window; expand it temporarily so all
     // appearance and history controls remain accessible in compact mode.
-    await windowManager.setMinimumSize(const Size(475, 395));
+    await windowManager.setMinimumSize(const Size(475, 340));
     await windowManager.setSize(history
       ? const Size(1040, 780)
       : const Size(690, 830));
