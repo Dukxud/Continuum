@@ -46,6 +46,13 @@ void main() {
       await tester.ensureVisible(find.text('Recent runs'));
       await tester.pump();
       expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Recent runs'));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('Recent Codex runs'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byIcon(Icons.close).last);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tester.takeException(), isNull);
     });
   }
 }

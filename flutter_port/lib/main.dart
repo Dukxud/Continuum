@@ -487,8 +487,8 @@ class _SchedulerHomeState extends State<SchedulerHome> {
                 IconButton(onPressed: () => Navigator.pop(parent), icon: const Icon(Icons.close)),
               ]),
               const Divider(),
-              Expanded(child: Row(children: [
-                SizedBox(width: 335, child: ListView.builder(
+              Expanded(child: LayoutBuilder(builder: (context, constraints) {
+                final list = ListView.builder(
                   itemCount: rows.length, itemBuilder: (context, i) {
                     final row = rows[i];
                     final name = stringField(row, 'Name');
@@ -498,9 +498,8 @@ class _SchedulerHomeState extends State<SchedulerHome> {
                       subtitle: Text(timeLabel(dateField(row, 'When')) + '\n' + name,
                         maxLines: 2, overflow: TextOverflow.ellipsis),
                       onTap: () => select(row));
-                  })),
-                const VerticalDivider(),
-                Expanded(child: DefaultTabController(length: 2, child: Column(children: [
+                  });
+                final detail = DefaultTabController(length: 2, child: Column(children: [
                   if (reading) const LinearProgressIndicator(),
                   const TabBar(tabs: [Tab(text: 'Codex response'), Tab(text: 'Worker log')]),
                   Expanded(child: TabBarView(children: [
@@ -509,8 +508,20 @@ class _SchedulerHomeState extends State<SchedulerHome> {
                     SingleChildScrollView(padding: const EdgeInsets.all(12),
                       child: SelectableText(log.isEmpty ? 'Select a run to inspect its worker log.' : log)),
                   ])),
-                ]))),
-              ])),
+                ]));
+                if (constraints.maxWidth < 650) {
+                  return Column(children: [
+                    SizedBox(height: math.min(180, constraints.maxHeight * 0.37), child: list),
+                    const Divider(),
+                    Expanded(child: detail),
+                  ]);
+                }
+                return Row(children: [
+                  SizedBox(width: math.min(335, constraints.maxWidth * 0.36), child: list),
+                  const VerticalDivider(),
+                  Expanded(child: detail),
+                ]);
+              })),
               const Divider(),
               Wrap(spacing: 8, children: [
                 OutlinedButton.icon(onPressed: response.isEmpty ? null :
@@ -535,7 +546,8 @@ class _SchedulerHomeState extends State<SchedulerHome> {
     final saved = await showDialog<bool>(context: context,
       builder: (parent) => StatefulBuilder(builder: (context, refresh) => AlertDialog(
         title: const Text('Aero Liquid appearance'),
-        content: SizedBox(width: 470, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        content: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 470),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
           for (final name in ['quota', 'time', 'working']) ...[
             Align(alignment: Alignment.centerLeft, child: Text(
               name == 'quota' ? 'Usage' : name == 'time' ? 'Countdown' : 'Running',
