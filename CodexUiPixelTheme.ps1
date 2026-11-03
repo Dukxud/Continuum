@@ -78,6 +78,20 @@ function Initialize-SchedulerPixelTheme {
     foreach($band in $bands){
         [void](Add-PixelBackplate -Parent $Form -Name $band.Name -Bounds ([System.Drawing.Rectangle]::new(10,$band.Y,898,$band.Height)) -Fill $band.Fill -Accent $band.Accent)
     }
+    # Match label backgrounds to their shared field backplates, avoiding
+    # opaque default-label rectangles cutting through the pixel texture.
+    $labelBands=@{
+        'Conversation'='#E8F1FF';'Repository root'='#E6F8F3'
+        'Run at (local)'='#F1ECFF';'Model'='#FFF3E4'
+        'Reasoning'='#FFF3E4';'Access'='#FFF3E4'
+        'Instruction'='#E8F5FC'
+    }
+    foreach($control in $Form.Controls){
+        if($control -is [System.Windows.Forms.Label] -and $labelBands.ContainsKey($control.Text)){
+            $control.BackColor=[System.Drawing.ColorTranslator]::FromHtml($labelBands[$control.Text])
+            $control.ForeColor=$ink
+        }
+    }
     $colors=@{
         Browse='#168E87';Minus='#785AC5';Plus='#785AC5'
         Now='#785AC5';Reset='#785AC5';Schedule='#2887B5'
