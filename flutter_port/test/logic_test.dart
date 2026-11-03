@@ -1,9 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:codex_resume_flutter/bridge.dart';
+import 'package:codex_resume_flutter/aero_appearance.dart';
 import 'package:codex_resume_flutter/scheduler_controller.dart';
 
 class FakeScheduler implements SchedulerAdapter {
   final List<String> actions = [];
+  final List<Map<String, dynamic>> saves = [];
   @override
   Future<Map<String, dynamic>> call(String action, [Map<String, dynamic> payload = const {}]) async {
     actions.add(action);
@@ -34,6 +36,7 @@ class FakeScheduler implements SchedulerAdapter {
       case 'schedule':
         return {'name': 'CodexResume-20261103-1400-12345678', 'status': 'Scheduled'};
       case 'save':
+        saves.add(payload);
         return {'saved': true};
       default:
         return {};
@@ -63,6 +66,42 @@ void main() {
     expect(name, startsWith('CodexResume-'));
     expect(fake.actions, contains('usage'));
     expect(fake.actions, contains('schedule'));
+    controller.dispose();
+  });
+
+  test('appearance Cancel cannot leak into concurrent preference saves', () async {
+    final fake = FakeScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    final baseline = controller.appearance;
+    controller.beginAppearancePreview();
+    controller.previewAppearance(baseline.copyWith(
+      quota: '#123ABC', weekly: 'violet', shimmer: 180));
+    await controller.save();
+    final snapshot = fake.saves.last['barAppearance'] as Map<String, dynamic>;
+    expect(snapshot['quota'], baseline.quota);
+    expect(snapshot['weekly'], baseline.weekly);
+    expect(snapshot['shimmer'], baseline.shimmer);
+    controller.cancelAppearancePreview();
+    expect(controller.appearance, baseline);
+    controller.dispose();
+  });
+
+  test('appearance Save commits all nine compatible settings', () async {
+    final fake = FakeScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    controller.beginAppearancePreview();
+    const updated = AeroAppearance(
+      quota: 'violet', weekly: 'red', time: '#123ABC',
+      working: 'amber', finish: 2, lighting: 1, shimmer: 150,
+      speed: 225, aero: false,
+    );
+    controller.commitAppearance(updated);
+    await controller.save();
+    expect(controller.appearance, updated);
+    final snapshot = fake.saves.last['barAppearance'];
+    expect(snapshot, updated.toJson());
     controller.dispose();
   });
 }
