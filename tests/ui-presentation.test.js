@@ -139,7 +139,7 @@ test('routine status clutter is absent but actionable errors remain visible', ()
   assert.match(source,/\$status = Add-Label ''/);
   assert.match(source,/function Update-Status \{/);
   assert.match(source,/\[switch\]\$Alert/);
-  assert.match(dash,/\$status\.Visible = -not \[string\]::IsNullOrWhiteSpace/);
+  assert.match(dash,/\$status\.Visible\s*=\s*-not\s+\[string\]::IsNullOrWhiteSpace\(/);
   assert.match(source,/Clear-SchedulerAlert/);
 });
 
