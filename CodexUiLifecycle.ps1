@@ -9,7 +9,10 @@ $systemRefreshTimer = New-Object System.Windows.Forms.Timer
 $systemRefreshTimer.Interval = 2000
 $systemRefreshTimer.Add_Tick({
     $scope=if(((Get-Date)-$script:ui.Async.lastFullRefresh).TotalSeconds -ge 60){'Full'}else{'TaskStatus'}
-    try { Request-SystemRefresh -Scope $scope }
+    try {
+        Request-SystemRefresh -Scope $scope
+        Update-SchedulingEligibility
+    }
     catch { Update-Status "System refresh failed: $($_.Exception.Message)" -Alert }
 })
 $form.Add_Activated({

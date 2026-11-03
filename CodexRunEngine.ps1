@@ -208,7 +208,10 @@ function Invoke-CodexScheduledJob {
             try { $sessionGuard.ReleaseMutex() }
             finally { $sessionGuard.Dispose() }
         }
-        if ($transcribing) { Stop-Transcript | Out-Null }
+        if ($transcribing) {
+            try { Stop-Transcript -ErrorAction Stop | Out-Null }
+            catch { Write-Warning "Worker transcript could not be closed: $($_.Exception.Message)" }
+        }
         Write-Host 'Run finished. Check the logs folder for the transcript.' -ForegroundColor Cyan
     }
 }

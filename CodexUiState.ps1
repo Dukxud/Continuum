@@ -16,7 +16,7 @@ function New-CodexUiState {
         Usage = @{
             usageSnapshot=$null; usageRequestedModel=''; usageSnapshotRequestedModel=''
             usageReadFailed=$false; usageProcess=$null; usageStarted=[datetime]::MinValue
-            usageRefreshQueued=$false
+            usageRefreshQueued=$false; usageSnapshotReceivedAt=[datetime]::MinValue
         }
         Preferences = @{
             uiSettings=$null; savedDraft=$null; settingsReady=$false

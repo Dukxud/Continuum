@@ -17,7 +17,10 @@ function Update-SchedulingEligibility {
     $requested=[string]$usage.usageSnapshotRequestedModel
     $modelMatches=($requested -ceq $model -or
         (-not $requested -and [string]$snapshot.model -ceq $model))
-    $verified=($snapshot -and -not $usage.usageReadFailed -and $modelMatches -and
+    # Displayed quota is not authorization while a refresh is pending or stale.
+    $fresh=($usage.usageSnapshotReceivedAt -ge (Get-Date).AddSeconds(-120))
+    $verified=($snapshot -and $fresh -and -not $usage.usageProcess -and
+        -not $usage.usageRefreshQueued -and -not $usage.usageReadFailed -and $modelMatches -and
         (Test-CanonicalWorkspaceIdentity ([string]$snapshot.accountId)))
     $schedule.Enabled=[bool]($supported -and $verified)
 }

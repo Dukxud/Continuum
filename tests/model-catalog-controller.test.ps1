@@ -26,6 +26,7 @@ try {
     $identity='workspace-sha256:'+('a'*64)
     $script:ui.Usage.usageSnapshot=[pscustomobject]@{model='gpt-test';accountId=$identity}
     $script:ui.Usage.usageSnapshotRequestedModel='gpt-test'
+    $script:ui.Usage.usageSnapshotReceivedAt=Get-Date
     Update-SchedulingEligibility
     if(-not $schedule.Enabled){throw 'Current matching verified quota identity must allow a supported model and effort.'}
 
@@ -41,12 +42,27 @@ try {
     $script:ui.Usage.usageSnapshot.accountId=$identity
     Update-SchedulingEligibility
     if(-not $schedule.Enabled){throw 'Fresh verified identity did not restore scheduling.'}
+    $script:ui.Usage.usageProcess=[pscustomobject]@{id='in-flight'}
+    Update-SchedulingEligibility
+    if($schedule.Enabled){throw 'An in-flight refresh reused old quota authority.'}
+    $script:ui.Usage.usageProcess=$null
+    $script:ui.Usage.usageRefreshQueued=$true
+    Update-SchedulingEligibility
+    if($schedule.Enabled){throw 'A queued refresh reused old quota authority.'}
+    $script:ui.Usage.usageRefreshQueued=$false
+    $script:ui.Usage.usageSnapshotReceivedAt=(Get-Date).AddMinutes(-3)
+    Update-SchedulingEligibility
+    if($schedule.Enabled){throw 'Expired quota authority was accepted.'}
+    $script:ui.Usage.usageSnapshotReceivedAt=Get-Date
+    Update-SchedulingEligibility
+    if(-not $schedule.Enabled){throw 'Fresh matching quota failed to restore scheduling.'}
     $alternative=@($modelBox.Items | Where-Object Id -eq 'other') | Select-Object -First 1
     $modelBox.SelectedItem=$alternative
     Select-AvailableEfforts
     if($schedule.Enabled){throw 'Switching models reused the previous model quota snapshot.'}
     $script:ui.Usage.usageSnapshot=[pscustomobject]@{model='other';accountId=$identity}
     $script:ui.Usage.usageSnapshotRequestedModel='other'
+    $script:ui.Usage.usageSnapshotReceivedAt=Get-Date
     Update-SchedulingEligibility
     if(-not $schedule.Enabled){throw 'A new matching quota snapshot did not restore scheduling.'}
     Apply-CodexModelCatalog -Snapshot $snapshot

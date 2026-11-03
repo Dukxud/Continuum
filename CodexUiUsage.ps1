@@ -64,6 +64,7 @@ function Apply-UsageSnapshot {
     param($Snapshot)
     $script:ui.Usage.usageSnapshot = $Snapshot
     $script:ui.Usage.usageSnapshotRequestedModel = $script:ui.Usage.usageRequestedModel
+    $script:ui.Usage.usageSnapshotReceivedAt = Get-Date
     $script:ui.Usage.usageReadFailed = $false
     Apply-CodexModelCatalog -Snapshot $Snapshot
     $windows = @($Snapshot.windows | Where-Object { $null -ne $_ })
@@ -94,6 +95,7 @@ function Set-UsageUnavailable {
     param([string]$Reason)
     $script:ui.Usage.usageReadFailed = $true
     $script:ui.Usage.usageSnapshot = $null
+    $script:ui.Usage.usageSnapshotReceivedAt = [datetime]::MinValue
     $script:ui.Usage.usageSnapshotRequestedModel = ''
     foreach ($card in $usageCards) {
         $card.Remaining.Text = 'Unavailable'
@@ -110,11 +112,13 @@ function Set-UsageUnavailable {
 function Request-UsageRefresh {
     if ($script:ui.Usage.usageProcess) {
         $script:ui.Usage.usageRefreshQueued = $true
+        Update-SchedulingEligibility
         return
     }
     try {
         $script:ui.Usage.usageProcess = Start-UsageRead
         $script:ui.Usage.usageStarted = Get-Date
+        Update-SchedulingEligibility
         $usagePoll.Start()
     } catch {
         Set-UsageUnavailable -Reason $_.Exception.Message

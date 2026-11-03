@@ -80,7 +80,7 @@ The second-app test exercises all ten component imports, while separate acceptan
 
 `CodexUiState.ps1` constructs the application-only context. The context is deliberately **not** a reusable module. It carries only state needed to coordinate application-specific controllers; consumers of the ten `components/` modules never import it.
 
-- **Selection** owns conversations, repository alternatives, model catalog, efforts, and the single Schedule-button eligibility policy. Eligibility requires a supported model/effort plus a current, matching quota snapshot with verified workspace identity. Usage reports freshness to the selection controller; it never independently enables the button. An empty catalog or failed usage read blocks scheduling.
+- **Selection** owns conversations, repository alternatives, model catalog, efforts, and the single Schedule-button eligibility policy. Eligibility requires a supported model/effort, a matching quota snapshot received within 120 seconds with no in-progress or queued quota refresh, and a verified workspace identity. Usage reports freshness to the selection controller; it never independently enables the button. An empty catalog or failed usage read blocks scheduling.
 - **Usage** owns the short-lived query process, quota snapshots, and refresh state, through `CodexUiUsage.ps1`.
 - **Async** owns coalesced background jobs and queued requests. `CodexUiRefresh.ps1` is the only user-facing refresh coordinator; scoped task/model changes delegate to asynchronous readers without duplicate timers or direct UI calls.
 - **Dashboard** owns visual controls, the pending run snapshot and its keyed index. `CodexUiPending.ps1` publishes the index and `CodexDashboard.ps1` renders only visible progress bars.

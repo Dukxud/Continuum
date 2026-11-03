@@ -125,9 +125,14 @@ test('one scheduling-eligibility owner enforces fresh model and workspace author
  const actions=read('CodexUiActions.ps1');
  assert.match(selection,/function Update-SchedulingEligibility/);
  assert.match(selection,/usageReadFailed/);
+ assert.match(selection,/usageSnapshotReceivedAt/);
+ assert.match(selection,/usageProcess/);
+ assert.match(selection,/usageRefreshQueued/);
  assert.match(selection,/usageSnapshotRequestedModel/);
  assert.match(selection,/Test-CanonicalWorkspaceIdentity/);
  assert.match(usage,/Update-SchedulingEligibility/);
+ assert.match(usage,/usageSnapshotReceivedAt = Get-Date/);
+ assert.match(read('CodexUiLifecycle.ps1'),/Update-SchedulingEligibility/);
  assert.match(usage,/\$script:ui\.Usage\.usageSnapshot = \$null/);
  assert.doesNotMatch(usage,/\$schedule\.Enabled\s*=/);
  assert.doesNotMatch(actions,/\$schedule\.Enabled\s*=/);
@@ -143,12 +148,24 @@ test('manual CI uses the complete local acceptance inventory without retries',()
  assert.doesNotMatch(workflow,/^\s+(?:push|pull_request|schedule):/m);
  assert.match(workflow,/validation_attempt:/);
  assert.match(workflow,/timeout-minutes: 35/);
+ assert.match(workflow,/GH_TOKEN:/);
+ assert.match(workflow,/GITHUB_RUN_ATTEMPT/);
+ assert.match(workflow,/GITHUB_RUN_ID/);
+ assert.match(workflow,/runs.Count -gt 2/);
  assert.match(workflow,/Invoke-LocalAcceptance\.ps1 -ExpectedCommit \$env:GITHUB_SHA/);
  assert.doesNotMatch(workflow,/tests\/[\w.-]+\.test\.ps1/,'workflow must not maintain a separate partial test list');
  assert.match(harness,/git -C \$root ls-files -- tests/);
  assert.match(harness,/Test inventory mismatch/);
+ assert.match(harness,/TestTimeoutSeconds/);
+ assert.match(harness,/WaitForExit\(\$TestTimeoutSeconds \* 1000\)/);
+ assert.match(harness,/\$process.Kill\(\$true\)/);
 });
 
+test('transcript cleanup cannot override the worker exit status',()=>{
+ const worker=read('CodexRunEngine.ps1');
+ assert.match(worker,/try \{ Stop-Transcript -ErrorAction Stop \| Out-Null \}/);
+ assert.match(worker,/catch \{ Write-Warning "Worker transcript could not be closed:/);
+});
 test('all scheduled executions must bind to a verified selected workspace',()=>{
  const ui=read('CodexUiActions.ps1'), worker=read('CodexRunEngine.ps1');
  assert.match(ui,/Test-CanonicalWorkspaceIdentity \$accountId/);

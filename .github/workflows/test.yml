@@ -14,6 +14,7 @@ on:
         options: ['1', '2']
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: scheduler-manual-validation-${{ github.ref }}
   cancel-in-progress: true
@@ -28,6 +29,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Enforce per-commit validation ceiling
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATION_ATTEMPT: ${{ inputs.validation_attempt }}
+        run: |
+          # Reject reruns and third dispatches before running any test.
+          if ([int]$env:GITHUB_RUN_ATTEMPT -ne 1) { throw 'Reruns are disabled for the same candidate.' }
+          $uri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/workflows/test.yml/runs?head_sha=$env:GITHUB_SHA&event=workflow_dispatch&per_page=100"
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ErrorAction Stop
+          $runs = @($response.workflow_runs | Where-Object { $_.head_sha -ceq $env:GITHUB_SHA })
+          if (@($runs | Where-Object { [string]$_.id -eq $env:GITHUB_RUN_ID }).Count -ne 1) {
+            throw 'Cannot verify the current workflow run. Validation refused.'
+          }
+          if ($runs.Count -gt 2) { throw 'Two CI attempts already exhausted for this commit.' }
+          if ($runs.Count -ne [int]$env:VALIDATION_ATTEMPT) {
+            throw "Attempt number must be $($runs.Count) for this commit."
+          }
       - name: Complete single-pass acceptance (PowerShell, JavaScript, WinForms, WebView2)
         shell: pwsh
         run: pwsh -NoProfile -STA -File ./scripts/Invoke-LocalAcceptance.ps1 -ExpectedCommit $env:GITHUB_SHA
