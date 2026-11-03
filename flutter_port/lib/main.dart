@@ -177,7 +177,7 @@ class _SchedulerHomeState extends State<SchedulerHome> {
         items: state.sessions.map((session) => DropdownMenuItem(
           value: stringField(session, 'Id'),
           child: Text(stringField(session, 'Display'), overflow: TextOverflow.ellipsis))).toList(),
-        onChanged: state.selectSession)),
+        onChanged: (id) { repository.clear(); state.selectSession(id); })),
       section('REPOSITORY', Row(children: [
         Expanded(child: TextField(
           controller: repository,

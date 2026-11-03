@@ -158,6 +158,7 @@ try {
                 version=1;lastAccess=$access
                 compactMode=($request.compactMode -eq $true)
                 barAppearance=$(if($previous){$previous.barAppearance}else{$null})
+                flutterAppearance=$(if($request.flutterAppearance){$request.flutterAppearance}elseif($previous){$previous.flutterAppearance}else{$null})
                 draft=$safeDraft
             }
             Write-CodexUiSettings -Directory $appDir -State $settings
