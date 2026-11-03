@@ -31,7 +31,8 @@ $exe=Join-Path $release 'codex_resume_flutter.exe'
 if(-not (Test-Path -LiteralPath $exe -PathType Leaf)){throw 'Flutter executable is missing.'}
 [void](New-Item -ItemType Directory -Path $OutputDirectory -Force)
 try{
-    Copy-Item -LiteralPath $release -Destination $destination -Recurse -ErrorAction Stop
+    [void](New-Item -ItemType Directory -Path $destination -Force)
+    Copy-Item -Path (Join-Path $release '*') -Destination $destination -Recurse -Force -ErrorAction Stop
     $mustCopy=@('CodexResumeScheduler.ps1','CodexRunEngine.ps1','CodexData.ps1',
         'CodexJobStore.ps1','CodexUsage.js','CodexRunJob.vbs')
     foreach($relative in $mustCopy){
