@@ -283,6 +283,26 @@ void main() {
       isNull, reason: 'A reset already passed must not activate Reset +1');
   });
 
+  test('quota continuation is opt-in, persisted and forwarded only when enabled', () async {
+    final fake = FakeScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    expect(controller.autoResumeOnLimit, isFalse,
+      reason: 'Older drafts must not gain automatic retries');
+    await controller.schedule(confirmUnrestricted:false, confirmOverlap:false);
+    expect(fake.schedules.last['autoResumeOnLimit'], isFalse);
+    controller.edit(autoResumeOnLimit: true);
+    expect(controller.autoResumeOnLimit, isTrue);
+    await controller.flushPreferences();
+    expect((fake.saves.last['draft'] as Map)['autoResumeOnLimit'], isTrue);
+    await controller.schedule(confirmUnrestricted:false, confirmOverlap:false);
+    expect(fake.schedules.last['autoResumeOnLimit'], isTrue);
+    controller.edit(autoResumeOnLimit: false);
+    await controller.flushPreferences();
+    expect((fake.saves.last['draft'] as Map)['autoResumeOnLimit'], isFalse);
+    controller.dispose();
+  });
+
   test('persisted draft and Windows task payload retain selected seconds', () async {
     final fake = FakeScheduler();
     final controller = SchedulerController(fake);
