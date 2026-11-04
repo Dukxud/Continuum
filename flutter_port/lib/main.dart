@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'aero_bar.dart';
-import 'aero_appearance.dart';
 import 'appearance_dialog.dart';
 import 'desktop_window.dart';
 import 'windows_icons.dart';
