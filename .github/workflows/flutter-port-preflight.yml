@@ -8,6 +8,7 @@ on:
       - 'tests/flutter-port-*.test.ps1'
       - 'tests/quota-continuation.test.ps1'
       - 'tests/quota-continuation-lifecycle.test.ps1'
+      - 'tests/session-activity.test.ps1'
       - 'tests/codex-worker-integration.test.ps1'
       - 'CodexQuotaContinuation.ps1'
       - 'CodexRunEngine.ps1'
@@ -47,6 +48,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Pinned worker integration failed.' }
           pwsh -NoProfile -STA -File ./tests/quota-continuation-lifecycle.test.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Quota lifecycle integration failed.' }
+          pwsh -NoProfile -STA -File ./tests/session-activity.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Session activity naming acceptance failed.' }
 
       - name: Install pinned Flutter
         uses: subosito/flutter-action@v2
