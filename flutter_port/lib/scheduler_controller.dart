@@ -12,6 +12,7 @@ class SchedulerController extends ChangeNotifier {
   List<Map<String, dynamic>> sessions = [];
   final Map<String, String> _sessionLabels = {};
   Future<void>? _sessionLabelsRequest;
+  DateTime? _lastSessionLabelsAttempt;
   List<Map<String, dynamic>> runs = [];
   List<Map<String, dynamic>> history = [];
   List<Map<String, dynamic>> models = [];
@@ -190,6 +191,12 @@ class SchedulerController extends ChangeNotifier {
   // A busy or malformed Codex rollout must never blank the workbench.
   Future<void> _refreshSessionLabels() async {
     if (_disposed || sessions.isEmpty || _sessionLabelsRequest != null) return;
+    final now = DateTime.now();
+    if (_lastSessionLabelsAttempt != null &&
+        now.difference(_lastSessionLabelsAttempt!) < const Duration(minutes: 3)) {
+      return;
+    }
+    _lastSessionLabelsAttempt = now;
     final request = _readSessionLabels();
     _sessionLabelsRequest = request;
     try {
