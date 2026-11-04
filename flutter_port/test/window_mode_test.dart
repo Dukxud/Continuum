@@ -59,11 +59,11 @@ void main() {
       windowHost: host)));
     await tester.pump(const Duration(milliseconds: 160));
     expect(host.modes, contains('standard:empty'));
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.text('Compact mode: OFF'));
     await tester.pump(const Duration(milliseconds: 160));
     expect(host.modes, contains('compact:empty'));
     expect(find.text('Schedule once'), findsNothing);
-    expect(find.textContaining('USAGE REMAINING'), findsOneWidget);
+    expect(find.text('Usage limits'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

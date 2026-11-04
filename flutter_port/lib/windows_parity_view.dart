@@ -175,11 +175,6 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
     return SizedBox(width:428,height:108,child:Stack(children:body));
   }
 
-  Widget _parityToggle(bool compact) => _LegacyButton(
-    compact?'Compact mode: ON':'Compact mode: OFF',
-    ()=>controller!.edit(compactMode:!compact),
-    color:compact?const Color(0xff315fa7):const Color(0xffecf2fa));
-
   Widget _parityHeader({required bool compact}) {
     final name=compact?'Codex Scheduler':'Schedule a continuation';
     return Stack(children:[
