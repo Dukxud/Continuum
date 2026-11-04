@@ -241,21 +241,25 @@ class SchedulerController extends ChangeNotifier {
       if (generation != _selectionEpoch || sessionId != id) return;
       final f = field(result, 'found');
       final found = f is Map ? Map<String, dynamic>.from(f) : null;
-      if (repo.trim().isEmpty) repo = stringField(found, 'Root');
-      final rawAlternatives = field(found, 'AlternativeRoots');
-      final candidateRoots = field(found, 'Candidates');
-      repositoryAlternatives = rawAlternatives is List
-        ? rawAlternatives.whereType<String>().toList()
-        : [];
-      if (repo.isEmpty && candidateRoots is List && candidateRoots.length > 1) {
-        repositoryAlternatives = candidateRoots.whereType<String>().toList();
-      }
-      if (repositoryAlternatives.isNotEmpty) {
-        repositoryWarning = repo.isEmpty
-          ? 'Conflicting checkouts: choose Browse to select the active repository.'
-          : 'Other checkouts found: verify the selected repository.';
-      } else {
-        repositoryWarning = repo.isEmpty ? 'Repository unresolved; use Browse.' : null;
+      // An explicit repository edit wins over a slower session lookup.
+      // This mirrors WinForms Apply-SelectionResult.
+      if (repo.trim().isEmpty) {
+        repo = stringField(found, 'Root');
+        final rawAlternatives = field(found, 'AlternativeRoots');
+        final candidateRoots = field(found, 'Candidates');
+        repositoryAlternatives = rawAlternatives is List
+          ? rawAlternatives.whereType<String>().toList()
+          : [];
+        if (repo.isEmpty && candidateRoots is List && candidateRoots.length > 1) {
+          repositoryAlternatives = candidateRoots.whereType<String>().toList();
+        }
+        if (repositoryAlternatives.isNotEmpty) {
+          repositoryWarning = repo.isEmpty
+            ? 'Conflicting checkouts: choose Browse to select the active repository.'
+            : 'Other checkouts found: verify the selected repository.';
+        } else {
+          repositoryWarning = repo.isEmpty ? 'Repository unresolved; use Browse.' : null;
+        }
       }
       final associated = stringField(result, 'model');
       if (models.any((m) => stringField(m, 'id') == associated)) selectModel(associated);
