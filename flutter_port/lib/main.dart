@@ -10,11 +10,13 @@ import 'aero_bar.dart';
 import 'appearance_dialog.dart';
 import 'desktop_window.dart';
 import 'date_labels.dart';
-import 'windows_icons.dart';
+import 'dashboard_skin.dart';
 import 'bridge.dart';
 import 'scheduler_controller.dart';
 
-part 'windows_parity_view.dart';
+part 'dashboard_frame.dart';
+part 'dashboard_workbench.dart';
+part 'dashboard_monitor.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,8 +28,7 @@ Future<void> main() async {
   runApp(SchedulerApp(windowHost: host));
 }
 
-const accent = Color(0xff516f98);
-const surface = Color(0xffedf3fa);
+const surface = Color(0xff26304a);
 
 class SchedulerApp extends StatelessWidget {
   const SchedulerApp({super.key, this.windowHost});
@@ -44,13 +45,24 @@ class SchedulerApp extends StatelessWidget {
     supportedLocales: const [Locale('en', 'US'), Locale('en', 'GB')],
     theme: ThemeData(
       useMaterial3: true,
+      brightness: Brightness.dark,
       fontFamily: 'Segoe UI',
-      scaffoldBackgroundColor: const Color(0xfff5f7fb),
-      colorScheme: ColorScheme.fromSeed(seedColor: accent),
+      scaffoldBackgroundColor: DeckColor.voidInk,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: DeckColor.coral, brightness: Brightness.dark),
+      dialogTheme: DialogThemeData(
+        backgroundColor: const Color(0xff1b243a),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18)),
+      ),
       inputDecorationTheme: InputDecorationTheme(
-        filled: true, fillColor: Colors.white, isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6))),
+        filled: true,
+        fillColor: const Color(0xff171f32),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 13, vertical: 13),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12)),
+      ),
     ),
     home: SchedulerHome(windowHost: windowHost),
   );
@@ -416,8 +428,8 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
       return Scaffold(body:Center(child:Text(startupError ?? 'Scheduler unavailable')));
     }
     return Scaffold(
-      backgroundColor:const Color(0xfff0f5fb),
-      body:SafeArea(child:state.compact?_compactParityView():_fullParityView()),
+      backgroundColor: DeckColor.voidInk,
+      body: SafeArea(child: state.compact ? _compactDeck() : _fullDeck()),
     );
   }
 }
