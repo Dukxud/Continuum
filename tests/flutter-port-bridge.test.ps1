@@ -7,13 +7,16 @@ $bridge=Join-Path $project 'windows_bridge.ps1'
 if(-not (Test-Path -LiteralPath $bridge -PathType Leaf)){throw 'Flutter JSON bridge missing.'}
 foreach($action in @('load','pending')){
     $output=@(& pwsh -NoProfile -NonInteractive -STA -File $bridge -Action $action)
-    if($LASTEXITCODE -ne 0 -or -not $output){throw "Flutter $action bridge request failed."}
+    $exitCode=$LASTEXITCODE
+    if(-not $output){throw "Flutter $action bridge returned no result (exit $exitCode)."}
     try{
         $body=($output | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
     }catch{
-        throw "Flutter $action response did not contain valid JSON."
+        throw "Flutter $action response was invalid JSON (exit $exitCode): $($output -join '; ')"
     }
-    if($body.ok -ne $true){throw "Flutter $action bridge rejected request: $($body.error)"}
+    if($exitCode -ne 0 -or $body.ok -ne $true){
+        throw "Flutter $action bridge failed (exit $exitCode): $($body.error)"
+    }
     if($null -eq $body.result -or $body.result.pending -isnot [array] -or $body.result.history -isnot [array]){
         throw "Flutter $action response is missing scheduler lists."
     }
