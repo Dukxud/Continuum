@@ -3,11 +3,13 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'aero_bar.dart';
 import 'appearance_dialog.dart';
 import 'desktop_window.dart';
+import 'date_labels.dart';
 import 'windows_icons.dart';
 import 'bridge.dart';
 import 'scheduler_controller.dart';
@@ -34,6 +36,12 @@ class SchedulerApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: 'Codex Resume Scheduler — Flutter preview',
     debugShowCheckedModeBanner: false,
+    localizationsDelegates: const [
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    supportedLocales: const [Locale('en', 'US'), Locale('en', 'GB')],
     theme: ThemeData(
       useMaterial3: true,
       fontFamily: 'Segoe UI',
@@ -184,20 +192,18 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
         ])) ?? false;
   }
 
-  String timeLabel(DateTime? time) {
-    if (time == null) return 'Unavailable';
-    String pad(int n) => n.toString().padLeft(2, '0');
-    final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
-    return time.month.toString() + '/' + pad(time.day) + '  ' +
-      hour.toString() + ':' + pad(time.minute) + (time.hour < 12 ? ' AM' : ' PM');
-  }
+  String timeLabel(DateTime? time) =>
+      time == null ? 'Unavailable' : formatLocalDateTime(time);
 
   String countdown(DateTime? due) => countdownText(due);
 
   Future<void> pickTime() async {
     final state = controller!;
     final now = DateTime.now();
+    // British English places Monday first and uses day–month ordering;
+    // keep the surrounding application in the user's 12-hour display.
     final day = await showDatePicker(context: context,
+      locale: const Locale('en', 'GB'),
       initialDate: state.runAt.isBefore(now) ? now : state.runAt,
       firstDate: DateTime(now.year, now.month, now.day),
       lastDate: DateTime(now.year + 3, 12, 31));
