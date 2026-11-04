@@ -3,9 +3,20 @@ $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $folder=Join-Path $root 'flutter_port'
 $bridge=Join-Path $folder 'windows_bridge.ps1'
-$tokens=$null;$errors=$null
-[void][System.Management.Automation.Language.Parser]::ParseFile($bridge,[ref]$tokens,[ref]$errors)
-if(@($errors).Count){throw "Flutter bridge does not parse: $($errors[0].Message)"}
+# A frontend can fail at startup because it dot-sources the backend. Parse
+# the entire load chain before the costly Flutter install, not just the bridge.
+foreach($relative in @(
+    'flutter_port/windows_bridge.ps1','CodexRunEngine.ps1',
+    'CodexQuotaContinuation.ps1','CodexData.ps1',
+    'CodexResumeScheduler.ps1','components/JobOutcomes/JobOutcomes.psm1'
+)){
+    $file=Join-Path $root $relative
+    $tokens=$null;$errors=$null
+    [void][System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)
+    if(@($errors).Count){
+        throw "Flutter startup dependency does not parse: $relative line $($errors[0].Extent.StartLineNumber): $($errors[0].Message)"
+    }
+}
 foreach($relative in @('pubspec.yaml','lib/main.dart','lib/aero_bar.dart',
         'lib/bridge.dart','lib/scheduler_controller.dart','lib/dashboard_skin.dart','lib/dashboard_frame.dart',
         'lib/dashboard_workbench.dart','lib/dashboard_monitor.dart','lib/date_labels.dart','lib/desktop_window.dart',
