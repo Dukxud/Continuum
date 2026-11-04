@@ -201,12 +201,13 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
             draft.shimmer,0,200,0,(v)=>preview(draft.copyWith(shimmer:v)))),
           _at(0,570,566,40,_settingsSlider('Reflection speed',
             draft.speed,25,300,0,(v)=>preview(draft.copyWith(speed:v)))),
-          _at(20,617,350,30,CheckboxListTile(
-            value:draft.aero,controlAffinity:ListTileControlAffinity.leading,
-            contentPadding:EdgeInsets.zero,dense:true,
-            title:const Text('Enable Aero Liquid optics',
-              style:TextStyle(fontFamily:'Segoe UI',fontSize:13)),
-            onChanged:(v){if(v!=null)preview(draft.copyWith(aero:v));})),
+          _at(20,617,350,30,Row(children:[
+            Checkbox(value:draft.aero,materialTapTargetSize:MaterialTapTargetSize.shrinkWrap,
+              visualDensity:VisualDensity.compact,
+              onChanged:(v){if(v!=null)preview(draft.copyWith(aero:v));}),
+            const SizedBox(width:5),
+            _label('Enable Aero Liquid optics'),
+          ])),
           _at(20,648,520,23,_label(
             diagnostic!=null?'Aero Liquid unavailable: '+diagnostic:
               draft.aero?'Aero Liquid: Flutter GPU renderer':'Aero optics disabled',

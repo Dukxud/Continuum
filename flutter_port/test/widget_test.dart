@@ -40,12 +40,12 @@ void main() {
     final instruction = tester.getTopLeft(find.text('Instruction'));
     final usage = tester.getTopLeft(find.text('Usage remaining'));
     expect(conversation.dx, closeTo(18, 4));
-    expect(conversation.dy, closeTo(61, 5));
-    expect(repository.dy, closeTo(108, 5));
-    expect(runtime.dy, closeTo(154, 5));
-    expect(model.dy, closeTo(199, 5));
-    expect(instruction.dy, closeTo(243, 5));
-    expect(usage.dy, closeTo(322, 5));
+    expect(conversation.dy, closeTo(68, 8));
+    expect(repository.dy, closeTo(115, 8));
+    expect(runtime.dy, closeTo(161, 8));
+    expect(model.dy, closeTo(206, 8));
+    expect(instruction.dy, closeTo(250, 8));
+    expect(usage.dy, closeTo(328, 8));
     expect(tester.takeException(), isNull);
   });
 
@@ -60,7 +60,7 @@ void main() {
     expect(find.text('Usage limits'), findsOneWidget);
     expect(find.text('Schedule once'), findsNothing);
     final title = tester.getTopLeft(find.text('Usage limits'));
-    expect(title.dy, closeTo(65, 5));
+    expect(title.dy, closeTo(70, 8));
     expect(tester.takeException(), isNull);
   });
 

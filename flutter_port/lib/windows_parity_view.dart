@@ -357,7 +357,7 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
     final visibleCount=state.quotaWindows.isEmpty?1:math.min(2,state.quotaWindows.length);
     final totalHeight=cardTop+visibleCount*117+58;
     final children=<Widget>[
-      if(hasRun)...[
+      if(run!=null)...[
         _at(18,65,430,26,_label('Next run',fontSize:16,bold:true)),
         _at(18,91,428,129,_compactRunSurface(run)),
       ],
