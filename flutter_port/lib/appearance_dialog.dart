@@ -83,7 +83,8 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
           Expanded(child: Text(caption,
             style: const TextStyle(fontWeight: FontWeight.w700))),
           SizedBox(width: 192, child: DropdownButtonFormField<String>(
-            isExpanded: true, value: value,
+            key: ValueKey('$kind:$selected'),
+            isExpanded: true, initialValue: value,
             decoration: const InputDecoration(isDense: true),
             items: [
               for (final name in AeroAppearance.presetColors.keys)
@@ -151,7 +152,8 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
           colorEditor('working', 'Working color', 100, working: true),
           const Divider(height: 22),
           DropdownButtonFormField<int>(
-            isExpanded: true, value: draft.finish,
+            key: ValueKey('finish:${draft.finish}'),
+            isExpanded: true, initialValue: draft.finish,
             decoration: const InputDecoration(labelText: 'Liquid material'),
             items: const [
               DropdownMenuItem(value: 0, child: Text('Optical glass')),
@@ -162,7 +164,8 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<int>(
-            isExpanded: true, value: draft.lighting,
+            key: ValueKey('lighting:${draft.lighting}'),
+            isExpanded: true, initialValue: draft.lighting,
             decoration: const InputDecoration(labelText: 'Studio lighting'),
             items: const [
               DropdownMenuItem(value: 0, child: Text('Product studio')),

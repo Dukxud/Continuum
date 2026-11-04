@@ -199,7 +199,8 @@ class _SchedulerHomeState extends State<SchedulerHome> {
       : null;
     return Column(children: [
       section('CONVERSATION', DropdownButtonFormField<String>(
-        value: validSessions ? state.sessionId : null,
+        key: ValueKey('session:${state.sessionId}'),
+        initialValue: validSessions ? state.sessionId : null,
         isExpanded: true,
         decoration: const InputDecoration(labelText: 'Saved CLI conversation'),
         hint: const Text('Select conversation'),
@@ -258,7 +259,8 @@ class _SchedulerHomeState extends State<SchedulerHome> {
           ? (constraints.maxWidth - 24) / 3 : constraints.maxWidth;
         return Wrap(spacing: 12, runSpacing: 10, children: [
           SizedBox(width: width, child: DropdownButtonFormField<String>(
-            isExpanded: true, value: validModels ? state.model : null,
+            key: ValueKey('model:${state.model}'),
+            isExpanded: true, initialValue: validModels ? state.model : null,
             decoration: const InputDecoration(labelText: 'Model'),
             items: state.models.map((m) => DropdownMenuItem(
               value: stringField(m, 'id'),
@@ -266,15 +268,17 @@ class _SchedulerHomeState extends State<SchedulerHome> {
                 stringField(m, 'name'), overflow: TextOverflow.ellipsis))).toList(),
             onChanged: state.selectModel)),
           SizedBox(width: width, child: DropdownButtonFormField<String>(
+            key: ValueKey('reasoning:${state.model}:${state.effort}'),
             isExpanded: true,
-            value: efforts.contains(state.effort) ? state.effort : null,
+            initialValue: efforts.contains(state.effort) ? state.effort : null,
             decoration: const InputDecoration(labelText: 'Reasoning'),
             items: efforts.map((e) => DropdownMenuItem(value: e,
               child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
             onChanged: (value) { if (value != null) state.edit(reasoning: value); })),
           SizedBox(width: width, child: DropdownButtonFormField<String>(
+            key: ValueKey('access:${state.access}'),
             isExpanded: true,
-            value: state.access,
+            initialValue: state.access,
             decoration: const InputDecoration(labelText: 'Access'),
             items: const [
               DropdownMenuItem(value: 'workspace-write', child: Text('Workspace write',
