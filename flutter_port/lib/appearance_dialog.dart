@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'aero_appearance.dart';
 import 'aero_bar.dart';
+import 'windows_icons.dart';
 
 /// A transactional, live-preview editor for the v1.16 appearance contract.
 /// The caller applies onPreview temporarily and restores initial on Cancel.
@@ -102,7 +103,7 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
       key:key,value:selected,isExpanded:true,isDense:true,
       items:items,onChanged:onChanged,
       style:const TextStyle(fontFamily:'Segoe UI',fontSize:13,color:Color(0xff253a58)),
-      icon:const Icon(Icons.arrow_drop_down,size:19,color:Color(0xff253a58)),
+      icon:const WindowsCaret(),
     )),
   );
 
@@ -167,7 +168,7 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
     _at(158,y,315,40,Slider(value:value.toDouble(),min:low.toDouble(),
       max:high.toDouble(),onChanged:(v)=>changed(v.round()))),
     _at(481,y+4,62,25,Align(alignment:Alignment.centerRight,
-      child:Text(value.toString()+'%',style:const TextStyle(fontSize:13)))),
+      child:Text(value.toString()+'%',style:const TextStyle(fontFamily:'Segoe UI',fontSize:13)))),
   ]);
 
   @override

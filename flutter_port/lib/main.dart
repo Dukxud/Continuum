@@ -8,6 +8,7 @@ import 'aero_bar.dart';
 import 'aero_appearance.dart';
 import 'appearance_dialog.dart';
 import 'desktop_window.dart';
+import 'windows_icons.dart';
 import 'bridge.dart';
 import 'scheduler_controller.dart';
 
