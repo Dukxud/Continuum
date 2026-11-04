@@ -30,12 +30,24 @@ function Get-RecentCliSessions {
                 # Do not include IDE, subagent or unknown session sources.
                 if ($meta.source -notin @('cli','exec') -or $meta.id -notmatch $sessionIdPattern) { continue }
                 if (-not $seen.Add([string]$meta.id)) { continue }
-                $name = if ($meta.cwd) { Split-Path -Leaf ([string]$meta.cwd) } else { 'CLI session' }
+                # The cwd folder name alone makes unrelated conversations
+                # look identical (e.g. dozens named after the home directory).
+                # Label only verified Git roots as repositories; retain the
+                # timestamp and a short unique suffix for all other sessions.
+                $cwd = [string]$meta.cwd
+                $gitRoot = Get-RepositoryRoot $cwd
+                $folder = if ($cwd) { Split-Path -Leaf $cwd.TrimEnd([char[]]@('/','\')) } else { 'unknown folder' }
+                $name = if ($gitRoot) {
+                    'Git: ' + (Split-Path -Leaf $gitRoot.TrimEnd([char[]]@('/','\')))
+                } else {
+                    'Outside Git: ' + $folder
+                }
+                $shortId = ([string]$meta.id).Substring(28)
                 $sessions += [pscustomobject]@{
                     Id = [string]$meta.id
-                    Cwd = [string]$meta.cwd
+                    Cwd = $cwd
                     File = [string]$item.FullName
-                    Display = ('{0} | {1:MM/dd HH:mm} | {2}' -f $name,$item.LastWriteTime,$meta.id)
+                    Display = ('{0} | {1:MM/dd HH:mm} | {2}' -f $name,$item.LastWriteTime,$shortId)
                 }
                 if ($sessions.Count -ge 30) { break }
             } catch { continue }
