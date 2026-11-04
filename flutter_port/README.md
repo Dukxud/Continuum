@@ -15,6 +15,23 @@ authored and passed in earlier builds, but renewed native visual, sizing,
 accessibility and real scheduling/cancellation acceptance on BLACK-PUDDLE
 are required for this revision. See docs/FLUTTER-PARITY.md.
 
+## Quota auto-resume — optional and bounded
+
+The **Auto-resume if usage limits stop Codex** switch in the handoff is off by
+default. When enabled for a **new** scheduled run, the pinned Windows worker may
+register one new continuation at the verified exhausted-model reset + 60 seconds.
+It keeps the session, account, Git repository, branch, model and permissions,
+and refuses automatic continuation on generic errors or missing thread data.
+Each continuation counts toward a hard maximum of **three** follow-ups.
+**Waiting for quota** appears in the pending list and can be cancelled.
+WinForms and existing jobs retain their original one-shot semantics; old
+`autoResume` fields alone do not activate this feature.
+
+This is a Windows Task Scheduler feature, not a Codex CLI flag. It requires an
+interactive signed-in Windows desktop at execution time. It does not retry
+indefinitely or guarantee quota becomes available. See
+[`docs/QUOTA-CONTINUATION-DESIGN.md`](../docs/QUOTA-CONTINUATION-DESIGN.md).
+
 ## Run (Windows review)
 
 1. Install Flutter stable (3.47+), Visual Studio C++ desktop toolchain,
