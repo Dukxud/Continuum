@@ -19,8 +19,16 @@ class StubAdapter implements SchedulerAdapter {
         'logDirectory': r'C:\scheduler\logs', 'settings': null};
     }
     if (action == 'usage') {
-      return {'ok': true, 'models': [], 'model': null, 'windows': [],
-        'accountId': null, 'ordinaryUsageAllowed': null};
+      return {'ok': true,
+        'models': [{'id': 'gpt-test', 'name': 'Test model',
+          'efforts': ['medium'], 'defaultEffort': 'medium', 'isDefault': true}],
+        'model': 'gpt-test',
+        'windows': [
+          {'label': '5-hour', 'remainingPercent': 71.0, 'resetsAt': 1793736000},
+          {'label': 'Weekly', 'remainingPercent': 45.0, 'resetsAt': 1794200000}
+        ],
+        'accountId': 'workspace-sha256:' + 'a' * 64,
+        'ordinaryUsageAllowed': true};
     }
     return {'pending': [], 'history': []};
   }
@@ -61,6 +69,10 @@ void main() {
     expect(find.text('Schedule once'), findsNothing);
     final title = tester.getTopLeft(find.text('Usage limits'));
     expect(title.dy, closeTo(70, 8));
+    final primary = tester.getTopLeft(find.text('5-hour'));
+    final secondary = tester.getTopLeft(find.text('Weekly'));
+    expect(primary.dy, lessThan(secondary.dy));
+    expect(secondary.dy - primary.dy, closeTo(117, 7));
     expect(tester.takeException(), isNull);
   });
 
