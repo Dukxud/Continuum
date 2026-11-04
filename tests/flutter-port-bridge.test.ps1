@@ -23,6 +23,46 @@ foreach($action in @('load','pending')){
     Write-Host "Flutter Windows $action read-only integration PASS." -ForegroundColor Green
 }
 
+# A real Windows bridge integration check: the same CodexData functions used
+# by WinForms must resolve the Git root for a selected saved CLI session.
+# A disposable CODEX_HOME prevents access to the operator's real conversations.
+$originalCodexHome=$env:CODEX_HOME
+$fixture=Join-Path ([IO.Path]::GetTempPath()) ('flutter-repository-selection-'+[guid]::NewGuid().ToString('N'))
+try {
+    $repository=Join-Path $fixture 'qa-repository'
+    $sessions=Join-Path $fixture 'codex-home\sessions\2026\11\04'
+    [void](New-Item -ItemType Directory -Path $repository,$sessions -Force)
+    & git init -b main $repository | Out-Null
+    if($LASTEXITCODE -ne 0){throw 'Unable to initialize disposable Git fixture.'}
+    $sessionId=[guid]::NewGuid().ToString()
+    $metadata=@{type='session_meta';payload=@{
+        id=$sessionId;source='exec';cwd=$repository
+    }} | ConvertTo-Json -Depth 8 -Compress
+    Set-Content -LiteralPath (Join-Path $sessions ('rollout-'+$sessionId+'.jsonl')) -Value $metadata -Encoding utf8
+    $env:CODEX_HOME=Join-Path $fixture 'codex-home'
+    $payload=@{sessionId=$sessionId} | ConvertTo-Json -Compress
+    $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
+    $output=@(& pwsh -NoLogo -NoProfile -NonInteractive -STA -File $bridge -Action select -Payload $encoded)
+    if($LASTEXITCODE -ne 0 -or -not $output){throw 'Real bridge could not select disposable Codex session.'}
+    $answer=($output | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+    if($answer.ok -ne $true -or $answer.result.sessionId -cne $sessionId){
+        throw "Bridge selected wrong session: $($answer.error)"
+    }
+    $actual=[string]$answer.result.found.Root
+    $expected=(& git -C $repository rev-parse --show-toplevel)
+    if($LASTEXITCODE -ne 0){throw 'Git root verification failed.'}
+    $actual=$actual.Replace('\','/').TrimEnd('/')
+    $expected=([string]$expected).Replace('\','/').TrimEnd('/')
+    if($actual -ine $expected){
+        throw "Flutter bridge must resolve the original CodexData Git root. Expected '$expected', found '$actual'."
+    }
+    Write-Host 'Flutter real bridge selected disposable Git-backed CLI session PASS.' -ForegroundColor Green
+} finally {
+    if($null -eq $originalCodexHome){Remove-Item Env:CODEX_HOME -ErrorAction SilentlyContinue}
+    else{$env:CODEX_HOME=$originalCodexHome}
+    if(Test-Path -LiteralPath $fixture){Remove-Item -LiteralPath $fixture -Recurse -Force}
+}
+
 # Exercise Flutter's actual JSON-in/JSON-out scheduling boundary, without
 # contacting Codex or registering any task: the all-zero session is unverified
 # and the repository path is deliberately empty.
