@@ -466,7 +466,8 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
       stringField(r,'Name')==selectedRun &&
       stringField(r,'Status')=='Scheduled');
     if(matches.isEmpty){toast('Select a future scheduled run.');return;}
-    if(!await confirm('Cancel selected','Cancel this task in Windows Task Scheduler?'))return;
+    // Selection is the user's explicit cancellation intent. The Windows
+    // adapter still refuses cancellation after a task has started.
     try{
       final result=await state.cancel(selectedRun!);
       selectedRun=null;
