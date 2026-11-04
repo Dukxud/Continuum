@@ -7,7 +7,8 @@ $tokens=$null;$errors=$null
 [void][System.Management.Automation.Language.Parser]::ParseFile($bridge,[ref]$tokens,[ref]$errors)
 if(@($errors).Count){throw "Flutter bridge does not parse: $($errors[0].Message)"}
 foreach($relative in @('pubspec.yaml','lib/main.dart','lib/aero_bar.dart',
-        'lib/bridge.dart','lib/scheduler_controller.dart','lib/windows_parity_view.dart','lib/windows_icons.dart','lib/desktop_window.dart',
+        'lib/bridge.dart','lib/scheduler_controller.dart','lib/dashboard_skin.dart','lib/dashboard_frame.dart',
+        'lib/dashboard_workbench.dart','lib/dashboard_monitor.dart','lib/date_labels.dart','lib/desktop_window.dart',
         'lib/aero_appearance.dart','lib/appearance_dialog.dart','test/appearance_test.dart','test/widget_test.dart',
         'test/logic_test.dart','test/aero_static_test.dart','test/window_mode_test.dart','test/windows_adapter_integration_test.dart','test/parity_capture_test.dart','Build-WindowsPreview.ps1','Run-WindowsReview.ps1','README.md')){
     if(-not (Test-Path -LiteralPath (Join-Path $folder $relative) -PathType Leaf)){throw "Missing Flutter file: $relative"}
