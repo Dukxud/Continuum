@@ -8,8 +8,13 @@ class StubAdapter implements SchedulerAdapter {
   StubAdapter({this.includePending = false, this.pendingCount = 0});
   final bool includePending;
   final int pendingCount;
+  final List<String> cancellations = [];
   @override
   Future<Map<String, dynamic>> call(String action, [Map<String, dynamic> payload = const {}]) async {
+    if (action == 'cancel') {
+      cancellations.add(payload['name'] as String);
+      return {'status': 'Cancelled', 'warning': ''};
+    }
     if (action == 'load') {
       return {'sessions': [], 'pending': pendingCount > 0
         ? List.generate(pendingCount, (i) => {
@@ -128,6 +133,30 @@ void main() {
     await tester.drag(list, const Offset(0, -300));
     await tester.pump();
     expect(find.text('Scheduled item 7'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('cancel selected goes directly to Windows adapter without confirmation',
+      (tester) async {
+    tester.view.physicalSize = const Size(940, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final adapter = StubAdapter(pendingCount: 1);
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(adapter: adapter)));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.text('Upcoming runs (1)'), findsOneWidget);
+    await tester.tap(find.text('Scheduled item 1'));
+    await tester.pump();
+    expect(find.text('Cancel selected'), findsOneWidget);
+    await tester.tap(find.text('Cancel selected'));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(adapter.cancellations, [
+      'CodexResume-20261103-1900-00000001',
+    ]);
+    expect(find.byType(AlertDialog), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
