@@ -31,6 +31,22 @@ function Read-UsageState {
     return $state
 }
 
+# Read-only App Server check. A cleanup diagnostic can follow an actual
+# quota failure, but only a still-readable conversation may be rescheduled.
+function Assert-CodexConversationAvailable {
+    param([Parameter(Mandatory)][string]$SessionId)
+    $helper=Join-Path $PSScriptRoot 'CodexUsage.js'
+    $cli=Get-CodexCliJs
+    $lines=@(& node.exe $helper --cli-js $cli --thread-id $SessionId)
+    if($LASTEXITCODE -ne 0 -or $lines.Count -eq 0){
+        throw 'Codex conversation could not be read; automatic continuation refused.'
+    }
+    $thread=($lines | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+    if($thread.ok -ne $true -or [string]$thread.threadId -cne $SessionId){
+        throw 'Codex returned no matching resumable conversation.'
+    }
+}
+
 function Assert-ModelEffortSupported {
     param([object[]]$Models, [string]$Model, [string]$Effort)
     $entry = @($Models | Where-Object { $_.id -ceq $Model }) | Select-Object -First 1
@@ -117,6 +133,7 @@ function Try-DeferCodexQuotaJob {
     $at=Get-VerifiedQuotaContinuationTime -Quota $Quota -AccountId ([string]$Job.accountId) -Model ([string]$Job.model)
     if(-not $at){Write-Warning 'Quota exhausted, but no verified future reset for this model/workspace; no automatic continuation.';return $false}
     try {
+        Assert-CodexConversationAvailable -SessionId ([string]$Job.sessionId)
         $child=Register-CodexQuotaContinuation -Job $Job -JobFile $JobFile -AppDirectory $AppDirectory -RuntimeDirectory $RuntimeDirectory -When $at
         Set-CodexRunOutcome -JobFile $JobFile -Status 'deferred' -Attempt ([int]$Job.retryAttempt) -ExitCode $ExitCode -NextJob $child.Name -Message "Waiting for verified quota reset at $($child.When.ToString('o'))"
         Write-Host "Quota exhausted. One bounded continuation registered: $($child.Name) at $($child.When.ToString('o'))" -ForegroundColor Cyan
@@ -161,7 +178,7 @@ function Invoke-CodexScheduledJob {
         $intentPath=Join-Path $appDir ([IO.Path]::GetFileNameWithoutExtension($JobFile)+'.continuation.json')
         if(Test-Path -LiteralPath $intentPath -PathType Leaf){
             try {
-                $linked=Get-RegisteredCodexQuotaContinuation -Job $job -JobFile $JobFile -Directory $appDir
+                $linked=Get-RegisteredCodexQuotaContinuation -Job $job -JobFile $JobFile -Directory $appDir -RuntimeDirectory $RuntimeDirectory
                 Set-CodexRunOutcome -JobFile $JobFile -Status 'deferred' -Attempt ([int]$job.retryAttempt) -NextJob $linked.Name -Message "Existing quota continuation: $($linked.Name)"
                 Write-Host "Existing continuation preserved: $($linked.Name)" -ForegroundColor Cyan
                 return 0
@@ -179,6 +196,10 @@ function Invoke-CodexScheduledJob {
         Write-Host "Session: $($job.sessionId) | Repository: $root | Branch: $branch"
         Write-Host "Model: $($job.model) | Reasoning: $($job.effort) | Access: $($job.access) | Message: $($job.message)"
         $model = [string]$job.model
+        # A child must still reference a readable original thread at launch.
+        if((Test-CodexContinuationPolicy $job) -and [int]$job.retryAttempt -gt 0){
+            Assert-CodexConversationAvailable -SessionId ([string]$job.sessionId)
+        }
         Assert-ModelEffortSupported (Read-CodexModelCatalog) $model ([string]$job.effort)
         # Every invocation rechecks the pinned workspace and quota before
         # execution. Only explicitly opted-in, verified quota exhaustion may
@@ -244,7 +265,7 @@ function Invoke-CodexScheduledJob {
                 Add-Content -LiteralPath $target -Value "$(Get-Date -Format o) $failure" -ErrorAction Stop
             } catch { }
         }
-        try { Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -ExitCode 1 -Message $failure } catch { }
+        try { Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -ExitCode 1 -Attempt ([int]$job.retryAttempt) -Message $failure } catch { }
         return 1
     } finally {
         # Releasing the writer lock must not depend on transcript shutdown.
