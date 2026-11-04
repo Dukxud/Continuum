@@ -230,7 +230,7 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
   /// Time and instruction are one operation. A single action column, with
   /// deliberate alignment and separation, replaces disconnected row buttons.
   Widget _schedulePanel(SchedulerController state) {
-    final resetAt = recommendedResetRunAt(state.quota);
+    final resetAt = state.resetSuggestion;
     return Stack(children: [
       const _LegacyBand(fill:Color(0xffe8f5fc),accent:Color(0xff2887b5)),
       _at(8,18,132,30,_label('Run at (local)')),
