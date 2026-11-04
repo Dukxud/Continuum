@@ -53,6 +53,11 @@ class WindowAdapter implements SchedulerAdapter {
 
 void main() {
   testWidgets('compact mode changes the host window size, not only controls', (tester) async {
+    // The real noncompact desktop window is at least 940px wide; Flutter's
+    // default 800px test viewport hides the original right-side control.
+    tester.view.physicalSize = const Size(940, 750);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() { tester.view.resetPhysicalSize(); tester.view.resetDevicePixelRatio(); });
     final host = SpyWindowHost();
     await tester.pumpWidget(MaterialApp(home: SchedulerHome(
       adapter: WindowAdapter(startCompact: false),

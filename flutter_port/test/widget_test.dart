@@ -58,13 +58,18 @@ void main() {
   });
 
   testWidgets('original compact mode stacks windows instead of squeezing them together', (tester) async {
-    tester.view.physicalSize = const Size(480, 800);
+    // Real full mode has a 940px minimum width. Switch modes while the
+    // toggle is reachable, then simulate the native compact resize.
+    tester.view.physicalSize = const Size(940, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() { tester.view.resetPhysicalSize(); tester.view.resetDevicePixelRatio(); });
     await tester.pumpWidget(MaterialApp(home: SchedulerHome(adapter: StubAdapter())));
     await tester.pump(const Duration(milliseconds: 150));
     await tester.tap(find.text('Compact mode: OFF'));
     await tester.pump(const Duration(milliseconds: 150));
+    expect(find.text('Compact mode: ON'), findsOneWidget);
+    tester.view.physicalSize = const Size(480, 800);
+    await tester.pump();
     expect(find.text('Usage limits'), findsOneWidget);
     expect(find.text('Schedule once'), findsNothing);
     final title = tester.getTopLeft(find.text('Usage limits'));
