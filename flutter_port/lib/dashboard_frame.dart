@@ -16,13 +16,13 @@ extension _DashboardFrame on _SchedulerHomeState {
               child: Column(children: [
                 SizedBox(height: 72, child: _deckHeader(state)),
                 const SizedBox(height: 17),
-                SizedBox(height: 660, child: Row(
+                SizedBox(height: 702, child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(flex: 7, child: Column(children: [
                       SizedBox(height: 320, child: _sourceCard(state)),
                       const SizedBox(height: 16),
-                      SizedBox(height: 324, child: _launchCard(state)),
+                      SizedBox(height: 366, child: _launchCard(state)),
                     ])),
                     const SizedBox(width: 18),
                     Expanded(flex: 5, child: _monitorColumn(state)),
