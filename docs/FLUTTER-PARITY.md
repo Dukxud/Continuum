@@ -5,6 +5,10 @@ This Flutter candidate is an alternate UI, not a new scheduler engine.
 The Windows bridge invokes the existing verification, pinned-runtime,
 Task Scheduler, history and worker functions; this is not a backend rewrite.
 
+**Complete source-to-behavior traceability, discovered defects, and adversarial
+acceptance cases:** [FLUTTER-BEHAVIOR-AUDIT.md](FLUTTER-BEHAVIOR-AUDIT.md).
+Historical CI or native success applies only to the exact tested commit.
+
 ## Requirements and evidence
 
 | V1.16 behavior | Flutter implementation | Acceptance |
@@ -59,11 +63,13 @@ The accepted Windows sources are `CodexUiForms.ps1`,
   platform accessibility as a workaround. Distinguish any Flutter engine issue
   from UI-specific semantics churn by reproducing with a minimal case.
 
-Native BP152 screenshots confirmed the geometry-based main layout and exposed
-three editor/window issues: clipped controls, explicit Save friction, and
-stale full-mode sizes. The current draft corrects these in source, but the
-revised two-tab editor, auto-save, and serialized native sizing are **not
-accepted** until exact-head Windows CI and renewed BLACK-PUDDLE inspection.
+Native BP152 screenshots exposed editor clipping, Save friction, and
+stale sizing. Owner subsequently reported BP154 **PASS** for tabs, autosave,
+and repeated full/compact switching; BP158/BP159 proved a real read-only
+Codex continuation and clean QA repository. Cancellation disappeared from
+the GUI, but the BP160 independent Windows task/outcome audit is still pending.
+New lifecycle, time, source-selection and quota fixes require a **new
+exact-head** CI and target-device review.
 
 ## Native November 4 scheduling investigation
 
