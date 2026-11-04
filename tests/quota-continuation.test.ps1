@@ -18,8 +18,8 @@ try {
     Require (-not (Test-CodexTerminalQuotaFailure -EventsPath $events)) 'Generic failure or agent text must not trigger quota retry.'
     # Exact BP169 ordering: terminal quota event followed by the rollout
     # recorder's secondary stderr. Worker thread/read must decide recoverability.
-    @('{"type":"error","message":"You’ve hit your usage limit. Try again at Nov 8th, 2026 9:58 AM."}',
-      '{"type":"turn.failed","error":{"message":"You’ve hit your usage limit. Try again at Nov 8th, 2026 9:58 AM."}}',
+    @('{"type":"error","message":"You\u2019ve hit your usage limit. Try again at Nov 8th, 2026 9:58 AM."}',
+      '{"type":"turn.failed","error":{"message":"You\u2019ve hit your usage limit. Try again at Nov 8th, 2026 9:58 AM."}}',
       '2026-11-04T21:20:52Z ERROR codex_core::session: failed to record rollout items: thread 00000000-0000-0000-0000-000000000001 not found') | Set-Content -LiteralPath $events
     Require (Test-CodexTerminalQuotaFailure -EventsPath $events) 'BP169 quota failure should reach authoritative thread verification.'
     '{"type":"turn.failed","error":{"message":"Usage limit; thread 00000000-0000-0000-0000-000000000001 not found"}}' | Set-Content -LiteralPath $events
