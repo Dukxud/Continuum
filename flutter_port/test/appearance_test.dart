@@ -47,7 +47,7 @@ void main() {
   });
 
   testWidgets('both appearance tabs and Done are visible at normal window height', (tester) async {
-    tester.view.physicalSize = const Size(900, 566);
+    tester.view.physicalSize = const Size(1000, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
@@ -68,30 +68,30 @@ void main() {
     )));
     await tester.tap(find.text('Open editor'));
     await tester.pump(const Duration(milliseconds: 200));
-    expect(find.text('5-hour color'), findsOneWidget);
-    expect(find.text('Weekly color'), findsOneWidget);
-    expect(find.text('Countdown color'), findsOneWidget);
-    expect(find.text('Working color'), findsOneWidget);
+    expect(find.text('5-HOUR COLOR'), findsOneWidget);
+    expect(find.text('WEEKLY COLOR'), findsOneWidget);
+    expect(find.text('COUNTDOWN COLOR'), findsOneWidget);
+    expect(find.text('WORKING COLOR'), findsOneWidget);
     expect(find.text('Changes are saved automatically.'), findsOneWidget);
     expect(find.text('Done'), findsOneWidget);
     expect(find.text('Save and close'), findsNothing);
-    expect(tester.getBottomRight(find.text('Done')).dy, lessThan(566));
+    expect(tester.getBottomRight(find.text('Done')).dy, lessThan(800));
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('Optics'));
     await tester.pump(); // Begin the TabBarView transition.
     await tester.pump(const Duration(milliseconds: 400));
     expect(DefaultTabController.of(tester.element(find.byType(TabBar))).index, 1);
-    expect(find.text('Liquid material'), findsOneWidget);
-    expect(find.text('Studio lighting'), findsOneWidget);
-    expect(find.text('Reflection strength'), findsOneWidget);
-    expect(find.text('Reflection speed'), findsOneWidget);
+    expect(find.text('LIQUID MATERIAL'), findsOneWidget);
+    expect(find.text('STUDIO LIGHTING'), findsOneWidget);
+    expect(find.text('REFLECTION STRENGTH'), findsOneWidget);
+    expect(find.text('REFLECTION SPEED'), findsOneWidget);
     expect(find.text('Enable Aero Liquid optics'), findsOneWidget);
     expect(find.byType(Slider), findsNWidgets(2));
     // Preserve the Windows accessibility workaround on both sliders.
     expect(find.byType(Overlay), findsAtLeastNWidgets(3));
     expect(find.text('Done'), findsOneWidget);
-    expect(tester.getBottomRight(find.text('Done')).dy, lessThan(566));
+    expect(tester.getBottomRight(find.text('Done')).dy, lessThan(800));
     await tester.tap(find.byType(Checkbox));
     await tester.pump(const Duration(milliseconds: 150));
     expect(last.aero, isFalse);
