@@ -4,12 +4,20 @@ import 'package:codex_resume_flutter/main.dart';
 import 'package:codex_resume_flutter/bridge.dart';
 
 class StubAdapter implements SchedulerAdapter {
-  StubAdapter({this.includePending = false});
+  StubAdapter({this.includePending = false, this.pendingCount = 0});
   final bool includePending;
+  final int pendingCount;
   @override
   Future<Map<String, dynamic>> call(String action, [Map<String, dynamic> payload = const {}]) async {
     if (action == 'load') {
-      return {'sessions': [], 'pending': includePending ? [
+      return {'sessions': [], 'pending': pendingCount > 0
+        ? List.generate(pendingCount, (i) => {
+          'Name': 'CodexResume-20261103-1900-${(i + 1).toRadixString(16).padLeft(8, '0')}',
+          'When': '2026-11-03T19:00:00', 'Repo': r'C:\projects\fixture',
+          'Description': 'Scheduled item ${i + 1}',
+          'Session': '11111111-1111-1111-1111-111111111111',
+          'Status': 'Scheduled', 'CreatedAt': 1793732400,
+        }) : includePending ? [
         {'Name': 'CodexResume-20261103-1900-abcd1234',
           'When': '2026-11-03T19:00:00', 'Repo': r'C:\projects\long-repository-name',
           'Description': 'medium | read-only | long scheduled instruction',
@@ -100,6 +108,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('all scheduled tasks remain reachable by scrolling four-row grid', (tester) async {
+    tester.view.physicalSize = const Size(940, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: StubAdapter(pendingCount: 7))));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.text('Upcoming runs (7)'), findsOneWidget);
+    final list = find.byKey(const PageStorageKey<String>('upcoming-run-list'));
+    expect(list, findsOneWidget);
+    await tester.drag(list, const Offset(0, -300));
+    await tester.pump();
+    expect(find.text('Scheduled item 7'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final width in [320.0, 800.0, 1024.0]) {
     testWidgets('Scheduler has no overflow at width '+width.toString(), (tester) async {
       tester.view.physicalSize = Size(width, 900);
@@ -115,7 +142,7 @@ void main() {
       expect(find.text('Schedule a continuation'), findsOneWidget);
       expect(find.text('Schedule once'), findsOneWidget);
       expect(find.text('Usage remaining'), findsOneWidget);
-      expect(find.text('Upcoming runs'), findsOneWidget);
+      expect(find.text('Upcoming runs (1)'), findsOneWidget);
       await tester.ensureVisible(find.text('Recent runs'));
       await tester.pump();
       expect(tester.takeException(), isNull);

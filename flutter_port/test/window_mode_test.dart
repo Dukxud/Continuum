@@ -23,9 +23,11 @@ class SpyWindowHost implements SchedulerWindowHost {
 }
 
 class WindowAdapter implements SchedulerAdapter {
-  WindowAdapter({required this.startCompact, this.hasRun = false});
+  WindowAdapter({required this.startCompact, this.hasRun = false,
+    this.quotaWindowCount = 0});
   final bool startCompact;
   final bool hasRun;
+  final int quotaWindowCount;
   @override
   Future<Map<String, dynamic>> call(String action,
       [Map<String, dynamic> payload = const {}]) async {
@@ -45,7 +47,10 @@ class WindowAdapter implements SchedulerAdapter {
       return {'ok': true, 'model': payload['model'] ?? 'gpt-test',
         'models': [{'id': 'gpt-test', 'efforts': ['medium']},
           {'id': 'gpt-run', 'efforts': ['medium']}],
-        'windows': [], 'ordinaryUsageAllowed': true,
+        'windows': List.generate(quotaWindowCount, (i) => {
+          'label': i == 0 ? '5-hour' : 'Weekly',
+          'remainingPercent': 70.0,
+        }), 'ordinaryUsageAllowed': true,
         'accountId': 'workspace-sha256:' + 'a' * 64};
     }
     if (action == 'pending') {
@@ -73,6 +78,19 @@ void main() {
     expect(host.modes, contains('compact:empty:quota:0'));
     expect(find.text('Schedule once'), findsNothing);
     expect(find.text('Usage limits unavailable'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('compact host follows quota availability without synthetic cards', (tester) async {
+    final host = SpyWindowHost();
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: WindowAdapter(startCompact: true, quotaWindowCount: 2),
+      windowHost: host)));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(host.modes, contains('compact:empty:quota:2'));
+    expect(find.text('Usage limits'), findsOneWidget);
+    expect(find.text('5-hour'), findsOneWidget);
+    expect(find.text('Weekly'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
