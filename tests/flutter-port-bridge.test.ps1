@@ -48,5 +48,5 @@ Assert-ScheduleRejected -RunAt $future -Expected 'Selected CLI session not verif
 Assert-ScheduleRejected -RunAt ($future+'Z') -Expected 'Invalid local run time.'
 Assert-ScheduleRejected -RunAt ($future+'-06:00') -Expected 'Invalid local run time.'
 Assert-ScheduleRejected -RunAt '2026-11-04 10:13:00' -Expected 'Invalid local run time.'
-Assert-ScheduleRejected -RunAt '2026-11-04T10:13:00' -Expected 'Choose a time at least 30 seconds ahead.'
+Assert-ScheduleRejected -RunAt ((Get-Date).AddMinutes(-3).ToString('yyyy-MM-ddTHH:mm:ss',[Globalization.CultureInfo]::InvariantCulture)) -Expected 'Choose a time at least 30 seconds ahead.'
 Write-Host 'Flutter strict local-time JSON schedule preflight PASS (no task mutation).' -ForegroundColor Green
