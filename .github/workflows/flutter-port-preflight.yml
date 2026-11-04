@@ -55,7 +55,20 @@ jobs:
       - name: Flutter widget and logic tests
         shell: pwsh
         working-directory: flutter_port
-        run: flutter test
+        run: flutter test --exclude-tags visual-capture
+
+      - name: Capture unapproved UI evidence frames (not GPU parity)
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter test test/parity_capture_test.dart --update-goldens
+
+      - name: Attach UI evidence for adversarial comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-ui-captures-${{ github.event.pull_request.head.sha }}
+          path: flutter_port/test/captures/*.png
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Windows compilation without launching jobs
         shell: pwsh

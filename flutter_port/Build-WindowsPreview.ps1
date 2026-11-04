@@ -35,7 +35,7 @@ try{
     if($LASTEXITCODE -ne 0){throw 'Flutter dependencies failed.'}
     & $flutter.Source analyze --no-fatal-infos
     if($LASTEXITCODE -ne 0){throw 'Dart analyzer found errors; preview was not launched.'}
-    & $flutter.Source test
+    & $flutter.Source test --exclude-tags visual-capture
     if($LASTEXITCODE -ne 0){throw 'Flutter tests failed. No preview will be built.'}
     & $flutter.Source build windows --release
     if($LASTEXITCODE -ne 0){throw 'Flutter release build failed.'}

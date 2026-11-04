@@ -24,7 +24,7 @@ try{
     if($LASTEXITCODE -ne 0){throw 'Flutter dependencies failed.'}
     & $flutter.Source analyze --no-fatal-infos
     if($LASTEXITCODE -ne 0){throw 'Dart analyzer found errors; preview was not launched.'}
-    & $flutter.Source test
+    & $flutter.Source test --exclude-tags visual-capture
     if($LASTEXITCODE -ne 0){throw 'Flutter test failed; preview was not started.'}
     if($TestsOnly){Write-Host 'Flutter tests passed; review launch skipped.' -ForegroundColor Green;return}
     & $flutter.Source run -d windows
