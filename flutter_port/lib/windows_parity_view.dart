@@ -298,7 +298,7 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
       ])),
       for(final run in _noMoreThanFour)
         SizedBox(height:40,child:InkWell(
-          onTap:()=>setState(()=>selectedRun=stringField(run,'Name')),
+          onTap:()=>selectRun(stringField(run,'Name')),
           child:Container(
             color:selectedRun==stringField(run,'Name')?const Color(0xffd9e7f7):Colors.white,
             child:Row(children:[

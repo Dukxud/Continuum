@@ -41,10 +41,6 @@ class SchedulerApp extends StatelessWidget {
         filled: true, fillColor: Colors.white, isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(6))),
-      cardTheme: CardThemeData(
-        color: Colors.white, elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(9), side: const BorderSide(color: edge))),
     ),
     home: SchedulerHome(windowHost: windowHost),
   );
@@ -65,6 +61,12 @@ class _SchedulerHomeState extends State<SchedulerHome> {
   final instruction = TextEditingController();
   bool hydrated = false;
   String? selectedRun;
+
+  // State mutations belong to the State subclass, not its UI-only extension.
+  void selectRun(String name) {
+    setState(() => selectedRun = name);
+  }
+
   bool _dialogOpen = false;
   String _lastWindowKey = '';
 
