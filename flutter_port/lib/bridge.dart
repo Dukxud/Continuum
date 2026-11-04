@@ -166,38 +166,13 @@ String countdownText(DateTime? due, [DateTime? now]) {
   return '${remainder}s';
 }
 
-/// Preserve the original 0–100 integer fraction instead of forwarding
-/// negative/>100 or subpixel percentages to the shader.
+/// Preserve the WinForms integer (0–100) elapsed fraction, or unknown.
 int? runElapsedPercent(DateTime? due, Object? createdAt, [DateTime? now]) {
   if (due == null || createdAt is! int ||
-      !RegExp(r'^\d{9,12}
-  String d(int value) => value.toString().padLeft(2, '0');
-  return date.year.toString() + '-' + d(date.month) + '-' + d(date.day) +
-      'T' + d(date.hour) + ':' + d(date.minute) + ':00';
-}
-
-DateTime nextWholeMinute(DateTime date) {
-  final base = DateTime(date.year, date.month, date.day, date.hour, date.minute);
-  return base.isBefore(date) ? base.add(const Duration(minutes: 1)) : base;
-}
-DateTime suggestedRunAt([DateTime? now]) =>
-    nextWholeMinute((now ?? DateTime.now()).add(const Duration(minutes: 2)));
-DateTime earliestRunAt([DateTime? now]) =>
-    nextWholeMinute((now ?? DateTime.now()).add(const Duration(seconds: 30)));
-DateTime stepRunAt(DateTime current, int direction, [DateTime? now]) {
-  if (direction != 1 && direction != -1) throw ArgumentError('Invalid direction.');
-  final candidate = current.add(Duration(minutes: direction));
-  final earliest = earliestRunAt(now);
-  if (!candidate.isBefore(earliest)) return candidate;
-  return direction == 1 ? earliest : current;
-}
-).hasMatch(createdAt.toString())) {
-    return null;
-  }
+      !RegExp(r'^\d{9,12}$').hasMatch(createdAt.toString())) return null;
   try {
     final start = DateTime.fromMillisecondsSinceEpoch(createdAt * 1000, isUtc: true);
-    final end = due.toUtc();
-    final duration = end.difference(start).inMicroseconds;
+    final duration = due.toUtc().difference(start).inMicroseconds;
     if (duration <= 0) return null;
     final elapsed = (now ?? DateTime.now()).toUtc().difference(start).inMicroseconds;
     return (100.0 * elapsed / duration).clamp(0.0, 100.0).round();
