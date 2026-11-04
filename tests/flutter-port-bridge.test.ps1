@@ -22,3 +22,31 @@ foreach($action in @('load','pending')){
     }
     Write-Host "Flutter Windows $action read-only integration PASS." -ForegroundColor Green
 }
+
+# Exercise Flutter's actual JSON-in/JSON-out scheduling boundary, without
+# contacting Codex or registering any task: the all-zero session is unverified
+# and the repository path is deliberately empty.
+function Assert-ScheduleRejected {
+    param([Parameter(Mandatory)][string]$RunAt,[Parameter(Mandatory)][string]$Expected)
+    $payload=@{
+        sessionId='00000000-0000-0000-0000-000000000000'
+        runAt=$RunAt
+        repo=''
+    } | ConvertTo-Json -Compress
+    $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
+    $output=@(& pwsh -NoProfile -NonInteractive -STA -File $bridge -Action schedule -Payload $encoded)
+    $exit=$LASTEXITCODE
+    if(-not $output){throw "Schedule preflight returned no response for $RunAt"}
+    $answer=($output | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+    if($exit -eq 0 -or $answer.ok -ne $false -or $answer.error -cne $Expected){
+        throw "Schedule preflight '$RunAt' expected '$Expected', got '$($answer.error)' (exit $exit)"
+    }
+}
+$future=(Get-Date).AddDays(2).Date.AddHours(13).ToString(
+    'yyyy-MM-ddTHH:mm:ss',[Globalization.CultureInfo]::InvariantCulture)
+Assert-ScheduleRejected -RunAt $future -Expected 'Selected CLI session not verified.'
+Assert-ScheduleRejected -RunAt ($future+'Z') -Expected 'Invalid local run time.'
+Assert-ScheduleRejected -RunAt ($future+'-06:00') -Expected 'Invalid local run time.'
+Assert-ScheduleRejected -RunAt '2026-11-04 10:13:00' -Expected 'Invalid local run time.'
+Assert-ScheduleRejected -RunAt '2026-11-04T10:13:00' -Expected 'Choose a time at least 30 seconds ahead.'
+Write-Host 'Flutter strict local-time JSON schedule preflight PASS (no task mutation).' -ForegroundColor Green
