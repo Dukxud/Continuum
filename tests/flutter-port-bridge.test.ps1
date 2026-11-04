@@ -144,4 +144,20 @@ Assert-ScheduleRejected -RunAt ($future+'Z') -Expected 'Invalid local run time.'
 Assert-ScheduleRejected -RunAt ($future+'-06:00') -Expected 'Invalid local run time.'
 Assert-ScheduleRejected -RunAt '2026-11-04 10:13:00' -Expected 'Invalid local run time.'
 Assert-ScheduleRejected -RunAt ((Get-Date).AddMinutes(-3).ToString('yyyy-MM-ddTHH:mm:ss',[Globalization.CultureInfo]::InvariantCulture)) -Expected 'Choose a time at least 30 seconds ahead.'
+
+# The versioned quota policy is opt-in; reject text or numbers rather than
+# allowing truthy coercion to turn unattended retries on.
+$invalid=@{
+    sessionId='00000000-0000-0000-0000-000000000000'
+    runAt=$future
+    autoResumeOnLimit='true'
+} | ConvertTo-Json -Compress
+$invalidPayload=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($invalid))
+$invalidOutput=@(& pwsh -NoProfile -NonInteractive -STA -File $bridge -Action schedule -Payload $invalidPayload)
+$invalidExit=$LASTEXITCODE
+$invalidAnswer=($invalidOutput | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+if($invalidExit -eq 0 -or $invalidAnswer.error -cne 'Invalid automatic-continuation option.'){
+    throw 'A non-boolean continuation flag was not rejected before task creation.'
+}
+
 Write-Host 'Flutter strict local-time JSON schedule preflight PASS (no task mutation).' -ForegroundColor Green
