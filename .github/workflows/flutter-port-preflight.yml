@@ -1,0 +1,66 @@
+name: Flutter port preflight (bounded)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'flutter_port/**'
+      - 'tests/flutter-port-*.test.ps1'
+      - '.github/workflows/flutter-port-preflight.yml'
+
+permissions:
+  contents: read
+
+# A newer revision cancels its predecessor. No retries, loops or deploy steps.
+concurrency:
+  group: flutter-port-preflight-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Analyze, test, build (Windows)
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact PR revision
+        uses: actions/checkout@v4
+
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+
+      - name: Verify approved UI assets and bridge source
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File ./tests/flutter-port-source.test.ps1
+
+      - name: Generate Windows runner
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter create --platforms=windows --project-name codex_resume_flutter .
+
+      - name: Resolve dependencies
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter pub get
+
+      - name: Dart analyzer (errors and warnings fail)
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter analyze --no-fatal-infos
+
+      - name: Flutter widget and logic tests
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter test
+
+      - name: Windows compilation without launching jobs
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter build windows --debug
+
+# Native rendering and Windows accessibility logs require separate on-device
+# review. A green workflow never certifies visual fidelity or task execution.
