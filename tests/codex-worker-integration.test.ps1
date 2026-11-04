@@ -56,15 +56,14 @@ exit /b %errorlevel%
     $settingsDir=Join-Path $temp 'isolated-appdata'
     [void](New-Item -ItemType Directory -Path $settingsDir -Force)
 
-    function Run-CodexStub([int]$expectedExit,[bool]$auto,[string]$activeAccount,[bool]$emitLimit,[bool]$writerConflict=$false,[string]$savedAccountId=$expectedAccountIdentity,[bool]$denyUsage=$false,[bool]$optIn=$false,[int]$attempt=0,[bool]$missingThread=$false) {
+    function Run-CodexStub([int]$expectedExit,[bool]$auto,[string]$activeAccount,[bool]$emitLimit,[bool]$writerConflict=$false,[string]$savedAccountId=$expectedAccountIdentity,[bool]$denyUsage=$false) {
         if(Test-Path $marker){Remove-Item -LiteralPath $marker -Force}
         if(Test-Path $outcomePath){Remove-Item -LiteralPath $outcomePath -Force}
         [pscustomobject]@{
             sessionId='00000000-0000-0000-0000-000000000001'
             repo=$repoRoot;branch='feature';model='test-model';effort='high'
             access='read-only';message='Resume.';autoResume=$auto
-            continuationPolicy=$(if($optIn){@{schema=1;mode='quota-only';maxContinuations=3}}else{$null})
-            retryAttempt=$attempt;accountId=$savedAccountId;runtimeFingerprint=$fingerprint
+            retryAttempt=0;accountId=$savedAccountId;runtimeFingerprint=$fingerprint
             log=(Join-Path $temp 'worker.log')
         } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $jobPath
         $psi=[Diagnostics.ProcessStartInfo]::new()
@@ -84,8 +83,6 @@ exit /b %errorlevel%
         $psi.Environment['CODEX_STUB_EMIT_LIMIT']=if($emitLimit){'1'}else{'0'}
         $psi.Environment['CODEX_STUB_EMIT_WRITER']=if($writerConflict){'1'}else{'0'}
         $psi.Environment['CODEX_STUB_MARKER']=$marker
-        $psi.Environment['CODEX_STUB_THREAD_MISSING']=if($missingThread){'1'}else{'0'}
-        $psi.Environment['CODEX_STUB_REPO']=$repoRoot
         $proc=[Diagnostics.Process]::Start($psi)
         try{
             if(-not $proc.WaitForExit(20000)){
@@ -162,15 +159,22 @@ exit /b %errorlevel%
     Require ($changed.Exit -ne 0 -and -not $changed.Executed) "Wrong account must stop before invoking Codex: $($changed.Output) $($changed.Errors)"
     $outcome=Read-JobOutcome -Path $outcomePath
     Require ($outcome.status -eq "failed") "Account mismatch must be recorded as a failed preflight."
-    # A new opt-in child may run only while its original Codex thread remains
-    # available through the read-only App Server endpoint.
-    $childOk=Run-CodexStub 0 $false 'acct-1' $false $false $expectedAccountIdentity $false $true 1
-    Require ($childOk.Exit -eq 0 -and $childOk.Executed) "Readable child failed to resume: $($childOk.Errors)"
-    Require ((Read-JobOutcome -Path $outcomePath).status -eq 'completed') 'Readable child did not complete.'
-    $missingChild=Run-CodexStub 0 $false 'acct-1' $false $false $expectedAccountIdentity $false $true 1 $true
-    Require ($missingChild.Exit -ne 0 -and -not $missingChild.Executed) 'Missing conversation still launched child Codex.'
-    $outcome=Read-JobOutcome -Path $outcomePath
-    Require ($outcome.status -eq 'failed' -and $outcome.attempt -eq 1) 'Missing child was not recorded as a failed attempt.'
+    # Read-only conversation checks distinguish a recoverable quota error
+    # from an inaccessible thread. Actual child execution is covered by the
+    # isolated parent-to-child lifecycle test.
+    $probePath=$env:PATH
+    try {
+        $env:PATH="$bin;$probePath"
+        $env:CODEX_STUB_THREAD_MISSING='0'
+        Assert-CodexConversationAvailable -SessionId '00000000-0000-0000-0000-000000000001'
+        $env:CODEX_STUB_THREAD_MISSING='1'
+        $missingThreadRefused=$false
+        try{Assert-CodexConversationAvailable -SessionId '00000000-0000-0000-0000-000000000001'}catch{$missingThreadRefused=$true}
+        Require $missingThreadRefused 'Missing conversation was treated as readable.'
+    } finally {
+        $env:PATH=$probePath
+        Remove-Item Env:CODEX_STUB_THREAD_MISSING -ErrorAction SilentlyContinue
+    }
 
     # A pinned runtime must fail closed after an existing dependency changes.
     Set-Content -LiteralPath (Join-Path $runtime.Directory 'CodexUsage.js') -Value 'tampered'
