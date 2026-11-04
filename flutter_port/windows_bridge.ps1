@@ -22,6 +22,34 @@ try {
     }else{[pscustomobject]@{}}
     . (Join-Path $source 'CodexRunEngine.ps1')
     . (Join-Path $source 'CodexData.ps1')
+    # Presentation-only labels: preserve the WinForms session reader and its
+    # full stable IDs, while making the Flutter chooser distinguish projects.
+    function Get-FlutterSessionChoices {
+        $rootCache=@{}
+        foreach($session in @(Get-RecentCliSessions)){
+            try {
+                $cwd=[string]$session.Cwd
+                $root=$null
+                if(-not [string]::IsNullOrWhiteSpace($cwd)){
+                    if(-not $rootCache.ContainsKey($cwd)){
+                        $rootCache[$cwd]=Get-RepositoryRoot $cwd
+                    }
+                    $root=$rootCache[$cwd]
+                }
+                $folder=if($cwd){Split-Path -Leaf ($cwd.TrimEnd([char[]]@('/','\')))}else{'unknown folder'}
+                $title=if($root){
+                    'Git: '+(Split-Path -Leaf ($root.TrimEnd([char[]]@('/','\'))))
+                }else{'Outside Git: '+$folder}
+                $when=(Get-Item -LiteralPath $session.File -ErrorAction Stop).LastWriteTime
+                $id=[string]$session.Id
+                $session.Display=('{0} | {1:MM/dd HH:mm} | {2}' -f $title,$when,$id.Substring($id.Length-8))
+            }catch{
+                # A disappearing/invalid session file must not hide the choice.
+                # Its original reader label remains usable.
+            }
+            $session
+        }
+    }
     function Get-FlutterHistory {
         param([object[]]$Tasks=@())
         $recentTasks=@($Tasks)
@@ -45,7 +73,7 @@ try {
         'load' {
             $tasks=@(Get-UpcomingCodexTasks -AppDirectory $appDir)
             $result=@{
-                sessions=@(Get-RecentCliSessions)
+                sessions=@(Get-FlutterSessionChoices)
                 pending=$tasks
                 history=@(Get-FlutterHistory -Tasks $tasks)
                 settings=Read-CodexUiSettings $appDir
