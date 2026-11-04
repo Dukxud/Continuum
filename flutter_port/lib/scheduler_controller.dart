@@ -15,7 +15,6 @@ class SchedulerController extends ChangeNotifier {
   List<Map<String, dynamic>> models = [];
   Map<String, dynamic>? quota;
   AeroAppearance appearance = AeroAppearance.defaults;
-  AeroAppearance? _appearanceBeforeDraft;
   String? repositoryWarning;
   List<String> repositoryAlternatives = [];
   String logDirectory = '';
@@ -273,26 +272,17 @@ class SchedulerController extends ChangeNotifier {
     }
   }
 
-  void beginAppearancePreview() {
-    _appearanceBeforeDraft = appearance;
-  }
-
-  void previewAppearance(AeroAppearance value) {
+  void updateAppearance(AeroAppearance value) {
+    if (appearance == value) return;
     appearance = value;
-    _changed();
-  }
-
-  void cancelAppearancePreview() {
-    appearance = _appearanceBeforeDraft ?? appearance;
-    _appearanceBeforeDraft = null;
-    _changed();
-  }
-
-  void commitAppearance(AeroAppearance value) {
-    appearance = value;
-    _appearanceBeforeDraft = null;
     _changed();
     _queueSave();
+  }
+
+  /// Flush a pending auto-save when the editor closes, without a Save button.
+  Future<void> flushPreferences() {
+    _saveTimer?.cancel();
+    return save();
   }
 
   void _queueSave() {
@@ -307,7 +297,7 @@ class SchedulerController extends ChangeNotifier {
     if (!ready || _disposed) return Future<void>.value();
     final snapshot = <String, dynamic>{
       'compactMode': compact,
-      'barAppearance': (_appearanceBeforeDraft ?? appearance).toJson(),
+      'barAppearance': appearance.toJson(),
       'draft': {
         'sessionId': sessionId ?? '', 'repo': repo, 'model': model ?? '',
         'effort': effort ?? '', 'access': access, 'message': message,
