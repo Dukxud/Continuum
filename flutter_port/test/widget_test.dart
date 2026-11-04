@@ -70,6 +70,32 @@ class StubAdapter implements SchedulerAdapter {
   }
 }
 
+/// Loads a saved CLI session without a repository. Only 'select' returns
+/// the Git evidence, as it does in the production Windows bridge.
+class AutoRepositoryAdapter extends StubAdapter {
+  AutoRepositoryAdapter() : super(verifiedSession: true);
+
+  @override
+  Future<Map<String, dynamic>> call(String action,
+      [Map<String, dynamic> payload = const {}]) async {
+    if (action == 'select') {
+      return {
+        'sessionId': payload['sessionId'],
+        'found': {'Root': r'C:\QA\auto-detected', 'AlternativeRoots': []},
+        'model': 'gpt-test',
+      };
+    }
+    final result = await super.call(action, payload);
+    if (action == 'load') {
+      final settings = Map<String, dynamic>.from(result['settings'] as Map);
+      final draft = Map<String, dynamic>.from(settings['draft'] as Map);
+      draft['repo'] = '';
+      return {...result, 'settings': {...settings, 'draft': draft}};
+    }
+    return result;
+  }
+}
+
 void main() {
   testWidgets('v1.16 desktop geometry retains original row order and coordinates', (tester) async {
     tester.view.physicalSize = const Size(940, 750);
@@ -93,6 +119,23 @@ void main() {
     expect(find.text('Browse'), findsOneWidget);
     expect(find.byType(WindowsCalendarGlyph), findsOneWidget);
     expect(find.byType(WindowsCaret), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('startup discovery visibly fills the repository field without a dropdown click',
+      (tester) async {
+    tester.view.physicalSize = const Size(940, 750);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: AutoRepositoryAdapter())));
+    await tester.pump(const Duration(milliseconds: 150));
+    final repositoryField = tester.widget<TextField>(find.byType(TextField).first);
+    expect(repositoryField.controller?.text, r'C:\QA\auto-detected');
+    expect(find.text('Repository unresolved; use Browse.'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
