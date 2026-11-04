@@ -14,7 +14,7 @@ This is a requirements-to-implementation audit, not an assertion that native or 
 | P04 | Canonical workspace hash required at scheduling and worker start; never email-only | Original `CodexUsage.js`/worker, live verified hash preflight | N. Native account-switch/unknown-identity rejection remains O |
 | P05 | `Update-SchedulingEligibility`: fresh (120s) model-matched quota/catalog and identity; unavailable/stale snapshot disables scheduling | `canSchedule` requires model, effort, fresh matching snapshot, verified hash | E by source review; negative tests must cover stale/invalid snapshot |
 | P06 | Quota at 0% can still register a *future* run; execution-time worker independently rejects exhausted quota | Earlier Flutter controller+bridge blocked registration; both checks removed | F. Logic+widget regression added; native future-run check O |
-| P07 | `CodexScheduleTime`: +2 minutes rounded up; + and − respect 30-second minimum; manual time preserved; Reset +2 uses verified reset only | Dart helpers and bridge wall-clock validator | E/source+unit; Windows DST and past-time boundary integration exists, native Reset +2 O |
+| P07 | WinForms v1.16 uses +2 minutes rounded to the next full minute | **Owner-approved Flutter change:** one contextual Now +1 / Reset +1 shortcut, exact local seconds, no minute rounding; the Windows 30-second minimum and DST checks remain unchanged | F: pure time and widget tests plus nonzero-second Windows bridge integration; native confirmation required |
 | P08 | `CodexUiActions`: confirm YOLO and repository overlaps; block duplicate running conversation | Flutter dialogs plus original bridge validation | E; adversarial native overlap/YOLO O |
 | P09 | `RuntimeBundle` + `OneTimeTasks`: one immutable pinned runtime and one Windows registration; no new retry | Original worker and Windows components, thin Flutter bridge | N; BP158 real read-only scheduled execution passed, exit 0 and persisted outcome |
 | P10 | Registration is not success proof; worker validates repository, branch, model, quota, identity and records actual exit | Same original pinned worker | N; BP159 result and clean disposable repo passed |
@@ -65,6 +65,27 @@ leave its root unresolved; guessing the previous checkout would be a safety
 regression. Final native acceptance must test both a known Git-backed CLI
 conversation and the specific `Nathan` conversation separately.
 
+## November 4 owner-approved scheduling refinement
+
+The Flutter-only time shortcut is a **single** button: **Now +1** normally,
+switching to **Reset +1** only when the current model has a fresh, authoritative
+exhausted-window recommendation. Stale, invalid or elapsed reset times fall
+back to Now +1. The new time is one minute after the chosen source timestamp,
+with the exact **seconds retained**; all saved draft and Windows schedule
+payloads use the same `yyyy-MM-ddTHH:mm:ss` local format. The Windows
+registration minimum (30 seconds ahead), DST safeguards, and runtime
+admission checks are unchanged. Date/time picker edits preserve the
+existing second rather than silently setting it to `:00`.
+
+The time row, instruction field and enlarged Schedule once control are
+laid out together in one unified panel: shared alignment, consistent
+insets and a dedicated action column. The full-mode height and compact
+mode are unchanged.
+
+**Acceptance:** valid/no/stale reset selection, now+1 with nonzero seconds,
+draft/task serialization, widget interaction and layout, Windows JSON bridge,
+and native BLACK-PUDDLE visual review.
+
 ## November 4 owner-approved chooser and scheduling layout
 
 The original WinForms conversation reader identifies a session by its **starting
@@ -111,6 +132,7 @@ These issues were established from both source paths, not inferred from screensh
 | A10 | Run safe read-only isolated continuation on actual Task Scheduler | Correct session, branch, access, response; persisted completed result and unchanged Git fixture |
 | A11 | Cancel future isolated run | Task removed from Windows, cancelled outcome, no worker start/log; never cancel an active process |
 | A12 | Native history, appearance, screen readers, 100%/125% DPI and Aero 99/100% | No clipped controls/AXTree crash, correct evidence/copy/hide, rendering matches approved baseline |
+| A13 | Future +1 and exhausted-window reset recommendations, seconds = 37, stale/malformed reset, date-picker edit | Exactly one Now +1 or Reset +1, selected second displayed and serialized unchanged, invalid/stale reset falls back, unified panel has no overlap |
 
 ## Review and release gates
 
