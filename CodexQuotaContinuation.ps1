@@ -18,14 +18,16 @@ function Test-CodexTerminalQuotaFailure {
     if(-not (Test-Path -LiteralPath $EventsPath -PathType Leaf)){return $false}
     $terminal=$null
     foreach($line in @(Get-Content -LiteralPath $EventsPath -Tail 128 -ErrorAction Stop)){
-        if($line -match '(?i)thread.{0,100}not found|thread-store conflict|already has an active writer'){return $false}
         if(-not $line.TrimStart().StartsWith('{')){continue}
         try{$event=$line | ConvertFrom-Json -ErrorAction Stop}catch{continue}
         if($event.type -in @('turn.completed','turn.failed')){$terminal=$event}
     }
     if(-not $terminal -or [string]$terminal.type -cne 'turn.failed'){return $false}
     $reason=[string]$terminal.error.message
-    return ($reason -match '(?i)(?:usage|rate)[ -]?limit|quota (?:exceeded|exhausted)')
+    # A trailing stderr cleanup error is not proof that the saved thread is gone.
+    # The worker independently verifies thread/read before registering a child.
+    return ($reason -match '(?i)(?:usage|rate)[ -]?limit|quota (?:exceeded|exhausted)' -and
+            $reason -notmatch '(?i)thread.{0,100}not found|thread-store conflict|already has an active writer')
 }
 
 # Reset comes from the model-matched App Server rate-limits result, never from
@@ -67,8 +69,13 @@ function Assert-NoPendingCodexSessionSibling {
     }
 }
 
+function Get-CodexQuotaContinuationMessage {
+    param([string]$OriginalMessage)
+    return 'Previous work stopped at a verified Codex usage limit. Inspect this conversation and the repository state; do not repeat completed changes or external side effects. Continue only unfinished work from the original instruction: '+$OriginalMessage
+}
+
 function Get-RegisteredCodexQuotaContinuation {
-    param($Job,[string]$JobFile,[string]$Directory)
+    param($Job,[string]$JobFile,[string]$Directory,[string]$RuntimeDirectory)
     $parent=[IO.Path]::GetFileNameWithoutExtension($JobFile)
     $planPath=Join-Path $Directory ($parent+'.continuation.json')
     if(-not (Test-Path -LiteralPath $planPath -PathType Leaf)){return $null}
@@ -95,13 +102,33 @@ function Get-RegisteredCodexQuotaContinuation {
        [string]$payload.retryAttempt -cne [string]([int]$Job.retryAttempt+1)){
         throw 'Registered child does not preserve its parent identity and attempt; no duplicate.'
     }
+    $rootJob=if($Job.rootJob){[string]$Job.rootJob}else{$parent}
+    $original=if($Job.originalMessage){[string]$Job.originalMessage}else{[string]$Job.message}
+    if([string]$payload.rootJob -cne $rootJob -or
+       [string]$payload.originalMessage -cne $original -or
+       [string]$payload.message -cne (Get-CodexQuotaContinuationMessage $original) -or
+       [string]$payload.log -cne (Join-Path $Directory ($name+'.log')) -or
+       -not (Test-CodexContinuationPolicy $payload)){
+        throw 'Registered child instruction, policy or provenance differs from its parent.'
+    }
+    # Validate the *actual* Task Scheduler executable, arguments, working
+    # directory and single trigger, not merely a matching task name.
     try {
         $planned=[datetime]$plan.when
-        $trigger=@($task.Triggers | Where-Object { $_.StartBoundary }) | Select-Object -First 1
-        if(-not $trigger -or [datetime]$trigger.StartBoundary -ne $planned){
+        if(@($task.Triggers).Count -ne 1 -or
+           [datetime]$task.Triggers[0].StartBoundary -ne $planned){
             throw 'Windows trigger does not match saved plan.'
         }
-    }catch{throw 'Registered child trigger cannot be verified; manual review required.'}
+        $action=@($task.Actions)
+        $expectedRunner=Join-Path $RuntimeDirectory 'CodexRunJob.vbs'
+        $expectedArguments=Get-CodexTaskArguments -Runner $expectedRunner -JobFile (Join-Path $Directory ($name+'.json'))
+        if($action.Count -ne 1 -or
+           [string]$action[0].Execute -ine (Join-Path $env:WINDIR 'System32\wscript.exe') -or
+           [string]$action[0].Arguments -cne $expectedArguments -or
+           [string]$action[0].WorkingDirectory -ine [string]$Job.repo){
+            throw 'Windows action does not match the pinned continuation.'
+        }
+    }catch{throw "Registered child task cannot be verified; manual review required: $($_.Exception.Message)"}
     return [pscustomobject]@{Name=$name;When=$planned}
 }
 
@@ -123,7 +150,7 @@ function Register-CodexQuotaContinuation {
     if($parent -cnotmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[a-fA-F0-9]{8}$'){
         throw 'Only verified Scheduler jobs may create a continuation.'
     }
-    $existing=Get-RegisteredCodexQuotaContinuation -Job $Job -JobFile $JobFile -Directory $AppDirectory
+    $existing=Get-RegisteredCodexQuotaContinuation -Job $Job -JobFile $JobFile -Directory $AppDirectory -RuntimeDirectory $RuntimeDirectory
     if($existing){return $existing}
     if($When -le (Get-Date).AddSeconds(60)){throw 'No safely scheduled continuation time was provided.'}
     Assert-NoPendingCodexSessionSibling -SessionId ([string]$Job.sessionId) -ParentName $parent -Directory $AppDirectory
@@ -136,7 +163,7 @@ function Register-CodexQuotaContinuation {
     if(Test-Path -LiteralPath $nextJobPath){throw 'Existing continuation payload requires manual review.'}
     $rootJob=if($Job.rootJob){[string]$Job.rootJob}else{$parent}
     $rootMessage=if($Job.originalMessage){[string]$Job.originalMessage}else{[string]$Job.message}
-    $continuationText='Previous work stopped at a verified Codex usage limit. Inspect this conversation and the repository state; do not repeat completed changes or external side effects. Continue only unfinished work from the original instruction: '+$rootMessage
+    $continuationText=Get-CodexQuotaContinuationMessage $rootMessage
     $child=[ordered]@{
         sessionId=[string]$Job.sessionId;repo=[string]$Job.repo;branch=[string]$Job.branch
         model=[string]$Job.model;effort=[string]$Job.effort;access=[string]$Job.access
