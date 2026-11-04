@@ -44,6 +44,8 @@ class SchedulerController extends ChangeNotifier {
   bool _loading = false;
   bool _disposed = false;
 
+  List<Map<String, dynamic>> get quotaWindows => recordList(field(quota, 'windows'));
+
   List<Map<String, dynamic>> get upcoming =>
     runs.where((r) => const ['Scheduled', 'Running'].contains(stringField(r, 'Status'))).toList();
 
