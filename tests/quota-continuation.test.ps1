@@ -16,9 +16,14 @@ try {
     @('{"type":"agent_message","text":"Usage limit exceeded"}',
       '{"type":"turn.failed","error":{"message":"Network disconnect"}}') | Set-Content -LiteralPath $events
     Require (-not (Test-CodexTerminalQuotaFailure -EventsPath $events)) 'Generic failure or agent text must not trigger quota retry.'
-    @('{"type":"turn.failed","error":{"message":"rate limit reached"}}',
-      'ERROR codex_core::session: thread 00000000-0000-0000-0000-000000000001 not found') | Set-Content -LiteralPath $events
-    Require (-not (Test-CodexTerminalQuotaFailure -EventsPath $events)) 'Missing thread must veto automatic continuation.'
+    # Exact BP169 ordering: terminal quota event followed by the rollout
+    # recorder's secondary stderr. Worker thread/read must decide recoverability.
+    @('{"type":"error","message":"You’ve hit your usage limit. Try again at Nov 8th, 2026 9:58 AM."}',
+      '{"type":"turn.failed","error":{"message":"You’ve hit your usage limit. Try again at Nov 8th, 2026 9:58 AM."}}',
+      '2026-11-04T21:20:52Z ERROR codex_core::session: failed to record rollout items: thread 00000000-0000-0000-0000-000000000001 not found') | Set-Content -LiteralPath $events
+    Require (Test-CodexTerminalQuotaFailure -EventsPath $events) 'BP169 quota failure should reach authoritative thread verification.'
+    '{"type":"turn.failed","error":{"message":"Usage limit; thread 00000000-0000-0000-0000-000000000001 not found"}}' | Set-Content -LiteralPath $events
+    Require (-not (Test-CodexTerminalQuotaFailure -EventsPath $events)) 'Structured missing-thread failure must veto automatic continuation.'
     '{"type":"turn.failed","error":{"message":"thread-store conflict: already has an active writer"}}' | Set-Content -LiteralPath $events
     Require (-not (Test-CodexTerminalQuotaFailure -EventsPath $events)) 'Active writer must not be retried.'
     '{"type":"turn.failed","error":{"message":"Usage limit reached"}}' | Set-Content -LiteralPath $events
@@ -64,6 +69,16 @@ try {
     Require (-not (Test-CodexContinuationPolicy $job)) 'Unrestricted retry policy accepted.'
     $job.continuationPolicy.mode='quota-only'
 
+    $script:threadAvailable=$true
+    $script:threadChecks=0
+    function Assert-CodexConversationAvailable {
+        param([string]$SessionId)
+        $script:threadChecks++
+        if(-not $script:threadAvailable -or $SessionId -cne '00000000-0000-0000-0000-000000000001'){
+            throw 'Codex thread/read failed.'
+        }
+    }
+
     $script:taskMap=@{}
     function global:Get-ScheduledTask {
         [CmdletBinding()]
@@ -102,6 +117,23 @@ try {
     Require ([string]$payload.message -match 'do not repeat completed changes') 'Child lacks duplicate-side-effect caution.'
     $again=Register-CodexQuotaContinuation -Job $job -JobFile $jobFile -AppDirectory $temp -RuntimeDirectory $runtime -When $scheduled.AddMinutes(5)
     Require ($again.Name -ceq $child.Name -and $script:taskMap.Count -eq 1) 'Repeated parent created a second child.'
+    # A persisted intent is not proof of the OS action or instruction.
+    $action=$script:taskMap[$child.Name].Actions[0]
+    $originalArgs=$action.Arguments
+    $action.Arguments='//B //Nologo "wrong-runner.vbs" "wrong-job.json"'
+    $refused=$false
+    try{[void](Register-CodexQuotaContinuation -Job $job -JobFile $jobFile -AppDirectory $temp -RuntimeDirectory $runtime -When $scheduled)}catch{$refused=$true}
+    Require $refused 'Tampered Windows task action was trusted.'
+    $action.Arguments=$originalArgs
+
+    $savedMessage=[string]$payload.message
+    $payload.message='Unexpected instruction'
+    SettingsStore\Write-JsonSettings -Path (Join-Path $temp ($child.Name+'.json')) -Value $payload
+    $refused=$false
+    try{[void](Register-CodexQuotaContinuation -Job $job -JobFile $jobFile -AppDirectory $temp -RuntimeDirectory $runtime -When $scheduled)}catch{$refused=$true}
+    Require $refused 'Tampered child instruction was trusted.'
+    $payload.message=$savedMessage
+    SettingsStore\Write-JsonSettings -Path (Join-Path $temp ($child.Name+'.json')) -Value $payload
     # Exercise the worker boundary, not just registration: a verified quota
     # deferral must persist the parent outcome and reference exactly that child.
     $quota.recommendedResetAt=[DateTimeOffset]::UtcNow.AddHours(2).ToUnixTimeSeconds()
@@ -109,7 +141,11 @@ try {
     $deferred=Read-JobOutcome -Path (Join-Path $temp ($parent+'.result.json'))
     Require ($deferred.status -ceq 'deferred' -and $deferred.attempt -eq 0 -and
       $deferred.nextJob -ceq $child.Name -and $deferred.exitCode -eq 1) 'Parent outcome missing deferred status or child link.'
-    Require ($script:taskMap.Count -eq 1) 'Worker created a second child for a deferred parent.'
+    Require ($script:taskMap.Count -eq 1 -and $script:threadChecks -gt 0) 'Worker failed to verify live conversation before deferral.'
+    $script:threadAvailable=$false
+    Require (-not (Try-DeferCodexQuotaJob -Job $job -JobFile $jobFile -AppDirectory $temp -RuntimeDirectory $runtime -Quota $quota -ExitCode 1)) 'Missing thread still registered a continuation.'
+    $script:threadAvailable=$true
+    Require ($script:taskMap.Count -eq 1) 'Unverified thread created duplicate child.'
     $quota.model='another-model'
     Require (-not (Try-DeferCodexQuotaJob -Job $job -JobFile $jobFile -AppDirectory $temp -RuntimeDirectory $runtime -Quota $quota -ExitCode 1)) 'Worker must not defer mismatched model quota.'
     Require ($script:taskMap.Count -eq 1) 'Mismatched model created a continuation.'
