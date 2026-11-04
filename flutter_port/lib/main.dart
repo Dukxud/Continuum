@@ -205,7 +205,10 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
     final time = await showTimePicker(context: context,
       initialTime: TimeOfDay.fromDateTime(state.runAt));
     if (time == null || !mounted) return;
-    state.edit(time: DateTime(day.year, day.month, day.day, time.hour, time.minute));
+    // The native picker edits hours and minutes only. Preserve the exact
+    // visible second rather than silently resetting it to :00.
+    state.edit(time: DateTime(day.year, day.month, day.day, time.hour,
+      time.minute, state.runAt.second));
   }
 
   Future<void> schedule() async {
