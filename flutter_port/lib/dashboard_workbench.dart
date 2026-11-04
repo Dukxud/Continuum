@@ -135,7 +135,10 @@ extension _DashboardWorkbench on _SchedulerHomeState {
       bottom: const Color(0xff292642),
       accent: DeckColor.coral,
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 19),
-      child: Stack(children: [
+      // The glow must flow through the inset padding. DeckSurface's outer
+      // rounded clip still contains it; Stack's default rectangular clip
+      // would leave hard edges at the top and right of the content bounds.
+      child: Stack(clipBehavior: Clip.none, children: [
         Positioned(right: -72, top: -138,
           child: IgnorePointer(child: Container(width: 290, height: 290,
             decoration: BoxDecoration(shape: BoxShape.circle,
