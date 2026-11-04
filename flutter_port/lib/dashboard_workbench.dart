@@ -29,7 +29,7 @@ extension _DashboardWorkbench on _SchedulerHomeState {
         const Text('Choose your thread',
           style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800,
             color: DeckColor.text, letterSpacing: -.45)),
-        const SizedBox(height: 14),
+        const SizedBox(height: 11),
         _deckFieldLabel('CONVERSATION'),
         const SizedBox(height: 5),
         SizedBox(height: 42, child: DeckSelect<String>(
@@ -42,7 +42,7 @@ extension _DashboardWorkbench on _SchedulerHomeState {
             state.selectSession(id);
           },
         )),
-        const SizedBox(height: 11),
+        const SizedBox(height: 9),
         _deckFieldLabel('REPOSITORY'),
         const SizedBox(height: 5),
         SizedBox(height: 43, child: Row(children: [
@@ -56,7 +56,7 @@ extension _DashboardWorkbench on _SchedulerHomeState {
           DeckAction(label: 'Browse', icon: Icons.folder_open_outlined,
             tone: DeckColor.mint, compact: true, onTap: _browseRepo),
         ])),
-        const SizedBox(height: 11),
+        const SizedBox(height: 9),
         Row(children: [
           Expanded(flex: 5, child: _deckSelectField(
             'MODEL',
@@ -103,7 +103,7 @@ extension _DashboardWorkbench on _SchedulerHomeState {
           )),
         ]),
         if (state.repositoryWarning != null) ...[
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(state.repositoryWarning!, maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 10.5, color: DeckColor.gold)),
@@ -158,7 +158,7 @@ extension _DashboardWorkbench on _SchedulerHomeState {
             style: TextStyle(fontSize: 25, height: 1.1,
               fontWeight: FontWeight.w800, color: DeckColor.text,
               letterSpacing: -.6)),
-          const SizedBox(height: 13),
+          const SizedBox(height: 10),
           SizedBox(height: 61, child: Row(children: [
             Expanded(child: Material(
               color: const Color(0xff221c36).withValues(alpha: .95),
@@ -216,7 +216,7 @@ extension _DashboardWorkbench on _SchedulerHomeState {
             maxLines: 2,
             onChanged: (value) => state.edit(instruction: value),
           )),
-          const SizedBox(height: 12),
+          const SizedBox(height: 9),
           Row(children: [
             Expanded(child: Text(
               state.canSchedule
