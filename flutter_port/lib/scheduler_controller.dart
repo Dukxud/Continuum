@@ -35,6 +35,10 @@ class SchedulerController extends ChangeNotifier {
   DateTime? quotaAt;
   String quotaModel = '';
   int _selectionEpoch = 0;
+  int _repositoryEditEpoch = 0;
+  Future<void>? _repositoryLookup;
+  String? _lookupSessionId;
+  bool _keepRestoredModel = false;
   Timer? _statusTimer;
   Timer? _refreshTimer;
   Timer? _clockTimer;
@@ -105,17 +109,21 @@ class SchedulerController extends ChangeNotifier {
       runs = recordList(field(data, 'pending'));
       history = recordList(field(data, 'history'));
       logDirectory = stringField(data, 'logDirectory');
-      // A failed first read must not strand the app permanently uninitialized.
+      // WinForms picks the most recent session when its saved choice is gone
+      // and immediately looks up the selected conversation's Git root.
       if (initial || !ready) {
         final settingsData = field(data, 'settings');
         final settings = settingsData is Map ? Map<String, dynamic>.from(settingsData) : <String, dynamic>{};
         final draftData = field(settings, 'draft');
         final draft = draftData is Map ? Map<String, dynamic>.from(draftData) : <String, dynamic>{};
-        sessionId = stringField(draft, 'sessionId').isEmpty ? null : stringField(draft, 'sessionId');
-        if (!sessions.any((s) => stringField(s, 'Id') == sessionId)) sessionId = null;
+        final savedId = stringField(draft, 'sessionId');
+        final savedChoiceExists = sessions.any((s) => stringField(s, 'Id') == savedId);
+        sessionId = savedChoiceExists ? savedId : _firstSessionId();
+        // Never pair an unrelated fallback session with the old session's root.
+        repo = savedChoiceExists ? stringField(draft, 'repo') : '';
         model = stringField(draft, 'model').isEmpty ? null : stringField(draft, 'model');
         effort = stringField(draft, 'effort').isEmpty ? null : stringField(draft, 'effort');
-        repo = stringField(draft, 'repo');
+        _keepRestoredModel = savedChoiceExists && model != null;
         message = stringField(draft, 'message').isEmpty ? 'Resume.' : stringField(draft, 'message');
         final preferredAccess = stringField(draft, 'access');
         access = const ['workspace-write', 'read-only', 'yolo'].contains(preferredAccess)
@@ -126,10 +134,23 @@ class SchedulerController extends ChangeNotifier {
           runAt = savedTime; editedTime = true;
         }
         appearance = AeroAppearance.fromJson(field(settings, 'barAppearance'));
+        ++_selectionEpoch;
         ready = true;
+      } else if (sessionId == null ||
+          !sessions.any((s) => stringField(s, 'Id') == sessionId)) {
+        ++_selectionEpoch;
+        sessionId = _firstSessionId();
+        repo = '';
+        repositoryWarning = null;
+        repositoryAlternatives = [];
+        _keepRestoredModel = false;
+        _queueSave();
       }
       error = null;
       _changed();
+      // A refresh may heal an unresolved repository. Coalesce overlapping
+      // lookups; never block quota refresh or discard a manually chosen root.
+      unawaited(_ensureRepositoryLookup());
       await readUsage();
     } catch (e) {
       error = 'Refresh failed: $e';
@@ -223,6 +244,7 @@ class SchedulerController extends ChangeNotifier {
     String? reasoning, bool? compactMode, DateTime? time,
   }) {
     if (repository != null) {
+      ++_repositoryEditEpoch;
       repo = repository;
       repositoryWarning = null;
       repositoryAlternatives = [];
@@ -246,44 +268,85 @@ class SchedulerController extends ChangeNotifier {
     _changed(); _queueSave(); readUsage();
   }
 
+  String? _firstSessionId() =>
+      sessions.isEmpty ? null : stringField(sessions.first, 'Id');
+
   Future<void> selectSession(String? id) async {
-    if (id == sessionId) return;
-    final generation = ++_selectionEpoch;
-    sessionId = id; repo = ''; repositoryWarning = null; repositoryAlternatives = [];
-    _changed(); _queueSave();
-    if (id == null) return;
+    if (id != sessionId) {
+      ++_selectionEpoch;
+      sessionId = id;
+      repo = '';
+      repositoryWarning = null;
+      repositoryAlternatives = [];
+      _keepRestoredModel = false;
+      _changed();
+      _queueSave();
+    }
+    await _ensureRepositoryLookup();
+  }
+
+  /// A selected session is resolved on startup, after switching sessions,
+  /// and on refresh if earlier discovery found nothing. The original
+  /// CodexData reader supplies Git evidence; Flutter never guesses a path.
+  Future<void> _ensureRepositoryLookup() async {
+    final id = sessionId;
+    if (_disposed || id == null || repo.trim().isNotEmpty ||
+        !sessions.any((s) => stringField(s, 'Id') == id)) return;
+    if (_lookupSessionId == id && _repositoryLookup != null) {
+      await _repositoryLookup;
+      return;
+    }
+    final selection = _selectionEpoch;
+    final edited = _repositoryEditEpoch;
+    final modelBeforeLookup = model;
+    final request = _resolveRepository(id, selection, edited, modelBeforeLookup);
+    _repositoryLookup = request;
+    _lookupSessionId = id;
+    try {
+      await request;
+    } finally {
+      if (identical(request, _repositoryLookup)) {
+        _repositoryLookup = null;
+        _lookupSessionId = null;
+      }
+    }
+  }
+
+  Future<void> _resolveRepository(String id, int selection, int edited,
+      String? modelBeforeLookup) async {
     try {
       final result = await adapter.call('select', {'sessionId': id});
-      if (generation != _selectionEpoch || sessionId != id) return;
-      final f = field(result, 'found');
-      final found = f is Map ? Map<String, dynamic>.from(f) : null;
-      // An explicit repository edit wins over a slower session lookup.
-      // This mirrors WinForms Apply-SelectionResult.
-      if (repo.trim().isEmpty) {
+      if (_disposed || selection != _selectionEpoch || sessionId != id) return;
+      // A manual Browse or text edit wins even if the user cleared the field.
+      if (edited == _repositoryEditEpoch && repo.trim().isEmpty) {
+        final source = field(result, 'found');
+        final found = source is Map ? Map<String, dynamic>.from(source) : null;
         repo = stringField(found, 'Root');
-        final rawAlternatives = field(found, 'AlternativeRoots');
-        final candidateRoots = field(found, 'Candidates');
-        repositoryAlternatives = rawAlternatives is List
-          ? rawAlternatives.whereType<String>().toList()
+        final alternatives = field(found, 'AlternativeRoots');
+        final candidates = field(found, 'Candidates');
+        repositoryAlternatives = alternatives is List
+          ? alternatives.whereType<String>().toList()
           : [];
-        if (repo.isEmpty && candidateRoots is List && candidateRoots.length > 1) {
-          repositoryAlternatives = candidateRoots.whereType<String>().toList();
+        if (repo.isEmpty && candidates is List && candidates.length > 1) {
+          repositoryAlternatives = candidates.whereType<String>().toList();
         }
-        if (repositoryAlternatives.isNotEmpty) {
-          repositoryWarning = repo.isEmpty
+        repositoryWarning = repositoryAlternatives.isNotEmpty
+          ? repo.isEmpty
             ? 'Conflicting checkouts: choose Browse to select the active repository.'
-            : 'Other checkouts found: verify the selected repository.';
-        } else {
-          repositoryWarning = repo.isEmpty ? 'Repository unresolved; use Browse.' : null;
-        }
+            : 'Other checkouts found: verify the selected repository.'
+          : repo.isEmpty ? 'Repository unresolved; use Browse.' : null;
+        _queueSave();
       }
+      // WinForms preserves a model explicitly restored for the same session.
       final associated = stringField(result, 'model');
-      if (models.any((m) => stringField(m, 'id') == associated)) selectModel(associated);
+      if (!_keepRestoredModel && model == modelBeforeLookup &&
+          models.any((m) => stringField(m, 'id') == associated)) {
+        selectModel(associated);
+      }
       _changed();
-      // The repository was resolved asynchronously; persist the resolved
-      // checkout just as a user-edited repository path would be persisted.
-      _queueSave();
     } catch (e) {
+      if (_disposed || selection != _selectionEpoch || sessionId != id) return;
+      repositoryWarning = 'Repository lookup unavailable; retrying automatically.';
       error = 'Repository lookup: $e';
       _changed();
     }
