@@ -106,47 +106,30 @@ class AutoRepositoryAdapter extends StubAdapter {
 }
 
 void main() {
-  testWidgets('model and unified schedule group retain full-mode geometry', (tester) async {
-    tester.view.physicalSize = const Size(940, 750);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(() { tester.view.resetPhysicalSize(); tester.view.resetDevicePixelRatio(); });
+  testWidgets('new workbench has distinct visual hierarchy', (tester) async {
+    tester.view.physicalSize = const Size(1240, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {tester.view.resetPhysicalSize();tester.view.resetDevicePixelRatio();});
     await tester.pumpWidget(MaterialApp(home: SchedulerHome(adapter: StubAdapter())));
     await tester.pump(const Duration(milliseconds: 150));
-    final conversation = tester.getTopLeft(find.text('Conversation'));
-    final repository = tester.getTopLeft(find.text('Repository root'));
-    final runtime = tester.getTopLeft(find.text('Run at (local)'));
-    final model = tester.getTopLeft(find.text('Model'));
-    final instruction = tester.getTopLeft(find.text('Instruction'));
-    final usage = tester.getTopLeft(find.text('Usage remaining'));
-    expect(conversation.dx, closeTo(18, 4));
-    expect(conversation.dy, closeTo(68, 8));
-    expect(repository.dy, closeTo(115, 8));
-    expect(model.dy, closeTo(161, 8));
-    expect(runtime.dy, closeTo(219, 8));
-    expect(instruction.dy, closeTo(266, 8));
-    expect(usage.dy, closeTo(328, 8));
-    // The single action column spans the time and instruction rows.
-    expect(model.dy, greaterThan(repository.dy));
-    expect(runtime.dy, greaterThan(model.dy));
-    expect(instruction.dy, greaterThan(runtime.dy));
-    final scheduleButton = find.ancestor(
-      of: find.text('Schedule once'), matching: find.byType(InkWell)).first;
-    final scheduleTop = tester.getTopLeft(scheduleButton);
-    expect(scheduleTop.dx, closeTo(734, 5));
-    expect(scheduleTop.dy, lessThan(instruction.dy));
-    expect(tester.getSize(scheduleButton).height, closeTo(34, 2));
+    expect(find.text('Continuum.'), findsOneWidget);
+    expect(find.text('Choose your thread'), findsOneWidget);
+    expect(find.text('Set the moment.'), findsOneWidget);
+    expect(find.text('CAPACITY / LIVE'), findsOneWidget);
+    expect(find.text('IN FLIGHT'), findsOneWidget);
     expect(find.text('Now +1'), findsOneWidget);
-    expect(find.text('Now +2'), findsNothing);
-    expect(find.text('Reset +2'), findsNothing);
-    expect(find.text('Browse'), findsOneWidget);
-    expect(find.byType(WindowsCalendarGlyph), findsOneWidget);
-    expect(find.byType(WindowsCaret), findsWidgets);
+    expect(find.text('Schedule once'), findsOneWidget);
+    final setup = tester.getTopLeft(find.text('Choose your thread'));
+    final launch = tester.getTopLeft(find.text('Set the moment.'));
+    final capacity = tester.getTopLeft(find.text('CAPACITY / LIVE'));
+    expect(launch.dy, greaterThan(setup.dy + 150));
+    expect(capacity.dx, greaterThan(setup.dx + 350));
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('adaptive +1 shortcut preserves recommended seconds',
       (tester) async {
-    tester.view.physicalSize = const Size(940, 750);
+    tester.view.physicalSize = const Size(1240, 850);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
@@ -180,7 +163,7 @@ void main() {
 
   testWidgets('date picker uses Monday as the first day of the week',
       (tester) async {
-    tester.view.physicalSize = const Size(940, 800);
+    tester.view.physicalSize = const Size(1240, 850);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
@@ -207,7 +190,7 @@ void main() {
 
   testWidgets('startup discovery visibly fills the repository field without a dropdown click',
       (tester) async {
-    tester.view.physicalSize = const Size(940, 750);
+    tester.view.physicalSize = const Size(1240, 850);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
@@ -223,51 +206,32 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('original compact mode stacks windows instead of squeezing them together', (tester) async {
-    // Real full mode has a 940px minimum width. Switch modes while the
-    // toggle is reachable, then simulate the native compact resize.
-    tester.view.physicalSize = const Size(940, 800);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(() { tester.view.resetPhysicalSize(); tester.view.resetDevicePixelRatio(); });
+  testWidgets('monitor is distinct and restores the full workbench',
+      (tester) async {
+    tester.view.physicalSize = const Size(1240, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {tester.view.resetPhysicalSize();tester.view.resetDevicePixelRatio();});
     await tester.pumpWidget(MaterialApp(home: SchedulerHome(adapter: StubAdapter())));
     await tester.pump(const Duration(milliseconds: 150));
-    await tester.tap(find.text('Compact mode: OFF'));
+    await tester.tap(find.text('Monitor'));
     await tester.pump(const Duration(milliseconds: 150));
-    expect(find.text('Compact mode: ON'), findsOneWidget);
-    tester.view.physicalSize = const Size(480, 800);
+    tester.view.physicalSize = const Size(540, 685);
     await tester.pump();
-    expect(find.text('Usage limits'), findsOneWidget);
-    expect(find.text('Schedule once'), findsNothing);
-    final title = tester.getTopLeft(find.text('Usage limits'));
-    expect(title.dy, closeTo(70, 8));
-    final primary = tester.getTopLeft(find.text('5-hour'));
-    final secondary = tester.getTopLeft(find.text('Weekly'));
-    expect(primary.dy, lessThan(secondary.dy));
-    expect(secondary.dy - primary.dy, closeTo(117, 7));
+    expect(find.text('On watch.'), findsOneWidget);
+    expect(find.text('Full view'), findsOneWidget);
+    expect(find.text('Set the moment.'), findsNothing);
+    final first = tester.getTopLeft(find.text('5-HOUR'));
+    final second = tester.getTopLeft(find.text('WEEKLY'));
+    expect(second.dy, greaterThan(first.dy + 120));
+    await tester.tap(find.text('Full view'));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.text('Continuum.'), findsOneWidget);
+    expect(find.text('Schedule once'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('compact and full modes remain top-aligned', (tester) async {
-    tester.view.physicalSize = const Size(1120, 900);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
-    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
-      adapter: StubAdapter())));
-    await tester.pump(const Duration(milliseconds: 150));
-    final heading = find.text('Schedule a continuation');
-    expect(tester.getTopLeft(heading).dy, lessThan(90));
-    await tester.tap(find.text('Compact mode: OFF'));
-    await tester.pump(const Duration(milliseconds: 150));
-    expect(tester.getTopLeft(find.text('Codex Scheduler')).dy, lessThan(60));
-    expect(tester.getTopLeft(find.text('Usage limits')).dy, lessThan(110));
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('all scheduled tasks remain reachable by scrolling four-row grid', (tester) async {
-    tester.view.physicalSize = const Size(940, 900);
+  testWidgets('all queued jobs remain reachable in bounded list', (tester) async {
+    tester.view.physicalSize = const Size(1240, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
@@ -276,10 +240,10 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: SchedulerHome(
       adapter: StubAdapter(pendingCount: 7))));
     await tester.pump(const Duration(milliseconds: 150));
-    expect(find.text('Upcoming runs (7)'), findsOneWidget);
+    expect(find.text('7 ACTIVE'), findsOneWidget);
     final list = find.byKey(const PageStorageKey<String>('upcoming-run-list'));
     expect(list, findsOneWidget);
-    await tester.drag(list, const Offset(0, -300));
+    await tester.drag(list, const Offset(0, -900));
     await tester.pump();
     expect(find.text('Scheduled item 7'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -287,7 +251,7 @@ void main() {
 
   testWidgets('exhausted quota still permits a verified future schedule',
       (tester) async {
-    tester.view.physicalSize = const Size(940, 750);
+    tester.view.physicalSize = const Size(1240, 850);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
@@ -305,7 +269,7 @@ void main() {
 
   testWidgets('usage failures show actionable feedback inside both cards',
       (tester) async {
-    tester.view.physicalSize = const Size(940, 750);
+    tester.view.physicalSize = const Size(1240, 850);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
@@ -314,13 +278,13 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: SchedulerHome(
       adapter: StubAdapter(failUsage: true))));
     await tester.pump(const Duration(milliseconds: 150));
-    expect(find.text('Usage unavailable; retrying automatically'), findsNWidgets(2));
+    expect(find.text('Usage unavailable · automatic retry'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('close does not terminate an in-flight scheduling operation',
       (tester) async {
-    tester.view.physicalSize = const Size(940, 750);
+    tester.view.physicalSize = const Size(1240, 850);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
@@ -345,7 +309,7 @@ void main() {
 
   testWidgets('running jobs show Running and cannot be cancelled',
       (tester) async {
-    tester.view.physicalSize = const Size(940, 750);
+    tester.view.physicalSize = const Size(1240, 850);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
@@ -359,15 +323,15 @@ void main() {
     final cancelButton = find.ancestor(
       of: find.text('Cancel selected'), matching: find.byType(InkWell)).first;
     expect(tester.widget<InkWell>(cancelButton).onTap, isNull);
-    await tester.tap(find.text('Compact mode: OFF'));
+    await tester.tap(find.text('Monitor'));
     await tester.pump(const Duration(milliseconds: 150));
-    expect(find.text('Running'), findsWidgets);
+    expect(find.text('RUNNING'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('cancel selected goes directly to Windows adapter without confirmation',
       (tester) async {
-    tester.view.physicalSize = const Size(940, 900);
+    tester.view.physicalSize = const Size(1240, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
@@ -376,7 +340,7 @@ void main() {
     final adapter = StubAdapter(pendingCount: 1);
     await tester.pumpWidget(MaterialApp(home: SchedulerHome(adapter: adapter)));
     await tester.pump(const Duration(milliseconds: 150));
-    expect(find.text('Upcoming runs (1)'), findsOneWidget);
+    expect(find.text('1 ACTIVE'), findsOneWidget);
     await tester.tap(find.text('Scheduled item 1'));
     await tester.pump();
     expect(find.text('Cancel selected'), findsOneWidget);
@@ -389,26 +353,23 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final width in [320.0, 800.0, 1024.0]) {
-    testWidgets('Scheduler has no overflow at width '+width.toString(), (tester) async {
+  for (final width in [320.0, 800.0, 1024.0, 1240.0]) {
+    testWidgets('workbench remains accessible at width ' + width.toString(),
+        (tester) async {
       tester.view.physicalSize = Size(width, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {tester.view.resetPhysicalSize();tester.view.resetDevicePixelRatio();});
       await tester.pumpWidget(MaterialApp(home: SchedulerHome(
         adapter: StubAdapter(includePending: true))));
       await tester.pump(const Duration(milliseconds: 150));
       expect(tester.takeException(), isNull);
-      expect(find.text('Schedule a continuation'), findsOneWidget);
+      expect(find.text('Continuum.'), findsOneWidget);
       expect(find.text('Schedule once'), findsOneWidget);
-      expect(find.text('Usage remaining'), findsOneWidget);
-      expect(find.text('Upcoming runs (1)'), findsOneWidget);
-      await tester.ensureVisible(find.text('Recent runs'));
+      expect(find.text('CAPACITY / LIVE'), findsOneWidget);
+      expect(find.text('1 ACTIVE'), findsOneWidget);
+      await tester.ensureVisible(find.text('History'));
       await tester.pump();
-      expect(tester.takeException(), isNull);
-      await tester.tap(find.text('Recent runs'));
+      await tester.tap(find.text('History'));
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('Recent Codex runs'), findsOneWidget);
       expect(tester.takeException(), isNull);
