@@ -5,9 +5,12 @@ import 'package:codex_resume_flutter/windows_icons.dart';
 import 'package:codex_resume_flutter/bridge.dart';
 
 class StubAdapter implements SchedulerAdapter {
-  StubAdapter({this.includePending = false, this.pendingCount = 0});
+  StubAdapter({this.includePending = false, this.pendingCount = 0,
+    this.verifiedSession = false, this.exhaustedQuota = false});
   final bool includePending;
   final int pendingCount;
+  final bool verifiedSession;
+  final bool exhaustedQuota;
   final List<String> cancellations = [];
   @override
   Future<Map<String, dynamic>> call(String action, [Map<String, dynamic> payload = const {}]) async {
@@ -16,7 +19,10 @@ class StubAdapter implements SchedulerAdapter {
       return {'status': 'Cancelled', 'warning': ''};
     }
     if (action == 'load') {
-      return {'sessions': [], 'pending': pendingCount > 0
+      return {'sessions': verifiedSession ? [
+        {'Id': '11111111-1111-1111-1111-111111111111',
+         'Display': 'QA project | verified CLI session'}
+      ] : [], 'pending': pendingCount > 0
         ? List.generate(pendingCount, (i) => {
           'Name': 'CodexResume-20261103-1900-${(i + 1).toRadixString(16).padLeft(8, '0')}',
           'When': '2026-11-03T19:00:00', 'Repo': r'C:\projects\fixture',
@@ -30,7 +36,13 @@ class StubAdapter implements SchedulerAdapter {
           'Session': '11111111-1111-1111-1111-111111111111',
           'Status': 'Scheduled', 'CreatedAt': 1793732400}
       ] : [], 'history': [],
-        'logDirectory': r'C:\scheduler\logs', 'settings': null};
+        'logDirectory': r'C:\scheduler\logs', 'settings': verifiedSession
+          ? {'draft': {
+              'sessionId': '11111111-1111-1111-1111-111111111111',
+              'model': 'gpt-test', 'effort': 'medium',
+              'repo': r'C:\projects\fixture', 'access': 'read-only',
+            }}
+          : null};
     }
     if (action == 'usage') {
       return {'ok': true,
@@ -42,7 +54,7 @@ class StubAdapter implements SchedulerAdapter {
           {'label': 'Weekly', 'remainingPercent': 45.0, 'resetsAt': 1794200000}
         ],
         'accountId': 'workspace-sha256:' + 'a' * 64,
-        'ordinaryUsageAllowed': true};
+        'ordinaryUsageAllowed': !exhaustedQuota};
     }
     return {'pending': [], 'history': []};
   }
@@ -133,6 +145,24 @@ void main() {
     await tester.drag(list, const Offset(0, -300));
     await tester.pump();
     expect(find.text('Scheduled item 7'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('exhausted quota still permits a verified future schedule',
+      (tester) async {
+    tester.view.physicalSize = const Size(940, 750);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: StubAdapter(verifiedSession: true, exhaustedQuota: true))));
+    await tester.pump(const Duration(milliseconds: 150));
+    final schedule = find.ancestor(
+      of: find.text('Schedule once'), matching: find.byType(InkWell)).first;
+    expect(tester.widget<InkWell>(schedule).onTap, isNotNull,
+      reason: 'the worker rechecks quota at execution; scheduling later is allowed');
     expect(tester.takeException(), isNull);
   });
 
