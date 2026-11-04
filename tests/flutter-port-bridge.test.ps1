@@ -104,7 +104,7 @@ try {
     if($gitSession.Count -ne 1 -or $outsideSession.Count -ne 1){
         throw 'Git-backed and non-Git sessions must both appear in the chooser.'
     }
-    if(-not $gitSession[0].Display.StartsWith('Review shared-EC2 architecture | Git: qa-repository | ') -or
+    if(-not $gitSession[0].Display.StartsWith('Git: qa-repository | ') -or
        -not $gitSession[0].Display.EndsWith($sessionId.Substring(28))){
         throw 'Git-backed session label must show the project, time and short ID.'
     }
@@ -120,6 +120,23 @@ try {
     if(-not $gitSession[0].Display.Contains(" | $displayStamp | ")){
         throw 'Session chooser date must use day then abbreviated month.'
     }
+    if($gitSession[0].Display.Contains('Review shared-EC2 architecture')){
+        throw 'Essential startup load unexpectedly depends on optional rollout content.'
+    }
+    $labelOutput=@(& pwsh -NoLogo -NoProfile -NonInteractive -STA -File $bridge -Action labels)
+    $labelExit=$LASTEXITCODE
+    if($labelExit -ne 0 -or -not $labelOutput){throw 'Optional activity-label query failed.'}
+    $labelBody=($labelOutput | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+    if($labelBody.ok -ne $true){throw "Optional labels failed: $($labelBody.error)"}
+    $gitLabel=@($labelBody.result.sessions | Where-Object Id -eq $sessionId)
+    $outsideLabel=@($labelBody.result.sessions | Where-Object Id -eq $otherId)
+    if($gitLabel.Count -ne 1 -or
+       -not $gitLabel[0].Display.StartsWith('Review shared-EC2 architecture | Git: qa-repository | ') -or
+       $outsideLabel.Count -ne 1 -or
+       -not $outsideLabel[0].Display.StartsWith('Outside Git: outside-git | ')){
+        throw 'Optional activity query lost its topic, fallback label or stable session identity.'
+    }
+    Write-Host 'Essential session loading is isolated from optional activity excerpts PASS.' -ForegroundColor Green
     Write-Host 'Flutter conversation labels clearly distinguish Git-backed and outside-Git sessions PASS.' -ForegroundColor Green
 
 } finally {
