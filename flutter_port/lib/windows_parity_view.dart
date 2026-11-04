@@ -148,6 +148,7 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
         child: Row(children: [
           Expanded(child: Text(
             _dateLabel(selected, long: true),
+            key: const Key('selected-run-time-label'),
             maxLines: 1, overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontFamily: 'Segoe UI',
               fontSize: 12, color: _legacyInk))),
