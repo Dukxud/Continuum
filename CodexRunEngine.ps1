@@ -180,8 +180,9 @@ function Invoke-CodexScheduledJob {
         Write-Host "Model: $($job.model) | Reasoning: $($job.effort) | Access: $($job.access) | Message: $($job.message)"
         $model = [string]$job.model
         Assert-ModelEffortSupported (Read-CodexModelCatalog) $model ([string]$job.effort)
-        # Every run has one opportunity. Verify selected workspace and quota
-        # immediately before execution; never register an automatic follow-up.
+        # Every invocation rechecks the pinned workspace and quota before
+        # execution. Only explicitly opted-in, verified quota exhaustion may
+        # register one bounded future continuation; unrelated failures stop.
         if (-not (Test-CanonicalWorkspaceIdentity ([string]$job.accountId))) {
             throw 'Scheduled job lacks verified workspace identity. Refresh usage and reschedule.'
         }
