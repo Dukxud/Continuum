@@ -6,11 +6,14 @@ import 'package:codex_resume_flutter/bridge.dart';
 
 class StubAdapter implements SchedulerAdapter {
   StubAdapter({this.includePending = false, this.pendingCount = 0,
-    this.verifiedSession = false, this.exhaustedQuota = false});
+    this.verifiedSession = false, this.exhaustedQuota = false,
+    this.failUsage = false, this.pendingStatus = 'Scheduled'});
   final bool includePending;
   final int pendingCount;
   final bool verifiedSession;
   final bool exhaustedQuota;
+  final bool failUsage;
+  final String pendingStatus;
   final List<String> cancellations = [];
   @override
   Future<Map<String, dynamic>> call(String action, [Map<String, dynamic> payload = const {}]) async {
@@ -28,13 +31,13 @@ class StubAdapter implements SchedulerAdapter {
           'When': '2026-11-03T19:00:00', 'Repo': r'C:\projects\fixture',
           'Description': 'Scheduled item ${i + 1}',
           'Session': '11111111-1111-1111-1111-111111111111',
-          'Status': 'Scheduled', 'CreatedAt': 1793732400,
+          'Status': pendingStatus, 'CreatedAt': 1793732400,
         }) : includePending ? [
         {'Name': 'CodexResume-20261103-1900-abcd1234',
           'When': '2026-11-03T19:00:00', 'Repo': r'C:\projects\long-repository-name',
           'Description': 'medium | read-only | long scheduled instruction',
           'Session': '11111111-1111-1111-1111-111111111111',
-          'Status': 'Scheduled', 'CreatedAt': 1793732400}
+          'Status': pendingStatus, 'CreatedAt': 1793732400}
       ] : [], 'history': [],
         'logDirectory': r'C:\scheduler\logs', 'settings': verifiedSession
           ? {'draft': {
@@ -45,6 +48,7 @@ class StubAdapter implements SchedulerAdapter {
           : null};
     }
     if (action == 'usage') {
+      if (failUsage) throw SchedulerException('Transient live quota failure');
       return {'ok': true,
         'models': [{'id': 'gpt-test', 'name': 'Test model',
           'efforts': ['medium'], 'defaultEffort': 'medium', 'isDefault': true}],
@@ -163,6 +167,43 @@ void main() {
       of: find.text('Schedule once'), matching: find.byType(InkWell)).first;
     expect(tester.widget<InkWell>(schedule).onTap, isNotNull,
       reason: 'the worker rechecks quota at execution; scheduling later is allowed');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('usage failures show actionable feedback inside both cards',
+      (tester) async {
+    tester.view.physicalSize = const Size(940, 750);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: StubAdapter(failUsage: true))));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.text('Usage unavailable; retrying automatically'), findsNWidgets(2));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('running jobs show Running and cannot be cancelled',
+      (tester) async {
+    tester.view.physicalSize = const Size(940, 750);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: StubAdapter(pendingCount: 1, pendingStatus: 'Running'))));
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.tap(find.text('Scheduled item 1'));
+    await tester.pump();
+    final cancelButton = find.ancestor(
+      of: find.text('Cancel selected'), matching: find.byType(InkWell)).first;
+    expect(tester.widget<InkWell>(cancelButton).onTap, isNull);
+    await tester.tap(find.text('Compact mode: OFF'));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.text('Running'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
