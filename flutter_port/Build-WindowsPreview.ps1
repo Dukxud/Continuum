@@ -17,6 +17,7 @@ if(-not $PackageVerifiedBuild){
     if(-not $flutter){throw 'Flutter SDK not on PATH.'}
 }
 $label='CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW'
+$OutputDirectory=[IO.Path]::GetFullPath($OutputDirectory)
 $destination=Join-Path $OutputDirectory $label
 $zip=Join-Path $OutputDirectory ($label+'.zip')
 if((Test-Path -LiteralPath $destination) -or (Test-Path -LiteralPath $zip)){
@@ -82,16 +83,43 @@ No publisher authentication or full device acceptance is asserted.
         Where-Object { $_.Name -ne 'SHA256SUMS.txt' } |
         Sort-Object FullName)
     $lines=@(foreach($file in $files){
-        $relative=$file.FullName.Substring($destination.Length+1).Replace('\','/')
+        $relative=[IO.Path]::GetRelativePath($destination,$file.FullName).Replace('\','/')
         "$(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256 | Select-Object -ExpandProperty Hash)  $relative"
     })
     $lines | Set-Content -LiteralPath (Join-Path $destination 'SHA256SUMS.txt') -Encoding utf8
     Compress-Archive -LiteralPath $destination -DestinationPath $zip -CompressionLevel Optimal
     if(-not (Test-Path -LiteralPath $zip -PathType Leaf)){throw 'Preview ZIP was not created.'}
     if((Get-Item -LiteralPath $zip).Length -lt 1048576){throw 'Unexpectedly small Windows review package.'}
+    # Extract and independently validate the actual distributed ZIP, not
+    # merely the pre-compression source files. Paths are package-root-relative.
+    $verify=Join-Path $OutputDirectory ('.verify-'+[guid]::NewGuid().ToString('N'))
+    try{
+        Expand-Archive -LiteralPath $zip -DestinationPath $verify -ErrorAction Stop
+        $extracted=Join-Path $verify $label
+        $manifest=Get-Content -LiteralPath (Join-Path $extracted 'SHA256SUMS.txt') -ErrorAction Stop
+        $actualFiles=@(Get-ChildItem -LiteralPath $extracted -Recurse -File |
+            Where-Object { $_.Name -ne 'SHA256SUMS.txt' })
+        if($manifest.Count -ne $actualFiles.Count){throw 'Packaged manifest file count mismatch.'}
+        foreach($entry in $manifest){
+            if($entry -cnotmatch '^([0-9A-F]{64})  ([^\\]+)$'){throw 'Malformed package checksum entry.'}
+            $digest=$Matches[1]
+            $relative=$Matches[2]
+            if($relative.StartsWith('/') -or $relative.StartsWith('..') -or $relative.Contains('/../')){
+                throw 'Unsafe package checksum path.'
+            }
+            $path=Join-Path $extracted $relative.Replace('/','\')
+            if(-not (Test-Path -LiteralPath $path -PathType Leaf)){throw "Package file missing: $relative"}
+            $actual=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+            if($actual -cne $digest){throw "Package checksum failed: $relative"}
+        }
+    }finally{
+        if(Test-Path -LiteralPath $verify){Remove-Item -LiteralPath $verify -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+    Write-Host "Verified $($manifest.Count) checksums from the extracted Windows package." -ForegroundColor Green
     Write-Host "Unsigned Windows Flutter review package: $zip" -ForegroundColor Green
     Write-Host "Standalone executable: $(Join-Path $destination 'codex_resume_flutter.exe')"
 }catch{
     if(Test-Path -LiteralPath $destination){Remove-Item -LiteralPath $destination -Recurse -Force -ErrorAction SilentlyContinue}
+    if(Test-Path -LiteralPath $zip){Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue}
     throw
 }
