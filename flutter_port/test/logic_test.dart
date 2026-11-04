@@ -130,6 +130,55 @@ class RepositoryLookupScheduler extends FakeScheduler {
   }
 }
 
+/// Mimics the real adapter: loading recent CLI sessions does not implicitly
+/// resolve their repositories; only the separate 'select' action does.
+class StartupRepositoryScheduler extends FakeScheduler {
+  StartupRepositoryScheduler({
+    this.savedSessionId = '11111111-1111-1111-1111-111111111111',
+    this.savedRepository = '',
+    this.roots = const [r'C:\discovered\checkout'],
+  });
+
+  String savedSessionId;
+  String savedRepository;
+  List<String?> roots;
+  List<Map<String, dynamic>> availableSessions = [
+    {'Id': '11111111-1111-1111-1111-111111111111', 'Display': 'CLI checkout'},
+  ];
+  int lookups = 0;
+  Completer<Map<String, dynamic>>? deferredSelection;
+
+  @override
+  Future<Map<String, dynamic>> call(String action,
+      [Map<String, dynamic> payload = const {}]) async {
+    final original = await super.call(action, payload);
+    if (action == 'load') {
+      final settings = Map<String, dynamic>.from(original['settings'] as Map);
+      final draft = Map<String, dynamic>.from(settings['draft'] as Map);
+      draft['sessionId'] = savedSessionId;
+      draft['repo'] = savedRepository;
+      return {
+        ...original,
+        'sessions': availableSessions,
+        'settings': {...settings, 'draft': draft},
+      };
+    }
+    if (action == 'select') {
+      lookups++;
+      if (deferredSelection != null) return deferredSelection!.future;
+      final index = (lookups - 1).clamp(0, roots.length - 1);
+      final root = roots[index];
+      return {
+        'sessionId': payload['sessionId'],
+        'model': 'gpt-test',
+        'found': root == null ? null :
+          {'Root': root, 'AlternativeRoots': <String>[]},
+      };
+    }
+    return original;
+  }
+}
+
 class PendingRepositoryLookupScheduler extends FakeScheduler {
   final lookup = Completer<Map<String, dynamic>>();
 
@@ -328,6 +377,96 @@ void main() {
     expect(fake.maxSimultaneous, 1);
     expect(fake.saves.length, 2);
     expect((fake.saves.last['draft'] as Map)['message'], 'Latest preference');
+    controller.dispose();
+  });
+
+  test('WinForms parity: restored CLI conversation discovers Git root on startup', () async {
+    final fake = StartupRepositoryScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    expect(fake.lookups, 1,
+      reason: 'WinForms Apply-SessionList requests repository discovery on startup');
+    await controller.selectSession(controller.sessionId);
+    expect(controller.repo, r'C:\discovered\checkout');
+    await controller.flushPreferences();
+    expect((fake.saves.last['draft'] as Map)['repo'], controller.repo);
+    controller.dispose();
+  });
+
+  test('missing saved conversation selects newest CLI session, not its old root', () async {
+    final fake = StartupRepositoryScheduler(
+      savedSessionId: '99999999-9999-9999-9999-999999999999',
+      savedRepository: r'C:\old\unsafe',
+      roots: [r'C:\new\safe'],
+    );
+    fake.availableSessions = [
+      {'Id': '22222222-2222-2222-2222-222222222222',
+       'Display': 'Newest CLI project'},
+      {'Id': '11111111-1111-1111-1111-111111111111',
+       'Display': 'Older CLI project'},
+    ];
+    final controller = SchedulerController(fake);
+    await controller.start();
+    expect(controller.sessionId, '22222222-2222-2222-2222-222222222222');
+    await controller.selectSession(controller.sessionId);
+    expect(controller.repo, r'C:\new\safe');
+    expect(controller.repo, isNot(r'C:\old\unsafe'));
+    controller.dispose();
+  });
+
+  test('saved manual repository wins on startup, with no redundant lookup', () async {
+    final fake = StartupRepositoryScheduler(savedRepository: r'C:\manual\verified');
+    final controller = SchedulerController(fake);
+    await controller.start();
+    expect(controller.repo, r'C:\manual\verified');
+    expect(fake.lookups, 0);
+    controller.dispose();
+  });
+
+  test('unresolved startup repository is automatically retried on full refresh', () async {
+    final fake = StartupRepositoryScheduler(
+      roots: [null, r'C:\recovered\project']);
+    final controller = SchedulerController(fake);
+    await controller.start();
+    await controller.selectSession(controller.sessionId);
+    expect(controller.repo, isEmpty);
+    expect(controller.repositoryWarning, contains('unresolved'));
+    await controller.load();
+    await controller.selectSession(controller.sessionId);
+    expect(fake.lookups, 2);
+    expect(controller.repo, r'C:\recovered\project');
+    controller.dispose();
+  });
+
+  test('refresh loses old session safely and resolves newly selected conversation', () async {
+    final fake = StartupRepositoryScheduler(
+      savedRepository: r'C:\first\project', roots: [r'C:\second\project']);
+    final controller = SchedulerController(fake);
+    await controller.start();
+    fake.availableSessions = [
+      {'Id': '22222222-2222-2222-2222-222222222222',
+       'Display': 'Replacement CLI session'},
+    ];
+    await controller.load();
+    await controller.selectSession(controller.sessionId);
+    expect(controller.sessionId, '22222222-2222-2222-2222-222222222222');
+    expect(controller.repo, r'C:\second\project');
+    controller.dispose();
+  });
+
+  test('late lookup never fills a repository explicitly cleared by the user', () async {
+    final fake = StartupRepositoryScheduler();
+    fake.deferredSelection = Completer<Map<String, dynamic>>();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    controller.edit(repository: '');
+    fake.deferredSelection!.complete({
+      'found': {'Root': r'C:\stale\guessed'},
+      'model': 'gpt-test',
+    });
+    await controller.selectSession(controller.sessionId);
+    expect(controller.repo, isEmpty);
+    expect(controller.repositoryWarning, isNull);
     controller.dispose();
   });
 
