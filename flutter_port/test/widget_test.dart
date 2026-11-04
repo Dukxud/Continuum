@@ -126,6 +126,27 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('handoff glow has no rectangular clipping seam', (tester) async {
+    tester.view.physicalSize = const Size(1240, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(adapter: StubAdapter())));
+    await tester.pump(const Duration(milliseconds: 150));
+
+    final badge = find.text('SECOND-PRECISE');
+    final handoffStack = find.ancestor(of: badge, matching: find.byType(Stack)).first;
+    expect(tester.widget<Stack>(handoffStack).clipBehavior, Clip.none,
+      reason: 'The inset Stack must not cut the ambient glow at its rectangular bounds.');
+
+    final roundedCard = find.ancestor(of: handoffStack, matching: find.byType(ClipRRect)).first;
+    expect(tester.widget<ClipRRect>(roundedCard).clipBehavior, isNot(Clip.none),
+      reason: 'Glow remains constrained by the outer rounded card.');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('auto-resume on quota is explicitly off until enabled',
       (tester) async {
     tester.view.physicalSize = const Size(1240, 900);
