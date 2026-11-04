@@ -71,6 +71,22 @@ class ExhaustedQuotaScheduler extends FakeScheduler {
   }
 }
 
+/// Controls only a subsequent usage refresh so startup has verified data.
+class PausedQuotaRefreshScheduler extends FakeScheduler {
+  Completer<void>? gate;
+  bool reject = false;
+
+  @override
+  Future<Map<String, dynamic>> call(String action,
+      [Map<String, dynamic> payload = const {}]) async {
+    if (action == 'usage' && gate != null) {
+      await gate!.future;
+      if (reject) throw SchedulerException('Quota refresh failed');
+    }
+    return super.call(action, payload);
+  }
+}
+
 class FailOnceLoadScheduler extends FakeScheduler {
   bool firstLoad = true;
   @override
@@ -281,6 +297,49 @@ void main() {
     await controller.schedule(confirmUnrestricted:false,confirmOverlap:false);
     expect(fake.schedules.last['runAt'],localIsoSecond(selected));
     controller.dispose();
+  });
+
+  test('valid Schedule once stays enabled during refresh; failed refresh disables it',
+      () async {
+    final adapter = PausedQuotaRefreshScheduler();
+    final state = SchedulerController(adapter);
+    await state.start();
+    expect(state.canSchedule, isTrue);
+    adapter.gate = Completer<void>();
+    final inFlight = state.readUsage();
+    expect(state.readingUsage, isTrue);
+    expect(state.canSchedule, isTrue,
+      reason: 'Refreshing valid cached quota must not blink the action');
+    adapter.gate!.complete();
+    await inFlight;
+    expect(state.readingUsage, isFalse);
+    expect(state.canSchedule, isTrue);
+
+    adapter.gate = Completer<void>();
+    adapter.reject = true;
+    final failing = state.readUsage();
+    expect(state.canSchedule, isTrue,
+      reason: 'Keep last verified identity while refresh is pending');
+    adapter.gate!.complete();
+    await failing;
+    expect(state.canSchedule, isFalse,
+      reason: 'Failed refresh must revoke the cached admission');
+    expect(state.quota, isNull);
+    state.dispose();
+  });
+
+  test('expired or mismatched cached quota still disables scheduling', () async {
+    final state = SchedulerController(FakeScheduler());
+    await state.start();
+    expect(state.canSchedule, isTrue);
+    state.readingUsage = true;
+    state.quotaAt = DateTime.now().subtract(const Duration(minutes: 3));
+    expect(state.canSchedule, isFalse,
+      reason: 'Refresh activity cannot bypass the 120-second TTL');
+    state.quotaAt = DateTime.now();
+    state.quotaModel = 'wrong-model';
+    expect(state.canSchedule, isFalse);
+    state.dispose();
   });
 
   test('Reset +1 is offered only for fresh matching quota data', () async {
