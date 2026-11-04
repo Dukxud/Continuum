@@ -103,6 +103,13 @@ and authoritative repository discovery remain unchanged. A session started
 outside Git may still work in a later checkout; its label never authorizes
 substituting a repository.
 
+**Startup isolation:** Loading sessions, task history and preferences uses
+only stable metadata. Activity excerpts are fetched separately after the
+live account/quota query and merged by the unchanged full session ID.
+Slow or malformed active rollout files cannot block the initial dashboard,
+and cosmetic errors leave the stable folder-and-ID labels available.
+Label attempts are bounded to once every three minutes.
+
 The full-mode form now places **Model / Reasoning / Access** immediately after
 **Repository root**. **Run at / Instruction / Schedule once** share one visually
 unified panel. Existing coordinates below that group, full/compact sizing,
