@@ -2,7 +2,7 @@
 # The existing verified worker owns all execution and account safety checks.
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('load','pending','usage','select','schedule','cancel','evidence','hide','save','browse')][string]$Action,
+    [Parameter(Mandatory)][ValidateSet('load','labels','pending','usage','select','schedule','cancel','evidence','hide','save','browse')][string]$Action,
     [string]$Payload = ''
 )
 $ErrorActionPreference='Stop'
@@ -25,6 +25,7 @@ try {
     # Presentation-only labels: preserve the WinForms session reader and its
     # full stable IDs, while making the Flutter chooser distinguish projects.
     function Get-FlutterSessionChoices {
+        param([switch]$IncludeActivity)
         $rootCache=@{}
         foreach($session in @(Get-RecentCliSessions)){
             try {
@@ -43,7 +44,9 @@ try {
                 $when=(Get-Item -LiteralPath $session.File -ErrorAction Stop).LastWriteTime
                 $id=[string]$session.Id
                 $date=$when.ToString('d MMM HH:mm',[Globalization.CultureInfo]::InvariantCulture)
-                $activity=Get-CodexSessionActivity -SessionFile ([string]$session.File)
+                # Activity excerpts are optional. Never scan large live Codex
+                # rollouts as part of the critical startup data load.
+                $activity=if($IncludeActivity){Get-CodexSessionActivity -SessionFile ([string]$session.File)}else{$null}
                 $identity=('{0} | {1} | {2}' -f $title,$date,$id.Substring($id.Length-8))
                 $session.Display=if($activity){$activity+' | '+$identity}else{$identity}
             }catch{
@@ -82,6 +85,9 @@ try {
                 settings=Read-CodexUiSettings $appDir
                 logDirectory=$appDir
             }
+        }
+        'labels' {
+            $result=@{sessions=@(Get-FlutterSessionChoices -IncludeActivity)}
         }
         'pending' {
             $tasks=@(Get-UpcomingCodexTasks -AppDirectory $appDir)
