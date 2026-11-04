@@ -10,6 +10,8 @@ on:
       - 'tests/codex-worker-integration.test.ps1'
       - 'CodexQuotaContinuation.ps1'
       - 'CodexRunEngine.ps1'
+      - 'CodexData.ps1'
+      - 'tests/flutter-port-source.test.ps1'
       - 'components/JobOutcomes/**'
       - 'scripts/Package-CodexScheduler.ps1'
       - '.github/workflows/flutter-port-preflight.yml'
@@ -30,6 +32,10 @@ jobs:
     steps:
       - name: Checkout exact PR revision
         uses: actions/checkout@v4
+
+      - name: Parse entire Windows bridge and worker source chain
+        shell: pwsh
+        run: pwsh -NoProfile -File ./tests/flutter-port-source.test.ps1
 
       - name: Install pinned Flutter
         uses: subosito/flutter-action@v2
