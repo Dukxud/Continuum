@@ -3,96 +3,94 @@ part of 'main.dart';
 // Coordinates, band colors and labels follow CodexUiForms.ps1,
 // CodexUiPixelTheme.ps1 and Update-DashboardLayout in CodexDashboard.ps1.
 // Flutter owns interactivity; the existing worker owns scheduling policy.
-const _legacyBackground = Color(0xfff0f5fb);
-const _legacyInk = Color(0xff253a58);
-const _legacyInput = Color(0xfffbfdff);
+const _legacyBackground = Color(0xfff3f6fa);
+const _legacyInk = Color(0xff273a53);
+const _legacyInput = Color(0xffffffff);
 
+/// Quiet card surface; liquid color belongs to the bars, not noisy borders.
 class _LegacyBand extends StatelessWidget {
   const _LegacyBand({required this.fill, required this.accent});
   final Color fill;
   final Color accent;
 
   @override
-  Widget build(BuildContext context) => CustomPaint(
-    painter: _BandPainter(fill, accent),
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: fill,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: accent.withValues(alpha: .36)),
+      boxShadow: [
+        BoxShadow(
+          color: const Color(0xff2a4469).withValues(alpha: .035),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
     child: const SizedBox.expand(),
   );
 }
 
-class _BandPainter extends CustomPainter {
-  _BandPainter(this.fill, this.accent);
-  final Color fill;
-  final Color accent;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width, h = size.height;
-    if (w < 18 || h < 18) return;
-    final area = Offset.zero & size;
-    canvas.drawRect(area, Paint()..shader = LinearGradient(
-      begin: Alignment.topCenter, end: Alignment.bottomCenter,
-      colors: [Color.lerp(fill, Colors.white, .30)!, fill],
-    ).createShader(area));
-    final border = Paint()..color = accent.withValues(alpha: .49)
-      ..style = PaintingStyle.stroke..strokeWidth = 1;
-    canvas.drawRect(Rect.fromLTWH(.5,.5,w-1,h-1),border);
-    final top = Paint()..color = Colors.white.withValues(alpha: .73);
-    final bottom = Paint()..color = accent.withValues(alpha: .26);
-    canvas.drawLine(const Offset(5,2),Offset(w-16,2),top);
-    canvas.drawLine(Offset(5,h-3),Offset(w-12,h-3),bottom);
-    canvas.drawRect(Rect.fromLTWH(0,0,4,h),Paint()..color = accent);
-    canvas.drawRect(const Rect.fromLTWH(8,0,13,2),Paint()..color=accent);
-    canvas.drawRect(Rect.fromLTWH(w-10,2,6,4),Paint()..color=accent);
-    final quiet = Paint()..color=accent.withValues(alpha: .31);
-    canvas.drawRect(Rect.fromLTWH(w-15,7,5,4),quiet);
-    for(double y=12;y<h-5;y+=22){
-      canvas.drawRect(Rect.fromLTWH(0,y,4,5),Paint()..color=fill);
-      canvas.drawRect(Rect.fromLTWH(5,y+1,3,3),quiet);
-    }
-    for(double x=27;x<w-20;x+=116){
-      canvas.drawRect(Rect.fromLTWH(x,h-5,4,2),quiet);
-      canvas.drawRect(Rect.fromLTWH(x+6,h-5,2,2),quiet);
-    }
-  }
-  @override
-  bool shouldRepaint(covariant _BandPainter old) => fill!=old.fill || accent!=old.accent;
-}
-
 class _LegacyButton extends StatelessWidget {
-  const _LegacyButton(this.text, this.onPressed,{this.color=const Color(0xff516f98),this.primary=false});
+  const _LegacyButton(this.text, this.onPressed,{
+    this.color = const Color(0xff55739b),
+    this.primary = false,
+  });
   final String text;
   final VoidCallback? onPressed;
   final Color color;
   final bool primary;
+
   @override
   Widget build(BuildContext context) {
-    final enabled=onPressed!=null;
-    final background=enabled ? color : const Color(0xffdde4ee);
-    return Semantics(button: true, enabled: enabled, child: Material(
-      color: background,
-      child: InkWell(onTap: onPressed,
-        child: Container(
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            border: Border.all(color: enabled
-              ? Color.lerp(color,Colors.black,.22)! : const Color(0xffb8c6d8))),
-          child: Stack(children:[
-            Positioned(left:4,right:4,top:2,
-              child: Container(height:1,color:Colors.white.withValues(alpha: primary ? .52 : .28))),
-            Positioned(right:4,top:5,
-              child: Container(width:3,height:3,color:Colors.white.withValues(alpha:.35))),
-            Center(child: Text(text,textAlign:TextAlign.center,
-              style: TextStyle(fontFamily:'Segoe UI',color:enabled?Colors.white:const Color(0xff52647c),
-                fontSize:13,fontWeight:primary?FontWeight.w700:FontWeight.w600))),
-          ]),
-        ))));
+    final enabled = onPressed != null;
+    final fill = !enabled
+      ? const Color(0xffe9edf3)
+      : primary ? color : Color.lerp(color, Colors.white, .89)!;
+    final ink = !enabled
+      ? const Color(0xff7a8597)
+      : primary ? Colors.white : Color.lerp(color, const Color(0xff1d2f48), .56)!;
+    final edge = !enabled
+      ? const Color(0xffd7dfe9)
+      : primary ? color : Color.lerp(color, Colors.white, .63)!;
+    final radius = BorderRadius.circular(6);
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      child: Material(
+        color: fill,
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(color: edge),
+        ),
+        child: InkWell(
+          onTap: onPressed,
+          child: Center(
+            child: Text(
+              text,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Segoe UI',
+                color: ink,
+                fontSize: 13,
+                fontWeight: primary ? FontWeight.w700 : FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
 class _LegacyInputBorder extends OutlineInputBorder {
   const _LegacyInputBorder()
-    : super(borderSide: const BorderSide(color:Color(0xffb8c6d8)),
-      borderRadius: BorderRadius.zero);
+    : super(
+        borderSide: const BorderSide(color: Color(0xffcad5e3)),
+        borderRadius: const BorderRadius.all(Radius.circular(6)),
+      );
 }
 
 extension _LegacySchedulerVisuals on _SchedulerHomeState {
@@ -115,8 +113,9 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
       hintText:hint,isDense:true,filled:true,fillColor:_legacyInput,
       contentPadding:const EdgeInsets.symmetric(horizontal:7,vertical:5),
       enabledBorder:const _LegacyInputBorder(),
-      focusedBorder:const OutlineInputBorder(borderRadius:BorderRadius.zero,
-        borderSide:BorderSide(color:Color(0xff547fd2),width:1.3)),
+      focusedBorder:const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(6)),
+        borderSide:BorderSide(color:Color(0xff457fb6),width:1.5)),
     ));
 
   Widget _combo<T>({
@@ -126,7 +125,8 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
   })=>Container(
     padding:const EdgeInsets.symmetric(horizontal:6),
     decoration:BoxDecoration(color:_legacyInput,
-      border:Border.all(color:const Color(0xffb8c6d8))),
+      borderRadius: BorderRadius.circular(6),
+      border:Border.all(color:const Color(0xffcad5e3))),
     child:DropdownButtonHideUnderline(child:DropdownButton<T>(
       key:ValueKey(name+':'+selected.toString()),
       value:selected,
@@ -143,7 +143,8 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
       onTap: pickTime,
       child: Container(
         decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xffb8c6d8))),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xffcad5e3))),
         padding: const EdgeInsets.only(left: 8, right: 4),
         child: Row(children: [
           Expanded(child: Text(
