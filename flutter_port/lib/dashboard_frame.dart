@@ -12,10 +12,10 @@ extension _DashboardFrame on _SchedulerHomeState {
           scrollDirection: Axis.horizontal,
           child: SizedBox(width: width,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(26, 18, 26, 20),
+              padding: const EdgeInsets.fromLTRB(26, 12, 26, 12),
               child: Column(children: [
-                SizedBox(height: 72, child: _deckHeader(state)),
-                const SizedBox(height: 17),
+                SizedBox(height: 62, child: _deckHeader(state)),
+                const SizedBox(height: 12),
                 SizedBox(height: 702, child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
