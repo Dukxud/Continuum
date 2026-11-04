@@ -110,6 +110,7 @@ try {
             $result=@{sessionId=$id;model=Read-SessionModel $session;found=$found}
         }
         'schedule' {
+            if($null -ne $request.autoResumeOnLimit -and $request.autoResumeOnLimit -isnot [bool]){throw 'Invalid automatic-continuation option.'}
             $sessionId=[string]$request.sessionId
             if($sessionId -notmatch '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$'){throw 'Invalid session ID.'}
             # Validate the actual Flutter wall-clock value before any lookup or
@@ -140,7 +141,6 @@ try {
             $access=[string]$request.access
             if($access -cnotin @('workspace-write','read-only','yolo')){throw 'Invalid access mode.'}
             if($access -eq 'yolo' -and $request.confirmUnrestricted -ne $true){throw 'Explicit unrestricted-access confirmation required.'}
-            if($null -ne $request.autoResumeOnLimit -and $request.autoResumeOnLimit -isnot [bool]){throw 'Invalid automatic-continuation option.'}
             $policy=if($request.autoResumeOnLimit -eq $true){
                 @{schema=1;mode='quota-only';maxContinuations=3}
             }else{$null}
