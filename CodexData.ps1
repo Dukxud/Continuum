@@ -178,6 +178,7 @@ function Get-UpcomingCodexTasks {
         $repo = '-'
         $model = ''
         $createdAt = $null
+        $quotaContinuation = $false
         if (Test-Path -LiteralPath $json) {
             try {
                 $job = Get-Content -LiteralPath $json -Raw | ConvertFrom-Json
@@ -185,7 +186,159 @@ function Get-UpcomingCodexTasks {
                 $session = [string]$job.sessionId
                 $repo = [string]$job.repo
                 $model = [string]$job.model
-                if ([string]$job.createdAt -match '^\d{9,12}$') { $createdAt = [long]$job.createdAt }
+                if ([string]$job.createdAt -match '^\d{9,12}
+            } catch { $description = 'Scheduled task (job data unreadable)' }
+        } elseif ($name -match '^BP\d+-Codex-') {
+            # Older manually registered BP tasks remain visible, read-only.
+            $repo = [string]$task.Actions[0].WorkingDirectory
+            $match = [regex]::Match([string]$task.Actions[0].Arguments, '-File\s+"([^"]+)"')
+            if ($match.Success -and (Test-Path -LiteralPath $match.Groups[1].Value -PathType Leaf)) {
+                try {
+                    $legacy = Get-Content -LiteralPath $match.Groups[1].Value -Raw
+                    $sidMatch = [regex]::Match($legacy, 'resume\s+"([0-9a-fA-F-]{36})"')
+                    if ($sidMatch.Success) { $session = $sidMatch.Groups[1].Value }
+                    $effortMatch = [regex]::Match($legacy, 'model_reasoning_effort=(medium|high|xhigh)')
+                    $effortName = if ($effortMatch.Success) { $effortMatch.Groups[1].Value } else { 'unspecified' }
+                    $accessName = if ($legacy.Contains('--dangerously-bypass-approvals-and-sandbox')) { 'YOLO' } elseif ($legacy.Contains('--sandbox read-only')) { 'read-only' } else { 'other' }
+                    $description = "$effortName | $accessName | existing BP task"
+                } catch { }
+            }
+        }
+        $taskInfo = $null
+        if ($when -le $now -and $task.State -ne 'Running') {
+            try {
+                $taskInfo = Get-ScheduledTaskInfo -TaskName $name -TaskPath $task.TaskPath -ErrorAction Stop
+            } catch { }
+        }
+        $outcome = $null
+        $resultPath = Join-Path $AppDirectory ($name + '.result.json')
+        if (Test-Path -LiteralPath $resultPath -PathType Leaf) {
+            try { $outcome = Read-JobOutcome -Path $resultPath } catch { }
+        }
+        $runState = Get-CodexTaskDisplayState -When $when -TaskState ([string]$task.State) -TaskInfo $taskInfo -Outcome $outcome -Now $now
+        $items += [pscustomobject]@{
+            Name = $name; When = $when; Repo = $repo; Session = $session
+            Description = $description; Model = $model; CreatedAt = $createdAt
+            Status = $runState; QuotaContinuation = $quotaContinuation
+        }
+    }
+    # Active work must be shown FIRST; next scheduled jobs precede history.
+    $active = @($items | Where-Object Status -eq 'Running' | Sort-Object When -Descending)
+    $future = @($items | Where-Object Status -eq 'Scheduled' | Sort-Object When)
+    $recent = @($items | Where-Object { $_.Status -notin @('Running','Scheduled') } | Sort-Object When -Descending)
+    return @($active) + @($future) + @($recent)
+}
+
+function Read-SessionModel {
+    param($Session)
+    if (-not $Session -or -not (Test-Path -LiteralPath $Session.File -PathType Leaf)) { return $null }
+    try {
+        foreach ($line in @(Get-Content -LiteralPath $Session.File -Tail 600) | Select-Object -Last 600) {
+            if ($line -notmatch '"model"') { continue }
+            $record = $line | ConvertFrom-Json -ErrorAction Stop
+            if ($record.type -eq 'turn_context' -and $record.payload.model -is [string]) { $found = [string]$record.payload.model }
+        }
+        return $found
+    } catch { return $null }
+}
+
+# App-specific facade over the reusable JSON settings store.
+function Read-CodexUiSettings {
+    param([string]$Directory)
+    return Read-JsonSettings -Path (Join-Path $Directory 'settings.json')
+}
+function Write-CodexUiSettings {
+    param([string]$Directory, $State)
+    Write-JsonSettings -Path (Join-Path $Directory 'settings.json') -Value $State
+}
+
+function Get-RestoredRunTime {
+    param([string]$Value, [datetime]$Now)
+    $parsed = [datetime]::MinValue
+    if ($Value -and [datetime]::TryParseExact($Value, 'yyyy-MM-ddTHH:mm:ss',
+        [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsed)) {
+        if ($parsed -gt $Now.AddSeconds(30)) { return $parsed }
+    }
+    return $null
+}
+) { $createdAt = [long]$job.createdAt }
+                $quotaContinuation = $job.continuationPolicy.mode -ceq 'quota-only' -and
+                    [string]$job.retryAttempt -match '^[1-3]
+            } catch { $description = 'Scheduled task (job data unreadable)' }
+        } elseif ($name -match '^BP\d+-Codex-') {
+            # Older manually registered BP tasks remain visible, read-only.
+            $repo = [string]$task.Actions[0].WorkingDirectory
+            $match = [regex]::Match([string]$task.Actions[0].Arguments, '-File\s+"([^"]+)"')
+            if ($match.Success -and (Test-Path -LiteralPath $match.Groups[1].Value -PathType Leaf)) {
+                try {
+                    $legacy = Get-Content -LiteralPath $match.Groups[1].Value -Raw
+                    $sidMatch = [regex]::Match($legacy, 'resume\s+"([0-9a-fA-F-]{36})"')
+                    if ($sidMatch.Success) { $session = $sidMatch.Groups[1].Value }
+                    $effortMatch = [regex]::Match($legacy, 'model_reasoning_effort=(medium|high|xhigh)')
+                    $effortName = if ($effortMatch.Success) { $effortMatch.Groups[1].Value } else { 'unspecified' }
+                    $accessName = if ($legacy.Contains('--dangerously-bypass-approvals-and-sandbox')) { 'YOLO' } elseif ($legacy.Contains('--sandbox read-only')) { 'read-only' } else { 'other' }
+                    $description = "$effortName | $accessName | existing BP task"
+                } catch { }
+            }
+        }
+        $taskInfo = $null
+        if ($when -le $now -and $task.State -ne 'Running') {
+            try {
+                $taskInfo = Get-ScheduledTaskInfo -TaskName $name -TaskPath $task.TaskPath -ErrorAction Stop
+            } catch { }
+        }
+        $outcome = $null
+        $resultPath = Join-Path $AppDirectory ($name + '.result.json')
+        if (Test-Path -LiteralPath $resultPath -PathType Leaf) {
+            try { $outcome = Read-JobOutcome -Path $resultPath } catch { }
+        }
+        $runState = Get-CodexTaskDisplayState -When $when -TaskState ([string]$task.State) -TaskInfo $taskInfo -Outcome $outcome -Now $now
+        $items += [pscustomobject]@{
+            Name = $name; When = $when; Repo = $repo; Session = $session
+            Description = $description; Model = $model; CreatedAt = $createdAt
+            Status = $runState
+        }
+    }
+    # Active work must be shown FIRST; next scheduled jobs precede history.
+    $active = @($items | Where-Object Status -eq 'Running' | Sort-Object When -Descending)
+    $future = @($items | Where-Object Status -eq 'Scheduled' | Sort-Object When)
+    $recent = @($items | Where-Object { $_.Status -notin @('Running','Scheduled') } | Sort-Object When -Descending)
+    return @($active) + @($future) + @($recent)
+}
+
+function Read-SessionModel {
+    param($Session)
+    if (-not $Session -or -not (Test-Path -LiteralPath $Session.File -PathType Leaf)) { return $null }
+    try {
+        foreach ($line in @(Get-Content -LiteralPath $Session.File -Tail 600) | Select-Object -Last 600) {
+            if ($line -notmatch '"model"') { continue }
+            $record = $line | ConvertFrom-Json -ErrorAction Stop
+            if ($record.type -eq 'turn_context' -and $record.payload.model -is [string]) { $found = [string]$record.payload.model }
+        }
+        return $found
+    } catch { return $null }
+}
+
+# App-specific facade over the reusable JSON settings store.
+function Read-CodexUiSettings {
+    param([string]$Directory)
+    return Read-JsonSettings -Path (Join-Path $Directory 'settings.json')
+}
+function Write-CodexUiSettings {
+    param([string]$Directory, $State)
+    Write-JsonSettings -Path (Join-Path $Directory 'settings.json') -Value $State
+}
+
+function Get-RestoredRunTime {
+    param([string]$Value, [datetime]$Now)
+    $parsed = [datetime]::MinValue
+    if ($Value -and [datetime]::TryParseExact($Value, 'yyyy-MM-ddTHH:mm:ss',
+        [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsed)) {
+        if ($parsed -gt $Now.AddSeconds(30)) { return $parsed }
+    }
+    return $null
+}
+
             } catch { $description = 'Scheduled task (job data unreadable)' }
         } elseif ($name -match '^BP\d+-Codex-') {
             # Older manually registered BP tasks remain visible, read-only.
