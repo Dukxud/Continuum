@@ -45,6 +45,9 @@ class WindowsSchedulerAdapter implements SchedulerAdapter {
     return findSourceDirectoryFrom(
       executableDirectory: File(Platform.resolvedExecutable).parent.absolute,
       workingDirectory: Directory.current.absolute,
+      // Debug `flutter run` relies on checkout CWD. A packaged release must
+      // fail closed rather than silently load worker code from CWD.
+      allowWorkingDirectory: !const bool.fromEnvironment('dart.vm.product'),
     );
   }
 
@@ -53,8 +56,12 @@ class WindowsSchedulerAdapter implements SchedulerAdapter {
   static String findSourceDirectoryFrom({
     required Directory executableDirectory,
     required Directory workingDirectory,
+    bool allowWorkingDirectory = true,
   }) {
-    for (final start in [executableDirectory, workingDirectory]) {
+    for (final start in [
+      executableDirectory,
+      if (allowWorkingDirectory) workingDirectory,
+    ]) {
       var current = start.absolute;
       for (var depth = 0; depth < 12; depth++) {
         if (File(current.path + r'\CodexRunEngine.ps1').existsSync() &&
@@ -175,7 +182,15 @@ int? runElapsedPercent(DateTime? due, Object? createdAt, [DateTime? now]) {
     final duration = due.toUtc().difference(start).inMicroseconds;
     if (duration <= 0) return null;
     final elapsed = (now ?? DateTime.now()).toUtc().difference(start).inMicroseconds;
-    return (100.0 * elapsed / duration).clamp(0.0, 100.0).round();
+    if (elapsed <= 0) return 0;
+    if (elapsed >= duration) return 100;
+    final scaled = elapsed * 100;
+    final whole = scaled ~/ duration;
+    final twiceRemainder = 2 * (scaled % duration);
+    if (twiceRemainder > duration) return whole + 1;
+    if (twiceRemainder < duration) return whole;
+    // PowerShell's [Math]::Round defaults to midpoint-to-even, unlike Dart.
+    return whole.isEven ? whole : whole + 1;
   } catch (_) {
     return null;
   }
