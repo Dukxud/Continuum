@@ -278,6 +278,11 @@ void main() {
     expect(runElapsedPercent(due, created, begin.subtract(const Duration(seconds:1))), 0);
     expect(runElapsedPercent(due, created, begin.add(const Duration(minutes:5))), 50);
     expect(runElapsedPercent(due, created, due.add(const Duration(minutes:1))), 100);
+    final midpointDue = begin.add(const Duration(seconds: 200));
+    expect(runElapsedPercent(midpointDue, created, begin.add(const Duration(seconds:1))), 0);
+    expect(runElapsedPercent(midpointDue, created, begin.add(const Duration(seconds:3))), 2);
+    expect(runElapsedPercent(midpointDue, created, begin.add(const Duration(seconds:5))), 2);
+    expect(runElapsedPercent(midpointDue, created, begin.add(const Duration(seconds:7))), 4);
     expect(runElapsedPercent(due, null, begin), isNull);
     expect(runElapsedPercent(due, 0, begin), isNull);
     expect(runElapsedPercent(begin, created, begin), isNull);
@@ -302,6 +307,9 @@ void main() {
       executableDirectory: exeDir, workingDirectory: untrusted), bundled.path);
     expect(WindowsSchedulerAdapter.findSourceDirectoryFrom(
       executableDirectory: sandbox, workingDirectory: untrusted), untrusted.path);
+    expect(() => WindowsSchedulerAdapter.findSourceDirectoryFrom(
+      executableDirectory: sandbox, workingDirectory: untrusted,
+      allowWorkingDirectory: false), throwsA(isA<SchedulerException>()));
   });
 
   test('concurrent saves cannot overwrite a later draft with earlier data', () async {
