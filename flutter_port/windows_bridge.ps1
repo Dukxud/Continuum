@@ -140,6 +140,10 @@ try {
             $access=[string]$request.access
             if($access -cnotin @('workspace-write','read-only','yolo')){throw 'Invalid access mode.'}
             if($access -eq 'yolo' -and $request.confirmUnrestricted -ne $true){throw 'Explicit unrestricted-access confirmation required.'}
+            if($null -ne $request.autoResumeOnLimit -and $request.autoResumeOnLimit -isnot [bool]){throw 'Invalid automatic-continuation option.'}
+            $policy=if($request.autoResumeOnLimit -eq $true){
+                @{schema=1;mode='quota-only';maxContinuations=3}
+            }else{$null}
             $message=([string]$request.message).Trim()
             if(-not $message){throw 'Enter an instruction.'}
             # Register only with a fresh model-specific catalog and verified workspace.
@@ -171,6 +175,7 @@ try {
             [pscustomobject]@{
                 sessionId=$sessionId;repo=$root;branch=$branchName;model=$model
                 effort=$effort;access=$access;message=$message
+                continuationPolicy=$policy;retryAttempt=0
                 createdAt=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
                 accountId=[string]$usage.accountId;runtimeFingerprint=$runtime.Fingerprint;log=$log
             } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $jobFilePath -Encoding utf8
