@@ -176,7 +176,19 @@ function Invoke-CodexScheduledJob {
         # parent and the registered Windows action at the moment it starts.
         if($job.parentJob -or [int]$job.retryAttempt -gt 0){
             $parentName=[string]$job.parentJob
-            if($parentName -cnotmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[a-fA-F0-9]{8}
+            if($parentName -cnotmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[a-fA-F0-9]{8}\z'){
+                throw 'Quota child has no valid parent job.'
+            }
+            $parentFile=Join-Path $appDir ($parentName+'.json')
+            $parentJob=Get-Content -LiteralPath $parentFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            $registered=Get-RegisteredCodexQuotaContinuation -Job $parentJob -JobFile $parentFile -Directory $appDir -RuntimeDirectory $RuntimeDirectory
+            if(-not $registered -or $registered.Name -cne [IO.Path]::GetFileNameWithoutExtension($JobFile)){
+                throw 'Quota child does not match its registered parent.'
+            }
+        }
+        # A process may stop after creating its child but before the parent
+        # outcome is written. Reconcile the persisted intent instead of
+        # executing the same Codex turn or registering another child.
         $intentPath=Join-Path $appDir ([IO.Path]::GetFileNameWithoutExtension($JobFile)+'.continuation.json')
         if(Test-Path -LiteralPath $intentPath -PathType Leaf){
             try {
