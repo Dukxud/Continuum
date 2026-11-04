@@ -30,6 +30,35 @@ Task Scheduler, history and worker functions; this is not a backend rewrite.
 | No terminal after launch | Native Flutter Windows executable in local unsigned preview bundle | Windows manual pending |
 | Mac, Linux and web execution | Not implemented: independent platform adapters needed | Out of Windows-port scope |
 
+## Visual acceptance baseline (WinForms v1.16)
+
+Flutter must reproduce the visible UI, not merely the behavior or GLSL source.
+The accepted Windows sources are `CodexUiForms.ps1`,
+`CodexUiPixelTheme.ps1`, `CodexDashboard.ps1`,
+`CodexBarAppearance.ps1` and `assets/AeroBar.html`.
+
+- Full view: 920 logical-pixel client layout, Segoe UI, five tinted stepped
+  pixel bands at y=54/102/148/194/238; labels and inputs at their original
+  x coordinates; two 428×108 usage cards at (18,358) and (470,358).
+- Compact view: 464-pixel client width; 5-hour and weekly meters **stacked**
+  with 117 pixels between card starts, not squeezed side by side; bottom
+  actions right aligned. No task means 391-pixel client height, one upcoming
+  task means approximately 572 pixels.
+- Appearance: 566×752 client layout, four selectors at y=78/116/154/192,
+  524×190 live preview at (19,240), 4 different bars, original option rows
+  and footer actions at y=699.
+- Aero: original GL shader and PNG sources are necessary but not sufficient.
+  Check pixel composition, optical reflectance, softened terminal columns,
+  partial rounded cap, full square cap, custom RGB and animation against
+  the approved v1.16 actual Windows rendering at the **same DPI and usage**.
+- Confirm there are no repeated accessibility-tree errors, without disabling
+  platform accessibility as a workaround. Distinguish any Flutter engine issue
+  from UI-specific semantics churn by reproducing with a minimal case.
+
+The v1.16 coordinate-driven Flutter view and geometry tests were authored
+**after** BP149. They are **not device-accepted** until a new Windows
+build, screenshots (full/compact/editor), and adversarial comparison pass.
+
 ## Conditions for acceptance
 
 1. Run a single bounded source-integrity, Dart analyzer and widget/unit-test pass with Run-WindowsReview.ps1 on BLACK-PUDDLE. Stop on any failure; no automatic retries or unbounded CI.
