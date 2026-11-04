@@ -11,6 +11,8 @@ import 'desktop_window.dart';
 import 'bridge.dart';
 import 'scheduler_controller.dart';
 
+part 'windows_parity_view.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   DesktopWindowHost? host;
@@ -21,12 +23,8 @@ Future<void> main() async {
   runApp(SchedulerApp(windowHost: host));
 }
 
-const ink = Color(0xff21334b);
-const slate = Color(0xff60718a);
 const accent = Color(0xff516f98);
-const primary = Color(0xff2277a1);
 const surface = Color(0xffedf3fa);
-const edge = Color(0xffc9d7e9);
 
 class SchedulerApp extends StatelessWidget {
   const SchedulerApp({super.key, this.windowHost});
@@ -136,19 +134,6 @@ class _SchedulerHomeState extends State<SchedulerHome> {
         ])) ?? false;
   }
 
-  Widget section(String title, Widget content) => Card(
-    margin: const EdgeInsets.only(bottom: 13),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(color: ink, fontWeight: FontWeight.w800,
-          fontSize: 15)),
-        const SizedBox(height: 11),
-        content,
-      ]),
-    ),
-  );
-
   String timeLabel(DateTime? time) {
     if (time == null) return 'Unavailable';
     String pad(int n) => n.toString().padLeft(2, '0');
@@ -184,132 +169,6 @@ class _SchedulerHomeState extends State<SchedulerHome> {
     state.edit(time: DateTime(day.year, day.month, day.day, time.hour, time.minute));
   }
 
-  Widget editing() {
-    final state = controller!;
-    final validSessions = state.sessions.where(
-      (s) => stringField(s, 'Id') == state.sessionId).isNotEmpty;
-    final validModels = state.models.where(
-      (m) => stringField(m, 'id') == state.model).isNotEmpty;
-    final efforts = state.efforts;
-    final resetEpoch = field(state.quota, 'recommendedResetAt');
-    final reset = stringField(state.quota, 'recommendationKind') == 'exhausted-window'
-        && resetEpoch is num && resetEpoch > 0
-      ? nextWholeMinute(DateTime.fromMillisecondsSinceEpoch(
-          resetEpoch.toInt() * 1000).add(const Duration(minutes: 2)))
-      : null;
-    return Column(children: [
-      section('CONVERSATION', DropdownButtonFormField<String>(
-        key: ValueKey('session:${state.sessionId}'),
-        initialValue: validSessions ? state.sessionId : null,
-        isExpanded: true,
-        decoration: const InputDecoration(labelText: 'Saved CLI conversation'),
-        hint: const Text('Select conversation'),
-        items: state.sessions.map((session) => DropdownMenuItem(
-          value: stringField(session, 'Id'),
-          child: Text(stringField(session, 'Display'), overflow: TextOverflow.ellipsis))).toList(),
-        onChanged: (id) { repository.clear(); state.selectSession(id); })),
-      section('REPOSITORY', Column(
-        crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: TextField(
-            controller: repository,
-            onChanged: (v) => state.edit(repository: v),
-            decoration: const InputDecoration(labelText: 'Git repository path'))),
-          const SizedBox(width: 10),
-          OutlinedButton(onPressed: () async {
-            try {
-              final result = await state.adapter.call('browse');
-              final folder = stringField(result, 'path');
-              if (folder.isNotEmpty) {
-                repository.text = folder;
-                state.edit(repository: folder);
-              }
-            } catch (e) { toast('Folder picker: $e'); }
-          }, child: const Text('Browse...')),
-        ]),
-        if (state.repositoryWarning != null) ...[
-          const SizedBox(height: 6),
-          Text(state.repositoryWarning!,
-            style: const TextStyle(color: Colors.deepOrange, fontSize: 12)),
-          for (final root in state.repositoryAlternatives)
-            TextButton(
-              onPressed: () {
-                repository.text = root;
-                state.edit(repository: root);
-              },
-              child: Text('Use ' + root, overflow: TextOverflow.ellipsis)),
-        ],
-      ])),
-      section('RUN AT', Wrap(spacing: 9, runSpacing: 9,
-        crossAxisAlignment: WrapCrossAlignment.center, children: [
-        OutlinedButton(onPressed: () => state.edit(time: stepRunAt(state.runAt, -1)),
-          child: const Text('−')),
-        OutlinedButton(onPressed: pickTime,
-          child: Text(timeLabel(state.runAt),
-            style: const TextStyle(fontWeight: FontWeight.w700))),
-        OutlinedButton(onPressed: () => state.edit(time: stepRunAt(state.runAt, 1)),
-          child: const Text('+')),
-        OutlinedButton(onPressed: () => state.edit(time: suggestedRunAt()),
-          child: const Text('Now +2')),
-        OutlinedButton(onPressed: reset == null ? null : () => state.edit(time: reset),
-          child: const Text('Reset +2')),
-      ])),
-      section('OPTIONS', LayoutBuilder(builder: (context, constraints) {
-        final width = constraints.maxWidth >= 690
-          ? (constraints.maxWidth - 24) / 3 : constraints.maxWidth;
-        return Wrap(spacing: 12, runSpacing: 10, children: [
-          SizedBox(width: width, child: DropdownButtonFormField<String>(
-            key: ValueKey('model:${state.model}'),
-            isExpanded: true, initialValue: validModels ? state.model : null,
-            decoration: const InputDecoration(labelText: 'Model'),
-            items: state.models.map((m) => DropdownMenuItem(
-              value: stringField(m, 'id'),
-              child: Text(stringField(m, 'name').isEmpty ? stringField(m, 'id') :
-                stringField(m, 'name'), overflow: TextOverflow.ellipsis))).toList(),
-            onChanged: state.selectModel)),
-          SizedBox(width: width, child: DropdownButtonFormField<String>(
-            key: ValueKey('reasoning:${state.model}:${state.effort}'),
-            isExpanded: true,
-            initialValue: efforts.contains(state.effort) ? state.effort : null,
-            decoration: const InputDecoration(labelText: 'Reasoning'),
-            items: efforts.map((e) => DropdownMenuItem(value: e,
-              child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
-            onChanged: (value) { if (value != null) state.edit(reasoning: value); })),
-          SizedBox(width: width, child: DropdownButtonFormField<String>(
-            key: ValueKey('access:${state.access}'),
-            isExpanded: true,
-            initialValue: state.access,
-            decoration: const InputDecoration(labelText: 'Access'),
-            items: const [
-              DropdownMenuItem(value: 'workspace-write', child: Text('Workspace write',
-                overflow: TextOverflow.ellipsis)),
-              DropdownMenuItem(value: 'read-only', child: Text('Read-only',
-                overflow: TextOverflow.ellipsis)),
-              DropdownMenuItem(value: 'yolo', child: Text('Unrestricted',
-                overflow: TextOverflow.ellipsis)),
-            ],
-            onChanged: (value) { if (value != null) state.edit(accessMode: value); })),
-        ]);
-      })),
-      section('INSTRUCTION', Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-        TextField(controller: instruction, minLines: 2, maxLines: 3,
-          onChanged: (value) => state.edit(instruction: value),
-          decoration: const InputDecoration(hintText: 'What should Codex do?')),
-        const SizedBox(height: 10),
-        FilledButton.icon(
-          onPressed: state.canSchedule ? schedule : null,
-          icon: const Icon(Icons.schedule),
-          label: Text(state.busy ? 'Working...' : 'Schedule once'),
-          style: FilledButton.styleFrom(backgroundColor: primary,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17))),
-        if (!state.canSchedule)
-          const Padding(padding: EdgeInsets.only(top: 8),
-            child: Text('Requires fresh quota and verified workspace identity',
-              style: TextStyle(fontSize: 11, color: slate))),
-      ])),
-    ]);
-  }
-
   Future<void> schedule() async {
     final state = controller!;
     var unrestricted = false;
@@ -338,165 +197,6 @@ class _SchedulerHomeState extends State<SchedulerHome> {
     } catch (e) {
       toast('Scheduling failed: $e');
     }
-  }
-
-  Widget quotaCard(Map<String, dynamic>? window, String fallback, String kind) {
-    final state = controller!;
-    final raw = field(window, 'remainingPercent');
-    final remaining = raw is num ? raw.toDouble() : null;
-    final epoch = field(window, 'resetsAt');
-    final reset = epoch is num && epoch > 0
-      ? DateTime.fromMillisecondsSinceEpoch(epoch.toInt() * 1000) : null;
-    final title = stringField(window, 'label').isEmpty ? fallback :
-      stringField(window, 'label');
-    return Container(padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: surface, border: Border.all(color: edge),
-        borderRadius: BorderRadius.circular(7)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: Text(title, overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w700, color: ink))),
-          const SizedBox(width: 8),
-          Flexible(child: Text(remaining == null ? 'Unavailable' :
-              remaining.toStringAsFixed(1) + '% remaining',
-            overflow: TextOverflow.ellipsis, textAlign: TextAlign.end,
-            style: const TextStyle(fontWeight: FontWeight.w700, color: ink))),
-        ]),
-        const SizedBox(height: 12),
-        AeroLiquidBar(amount: remaining, appearance: state.appearance, kind: kind),
-        const SizedBox(height: 10),
-        Text(reset == null ? 'Reset time unavailable' : 'Resets ' + timeLabel(reset),
-          style: const TextStyle(color: slate, fontSize: 12)),
-      ]));
-  }
-
-  Widget quotas() {
-    final windows = recordList(field(controller!.quota, 'windows'));
-    final first = quotaCard(windows.isNotEmpty ? windows[0] : null, 'Primary window', 'quota');
-    final second = quotaCard(windows.length > 1 ? windows[1] : null, 'Secondary window', 'weekly');
-    return LayoutBuilder(builder: (context, constraints) {
-      final sideBySide = constraints.maxWidth >= 590 ||
-        (controller!.compact && constraints.maxWidth >= 420);
-      return sideBySide
-        ? Row(children: [
-            Expanded(child: first),
-            const SizedBox(width: 12),
-            Expanded(child: second),
-          ])
-        : Column(children: [
-            first,
-            const SizedBox(height: 10),
-            second,
-          ]);
-    });
-  }
-
-  Widget runCountdown(Map<String, dynamic> run) {
-    final status = stringField(run, 'Status');
-    final working = status == 'Running';
-    final due = dateField(run, 'When');
-    final createdRaw = field(run, 'CreatedAt');
-    double? pct;
-    if (!working && due != null && createdRaw is num) {
-      final created = DateTime.fromMillisecondsSinceEpoch(createdRaw.toInt() * 1000);
-      final total = due.difference(created).inMilliseconds;
-      if (total > 0) {
-        pct = (DateTime.now().difference(created).inMilliseconds / total * 100)
-          .clamp(0.0, 100.0);
-      }
-    }
-    return Row(children: [
-      SizedBox(width: 74, child: Text(working ? 'Running' : countdown(due),
-        style: const TextStyle(color: ink, fontSize: 12, fontWeight: FontWeight.w700))),
-      const SizedBox(width: 5),
-      Expanded(child: AeroLiquidBar(amount: pct, working: working,
-        kind: working ? 'working' : 'time', appearance: controller!.appearance)),
-    ]);
-  }
-
-  Widget runItem(Map<String, dynamic> run, {bool compact = false}) {
-    final name = stringField(run, 'Name');
-    final path = stringField(run, 'Repo');
-    final segments = path.split(RegExp(r'[\\/]')).where((s) => s.isNotEmpty).toList();
-    final project = segments.isEmpty ? 'Unknown project' : segments.last;
-    final date = dateField(run, 'When');
-    if (compact) {
-      return InkWell(
-        onTap: () => setState(() => selectedRun = selectedRun == name ? null : name),
-        child: Container(padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: selectedRun == name ? const Color(0xffdbe9f8) : surface,
-            border: Border.all(color: edge),
-            borderRadius: BorderRadius.circular(7)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(project, style: const TextStyle(color: ink, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 5),
-            Text(stringField(run, 'Description'), maxLines: 1,
-              overflow: TextOverflow.ellipsis, style: const TextStyle(color: slate)),
-            Text(timeLabel(date), style: const TextStyle(color: slate, fontSize: 12)),
-            const SizedBox(height: 12),
-            runCountdown(run),
-          ])));
-    }
-    return InkWell(onTap: () => setState(() => selectedRun = selectedRun == name ? null : name),
-      child: Container(color: selectedRun == name ? const Color(0xffdbe9f8) : null,
-        height: 58, padding: const EdgeInsets.symmetric(horizontal: 9),
-        child: Row(children: [
-          SizedBox(width: 140, child: Text(timeLabel(date),
-            style: const TextStyle(fontSize: 12, color: ink))),
-          SizedBox(width: 205, child: runCountdown(run)),
-          const SizedBox(width: 12),
-          SizedBox(width: 130, child: Text(project, overflow: TextOverflow.ellipsis)),
-          const SizedBox(width: 10),
-          Expanded(child: Text(stringField(run, 'Description'),
-            overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: slate))),
-          SizedBox(width: 68, child: Text(stringField(run, 'Session').length >= 8
-            ? stringField(run, 'Session').substring(0, 8) : '—',
-            style: const TextStyle(fontSize: 12, color: slate))),
-        ])));
-  }
-
-  Widget runsGrid() {
-    final state = controller!;
-    final runs = state.upcoming;
-    if (runs.isEmpty) return const SizedBox.shrink();
-    return section('UPCOMING RUNS (' + runs.length.toString() + ')',
-      LayoutBuilder(builder: (context, constraints) => Column(children: [
-        if (constraints.maxWidth < 850) ...[
-          for (final run in runs) ...[
-            runItem(run, compact: true),
-            const SizedBox(height: 7),
-          ],
-        ] else ...[
-        const Row(children: [
-          SizedBox(width: 140, child: Text('SCHEDULED', style: TextStyle(fontSize: 10, color: slate))),
-          SizedBox(width: 217, child: Text('TIME TO RUN', style: TextStyle(fontSize: 10, color: slate))),
-          SizedBox(width: 140, child: Text('PROJECT', style: TextStyle(fontSize: 10, color: slate))),
-          Expanded(child: Text('DETAILS', style: TextStyle(fontSize: 10, color: slate))),
-          SizedBox(width: 68, child: Text('SESSION', style: TextStyle(fontSize: 10, color: slate))),
-        ]),
-        const Divider(),
-        SizedBox(height: math.min(4, runs.length) * 58.0,
-          child: Scrollbar(child: ListView.builder(itemCount: runs.length, itemExtent: 58,
-            itemBuilder: (context, index) => runItem(runs[index])))),
-        ],
-        const Divider(),
-        Align(alignment: Alignment.centerLeft, child: OutlinedButton.icon(
-          onPressed: selectedRun == null || state.busy ? null : () async {
-            final matches = runs.where((r) => stringField(r, 'Name') == selectedRun &&
-              stringField(r, 'Status') == 'Scheduled');
-            if (matches.isEmpty) { toast('Only future scheduled runs can be cancelled.'); return; }
-            if (!await confirm('Cancel selected', 'Cancel this task in Windows Task Scheduler?')) return;
-            try {
-              final result = await state.cancel(selectedRun!);
-              selectedRun = null;
-              if (stringField(result, 'warning').isNotEmpty) {
-                toast('Cancelled; cleanup warning: ' + stringField(result, 'warning'));
-              }
-            } catch (e) { toast('Cancellation failed: $e'); }
-          },
-          icon: const Icon(Icons.close, size: 17), label: const Text('Cancel selected'))),
-      ])));
   }
 
   Future<void> historyDialog() async {
@@ -669,73 +369,13 @@ class _SchedulerHomeState extends State<SchedulerHome> {
 
   @override
   Widget build(BuildContext context) {
-    if (controller == null) {
-      return Scaffold(body: Center(child: Padding(padding: const EdgeInsets.all(30),
-        child: Text(startupError ?? 'Platform adapter unavailable'))));
+    final state = controller;
+    if (state == null) {
+      return Scaffold(body:Center(child:Text(startupError ?? 'Scheduler unavailable')));
     }
-    final state = controller!;
-    return Scaffold(body: SafeArea(child: Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 1110),
-      child: SingleChildScrollView(padding: const EdgeInsets.all(18),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          LayoutBuilder(builder: (context, constraints) {
-            final heading = Row(children: [
-              const Icon(Icons.window, color: accent, size: 28),
-              const SizedBox(width: 10),
-              const Expanded(child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('CODEX RESUME SCHEDULER',
-                  style: TextStyle(fontWeight: FontWeight.w900,
-                    fontSize: 21, color: ink)),
-                Text('Flutter review · Windows bridge to tested v1.16 worker',
-                  style: TextStyle(fontSize: 11, color: slate)),
-              ])),
-            ]);
-            final controls = [
-              OutlinedButton(onPressed: appearanceDialog,
-                child: const Text('Appearance...')),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(state.compact ? 'Compact ON' : 'Compact OFF',
-                  style: const TextStyle(color: slate, fontSize: 12)),
-                Switch(value: state.compact,
-                  onChanged: (v) => state.edit(compactMode: v)),
-              ]),
-            ];
-            return constraints.maxWidth < 700
-              ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  heading, const SizedBox(height: 8),
-                  Wrap(spacing: 12, runSpacing: 6, children: controls),
-                ])
-              : Row(children: [
-                  Expanded(child: heading), const SizedBox(width: 12),
-                  controls.first, const SizedBox(width: 12), controls.last,
-                ]);
-          }),
-          const SizedBox(height: 16),
-          if (state.error != null)
-            Container(margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: const Color(0xffffe9e3),
-                borderRadius: BorderRadius.circular(6)),
-              child: Text(state.error!, style: const TextStyle(color: Color(0xff933e2f)))),
-          if (!state.compact) editing(),
-          if (state.compact && state.upcoming.isNotEmpty)
-            section('NEXT RUN', runItem(state.upcoming.first, compact: true)),
-          section(state.compact && state.quotaModel.isNotEmpty
-            ? 'USAGE REMAINING · ' + state.quotaModel
-            : 'USAGE REMAINING', quotas()),
-          if (!state.compact && state.upcoming.isNotEmpty) runsGrid(),
-          Wrap(spacing: 10, children: [
-            OutlinedButton.icon(onPressed: openLogs,
-              icon: const Icon(Icons.folder_open, size: 18),
-              label: const Text('Open logs folder')),
-            OutlinedButton.icon(onPressed: historyDialog,
-              icon: const Icon(Icons.history, size: 18),
-              label: const Text('Recent runs')),
-          ]),
-        ])),
-    ))));
+    return Scaffold(
+      backgroundColor:const Color(0xfff0f5fb),
+      body:SafeArea(child:state.compact?_compactParityView():_fullParityView()),
+    );
   }
 }
