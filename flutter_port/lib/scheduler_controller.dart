@@ -40,6 +40,7 @@ class SchedulerController extends ChangeNotifier {
   Timer? _refreshTimer;
   Timer? _clockTimer;
   Timer? _saveTimer;
+  Future<void> _saveTail = Future<void>.value();
   bool _polling = false;
   bool _loading = false;
   bool _disposed = false;
@@ -250,6 +251,9 @@ class SchedulerController extends ChangeNotifier {
       final associated = stringField(result, 'model');
       if (models.any((m) => stringField(m, 'id') == associated)) selectModel(associated);
       _changed();
+      // The repository was resolved asynchronously; persist the resolved
+      // checkout just as a user-edited repository path would be persisted.
+      _queueSave();
     } catch (e) {
       error = 'Repository lookup: $e';
       _changed();
@@ -284,22 +288,29 @@ class SchedulerController extends ChangeNotifier {
     _saveTimer = Timer(const Duration(milliseconds: 650), () => save());
   }
 
-  Future<void> save() async {
-    if (!ready) return;
-    try {
-      await adapter.call('save', {
-        'compactMode': compact,
-        'barAppearance': (_appearanceBeforeDraft ?? appearance).toJson(),
-        'draft': {
-          'sessionId': sessionId ?? '', 'repo': repo, 'model': model ?? '',
-          'effort': effort ?? '', 'access': access, 'message': message,
-          'runAt': localIsoMinute(runAt),
-        },
-      });
-    } catch (e) {
-      error = 'Preferences save could not be confirmed: $e';
-      _changed();
-    }
+  /// Serialize writes: a slow, earlier save must never overwrite a newer
+  /// draft or accepted appearance after the newer write has completed.
+  Future<void> save() {
+    if (!ready || _disposed) return Future<void>.value();
+    final snapshot = <String, dynamic>{
+      'compactMode': compact,
+      'barAppearance': (_appearanceBeforeDraft ?? appearance).toJson(),
+      'draft': {
+        'sessionId': sessionId ?? '', 'repo': repo, 'model': model ?? '',
+        'effort': effort ?? '', 'access': access, 'message': message,
+        'runAt': localIsoMinute(runAt),
+      },
+    };
+    _saveTail = _saveTail.then((_) async {
+      if (_disposed) return;
+      try {
+        await adapter.call('save', snapshot);
+      } catch (e) {
+        error = 'Preferences save could not be confirmed: $e';
+        _changed();
+      }
+    });
+    return _saveTail;
   }
 
   Future<String> schedule({required bool confirmUnrestricted, required bool confirmOverlap}) async {
