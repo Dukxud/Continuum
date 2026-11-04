@@ -215,13 +215,13 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
       draft.shimmer, 0, 200, 0, (v) => preview(draft.copyWith(shimmer: v)))),
     _at(0, 130, 566, 40, _settingsSlider('Reflection speed',
       draft.speed, 25, 300, 0, (v) => preview(draft.copyWith(speed: v)))),
-    _at(20, 178, 350, 30, Row(children: [
+    _at(20, 178, 522, 30, Row(children: [
       Checkbox(value: draft.aero,
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         visualDensity: VisualDensity.compact,
         onChanged: (v) { if (v != null) preview(draft.copyWith(aero: v)); }),
       const SizedBox(width: 5),
-      _label('Enable Aero Liquid optics'),
+      Expanded(child: _label('Enable Aero Liquid optics')),
     ])),
     _at(20, 207, 520, 23, _label(
       diagnostic != null ? 'Aero Liquid unavailable: ' + diagnostic :
