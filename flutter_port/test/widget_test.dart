@@ -126,6 +126,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('auto-resume on quota is explicitly off until enabled',
+      (tester) async {
+    tester.view.physicalSize = const Size(1240, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {tester.view.resetPhysicalSize();tester.view.resetDevicePixelRatio();});
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: StubAdapter(verifiedSession: true))));
+    await tester.pump(const Duration(milliseconds: 150));
+    final toggle = find.byKey(const Key('auto-resume-on-limit'));
+    expect(toggle, findsOneWidget);
+    expect(tester.widget<Switch>(toggle).value, isFalse);
+    expect(find.text('Auto-resume if usage limits stop Codex'), findsOneWidget);
+    await tester.tap(toggle);
+    await tester.pump();
+    expect(tester.widget<Switch>(toggle).value, isTrue);
+    expect(find.text('Schedule once'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('adaptive +1 shortcut preserves recommended seconds',
       (tester) async {
     tester.view.physicalSize = const Size(1240, 850);
