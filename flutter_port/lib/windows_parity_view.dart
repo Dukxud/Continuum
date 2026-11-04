@@ -416,7 +416,7 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
       _at(116,totalHeight-37,178,31,
         _LegacyButton('Recent runs',historyDialog,color:const Color(0xff466baa))),
       _at(306,totalHeight-37,140,31,
-        _LegacyButton('Appearance...',appearanceDialog,color:const Color(0xff52749b))),
+        _LegacyButton('Appearance...',appearanceDialog,color:const Color(0xff785ac5))),
       if(state.error!=null)_at(18,totalHeight-71,428,25,
         _label(state.error!,fontSize:11,color:const Color(0xff8a3121))),
     ];
