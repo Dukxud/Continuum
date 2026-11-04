@@ -12,7 +12,7 @@ foreach($relative in @('pubspec.yaml','lib/main.dart','lib/aero_bar.dart',
         'test/logic_test.dart','test/window_mode_test.dart','Build-WindowsPreview.ps1','Run-WindowsReview.ps1','README.md')){
     if(-not (Test-Path -LiteralPath (Join-Path $folder $relative) -PathType Leaf)){throw "Missing Flutter file: $relative"}
 }
-foreach($relative in @('Run-WindowsReview.ps1','Build-WindowsPreview.ps1')){
+foreach($relative in @('Run-WindowsReview.ps1','Build-WindowsPreview.ps1','../tests/flutter-port-bridge.test.ps1')){
     $path=Join-Path $folder $relative
     $pTokens=$null;$pErrors=$null
     [void][System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$pTokens,[ref]$pErrors)
