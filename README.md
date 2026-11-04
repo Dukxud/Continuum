@@ -19,7 +19,7 @@ Download the versioned ZIP from **Releases**, not GitHub's generic `main.zip`. T
 - Countdown labels update locally every second without additional Codex requests. One system refresh coordinator polls task status every two seconds and refreshes conversations, tasks and quota every 60 seconds or after returning to the app.
 - Autosaves and restores the scheduling draft: conversation, repository, model, reasoning effort, access, instruction, and requested local run time. Saving does not require creating a scheduled run.
 - Starts through Windows' built-in Script Host (`wscript.exe`), without a visible terminal. New scheduled jobs also run with a hidden window and report their exit status; transcripts and event logs remain available.
-- **One schedule = one execution.** When Codex reports a usage limit or execution failure, the application records the result for review under **Recent runs**; it does not register another task.
+- **One schedule = one execution by default.** The original WinForms interface remains one-shot. The draft Flutter Continuum preview has a separate, **off-by-default** opt-in for up to three quota-only continuations using confirmed reset times; generic failures do not trigger retries.
 - Displays **percentage remaining**, progress bars, and local reset times from Codex's official `account/rateLimits/read` App Server method. **Reset +2** sets the scheduling control to two minutes after the selected reset, rounded up to the next whole minute. It never schedules automatically.
 - Refreshes **all system data automatically on startup, every 60 seconds, after returning to the app, and after scheduling or cancellation**. No manual refresh controls or timestamps are needed. Quota failures are labeled inside the usage cards; the next cycle retries automatically. Usage reads run in a short-lived process; conversation, repository, and pending-task reads run in background jobs.
 
@@ -69,7 +69,7 @@ See [reusable components and usage examples](components/README.md) and [architec
 
 **Scheduled jobs are pinned to their original worker files.** A later app upgrade creates a new runtime snapshot rather than overwriting the runner for existing tasks. Before execution, the worker validates every pinned file against the saved SHA-256 fingerprint. This detects accidental runtime changes; it does not defend against the same Windows account intentionally rewriting both job metadata and files.
 
-The scheduler records completed, failed, blocked and cancelled outcomes; historical deferred results from older worker versions remain readable. Use **Recent runs** to inspect their history. Every scheduled execution requires a verified selected-workspace identity. The application computes the same canonical hash from `account/rateLimits/read.accountId` or from experimental `account/read.workspaceRouting.chatgptAccountId`; it rejects conflicting identifiers. **Email alone never permits unattended execution.** If the backend offers no reliable workspace ID, scheduling is unavailable until identity can be verified. Every worker checks identity again immediately before execution. Previously created tasks retain their old launchers and must be cancelled and rescheduled to gain these protections.
+The scheduler records completed, failed, blocked, deferred and cancelled outcomes. A deferred outcome names the verified follow-up task; it never means the original work completed. Use **Recent runs** to inspect their history. Every scheduled execution requires a verified selected-workspace identity. The application computes the same canonical hash from `account/rateLimits/read.accountId` or from experimental `account/read.workspaceRouting.chatgptAccountId`; it rejects conflicting identifiers. **Email alone never permits unattended execution.** If the backend offers no reliable workspace ID, scheduling is unavailable until identity can be verified. Every worker checks identity again immediately before execution. Previously created tasks retain their old launchers and must be cancelled and rescheduled to gain these protections.
 
 ## Requirements
 
@@ -98,9 +98,15 @@ The usage helper currently supports the **npm Codex installation** on Windows. W
 
 ## One-time execution
 
-Only operations launched **through a scheduled job in this application** are monitored. Each task runs its saved Codex session at most once, with a pinned worker, selected model/effort, repository, branch, access, and instruction. It verifies the account/workspace and available quota before execution, records a blocked or failed outcome if it cannot safely proceed, and **never registers an automatic retry**. Review the response and logs under **Recent runs**; schedule another run explicitly if desired.
+Only operations launched **through a scheduled job in this application** are monitored. Each task runs its saved Codex session at most once, with a pinned worker, selected model/effort, repository, branch, access, and instruction. It verifies the account/workspace and available quota before execution, records a blocked or failed outcome if it cannot safely proceed, and, unless a new Flutter job explicitly opted into bounded quota continuation, **never registers an automatic retry**. Only a terminal, structured limit failure with a matching verified workspace/model and an authoritative future reset can register a child; each child is revalidated before execution. Review the response and logs under **Recent runs**.
 
 Previously scheduled jobs use **their own immutable worker snapshots**. Jobs created by old versions may still retry if their original worker and payload enabled that behavior; this upgrade does not rewrite or cancel those registrations.
+
+## Draft Flutter quota continuation (opt-in)
+
+In the Continuum preview, enable **Auto-resume if usage limits stop Codex** when scheduling. It is **off by default** and does not change older tasks or the WinForms UI. A confirmed usage limit may produce **Waiting for quota**: one new Windows task scheduled for the authoritative reset plus one minute (seconds preserved). This can repeat up to **three** times, then stops. Cancel the pending continuation normally if no longer needed. The same conversation, Git root, branch, model, account identity, runtime fingerprint and access mode are reverified at every launch. A missing thread, uncertain reset, generic error, identity change, duplicate writer, or inability to register a task **stops**, rather than blindly retrying. A signed-in Windows desktop must remain available when the trigger fires.
+
+The full architecture, lifecycle choices and acceptance cases are in [docs/QUOTA-CONTINUATION-DESIGN.md](docs/QUOTA-CONTINUATION-DESIGN.md). This is not a feature of the released main-branch application.
 
 ## Repository auto-detection
 
