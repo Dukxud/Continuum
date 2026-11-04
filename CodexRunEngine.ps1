@@ -3,6 +3,7 @@ Import-Module (Join-Path $PSScriptRoot 'components/RuntimeBundle/RuntimeBundle.p
 Import-Module (Join-Path $PSScriptRoot 'components/OneTimeTasks/OneTimeTasks.psm1') -Force -ErrorAction Stop
 Import-Module (Join-Path $PSScriptRoot 'components/GitRepository/GitRepository.psm1') -Force -ErrorAction Stop
 Import-Module (Join-Path $PSScriptRoot 'components/JobOutcomes/JobOutcomes.psm1') -Force -ErrorAction Stop
+. (Join-Path $PSScriptRoot 'CodexQuotaContinuation.ps1')
 
 function Get-RepositoryBranch {
     param([string]$Path)
@@ -53,7 +54,7 @@ function Read-CodexModelCatalog {
 function Get-CodexRuntimeFiles {
     return @(
         'CodexResumeScheduler.ps1','CodexRunEngine.ps1',
-        'CodexUsage.js','CodexRunJob.vbs',
+        'CodexUsage.js','CodexRunJob.vbs','CodexQuotaContinuation.ps1',
         'components/RuntimeBundle/RuntimeBundle.psm1',
         'components/OneTimeTasks/OneTimeTasks.psm1',
         'components/GitRepository/GitRepository.psm1',
@@ -101,11 +102,31 @@ function Test-CanonicalWorkspaceIdentity {
 # Task Scheduler reports handler success; the persisted outcome distinguishes
 # completed, failed, or blocked one-time work.
 function Set-CodexRunOutcome {
-    param([string]$JobFile,[string]$Status,$ExitCode=$null,[string]$Message='')
+    param([string]$JobFile,[string]$Status,$ExitCode=$null,[string]$Message='',
+          [int]$Attempt=0,[string]$NextJob='')
     if (-not $JobFile -or -not [IO.Path]::IsPathRooted($JobFile)) { return }
     $outcomePath=[IO.Path]::ChangeExtension($JobFile,'.result.json')
-    [void](Write-JobOutcome -Path $outcomePath -Status $Status -Attempt 0 -ExitCode $ExitCode -Message $Message)
+    [void](Write-JobOutcome -Path $outcomePath -Status $Status -Attempt $Attempt -ExitCode $ExitCode -Message $Message -NextJob $NextJob)
 }
+# The decision is single-shot. A reliable model-specific reset is required,
+# and a failure to register is reported without an invented future job.
+function Try-DeferCodexQuotaJob {
+    param($Job,[string]$JobFile,[string]$AppDirectory,
+          [string]$RuntimeDirectory,$Quota,[int]$ExitCode)
+    if(-not (Test-CodexContinuationPolicy $Job) -or [int]$Job.retryAttempt -ge 3){return $false}
+    $at=Get-VerifiedQuotaContinuationTime -Quota $Quota -AccountId ([string]$Job.accountId) -Model ([string]$Job.model)
+    if(-not $at){Write-Warning 'Quota exhausted, but no verified future reset for this model/workspace; no automatic continuation.';return $false}
+    try {
+        $child=Register-CodexQuotaContinuation -Job $Job -JobFile $JobFile -AppDirectory $AppDirectory -RuntimeDirectory $RuntimeDirectory -When $at
+        Set-CodexRunOutcome -JobFile $JobFile -Status 'deferred' -Attempt ([int]$Job.retryAttempt) -ExitCode $ExitCode -NextJob $child.Name -Message "Waiting for verified quota reset at $($child.When.ToString('o'))"
+        Write-Host "Quota exhausted. One bounded continuation registered: $($child.Name) at $($child.When.ToString('o'))" -ForegroundColor Cyan
+        return $true
+    }catch{
+        Write-Warning "Quota continuation not registered: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 function Invoke-CodexScheduledJob {
     [CmdletBinding()]
     param([string]$JobFile, [string]$AppDirectory, [string]$RuntimeDirectory)
@@ -154,7 +175,8 @@ function Invoke-CodexScheduledJob {
             [string]$job.accountId -cne [string]$state.accountId) {
             throw 'Selected workspace identity is unavailable or changed; scheduled execution refused.'
         }
-        if ($state.canAttempt -eq $false) {
+        if ($state.canAttempt -ne $true) {
+            if(Try-DeferCodexQuotaJob -Job $job -JobFile $JobFile -AppDirectory $appDir -RuntimeDirectory $RuntimeDirectory -Quota $state -ExitCode 1){return 0}
             $message = if ($state.blockedReason) { [string]$state.blockedReason } else { 'Codex reports usage unavailable for the selected model.' }
             Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode 1 -Message $message
             Write-Host $message -ForegroundColor Yellow
@@ -187,7 +209,14 @@ function Invoke-CodexScheduledJob {
             Set-CodexRunOutcome -JobFile $JobFile -Status 'completed' -ExitCode 0
             return 0
         }
-        Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -ExitCode ([int]$result) -Message 'Codex exited unsuccessfully.'
+        if((Test-CodexContinuationPolicy $job) -and
+           (Test-CodexTerminalQuotaFailure -EventsPath $events)){
+            try {
+                $postQuota=Read-UsageState $model
+                if(Try-DeferCodexQuotaJob -Job $job -JobFile $JobFile -AppDirectory $appDir -RuntimeDirectory $RuntimeDirectory -Quota $postQuota -ExitCode ([int]$result)){return 0}
+            }catch{Write-Warning "Quota verification failed after Codex exit: $($_.Exception.Message)"}
+        }
+        Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -ExitCode ([int]$result) -Message 'Codex exited unsuccessfully; no verified automatic continuation was registered.' -Attempt ([int]$job.retryAttempt)
         return [int]$result
     } catch {
         $failure = "Scheduled run failed: $($_.Exception.Message)"
