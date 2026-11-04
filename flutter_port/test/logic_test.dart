@@ -212,39 +212,32 @@ void main() {
     controller.dispose();
   });
 
-  test('appearance Cancel cannot leak into concurrent preference saves', () async {
+  test('appearance edits auto-save without an explicit Save action', () async {
     final fake = FakeScheduler();
     final controller = SchedulerController(fake);
     await controller.start();
-    final baseline = controller.appearance;
-    controller.beginAppearancePreview();
-    controller.previewAppearance(baseline.copyWith(
-      quota: '#123ABC', weekly: 'violet', shimmer: 180));
-    await controller.save();
-    final snapshot = fake.saves.last['barAppearance'] as Map<String, dynamic>;
-    expect(snapshot['quota'], baseline.quota);
-    expect(snapshot['weekly'], baseline.weekly);
-    expect(snapshot['shimmer'], baseline.shimmer);
-    controller.cancelAppearancePreview();
-    expect(controller.appearance, baseline);
-    controller.dispose();
-  });
-
-  test('appearance Save commits all nine compatible settings', () async {
-    final fake = FakeScheduler();
-    final controller = SchedulerController(fake);
-    await controller.start();
-    controller.beginAppearancePreview();
     const updated = AeroAppearance(
       quota: 'violet', weekly: 'red', time: '#123ABC',
       working: 'amber', finish: 2, lighting: 1, shimmer: 150,
       speed: 225, aero: false,
     );
-    controller.commitAppearance(updated);
-    await controller.save();
+    controller.updateAppearance(updated);
+    await controller.flushPreferences();
     expect(controller.appearance, updated);
-    final snapshot = fake.saves.last['barAppearance'];
-    expect(snapshot, updated.toJson());
+    expect(fake.saves.last['barAppearance'], updated.toJson());
+    controller.dispose();
+  });
+
+  test('closing the editor persists the last rapid appearance choice', () async {
+    final fake = FakeScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    controller.updateAppearance(controller.appearance.copyWith(quota: 'blue'));
+    controller.updateAppearance(controller.appearance.copyWith(quota: 'violet'));
+    await controller.flushPreferences();
+    expect((fake.saves.last['barAppearance'] as Map)['quota'], 'violet');
+    await Future<void>.delayed(const Duration(milliseconds: 750));
+    expect(fake.saves.length, 1);
     controller.dispose();
   });
 }
