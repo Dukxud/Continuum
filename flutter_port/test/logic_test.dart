@@ -249,6 +249,10 @@ void main() {
     expect(recommendedResetRunAt({...valid,'recommendedResetAt':'not a time'},now),isNull);
     final expired = DateTime(2026, 11, 3, 14, 2, 37).millisecondsSinceEpoch ~/ 1000;
     expect(recommendedResetRunAt({...valid,'recommendedResetAt':expired},now),isNull);
+    final justElapsed = now.subtract(const Duration(seconds: 1))
+      .millisecondsSinceEpoch ~/ 1000;
+    expect(recommendedResetRunAt({...valid,'recommendedResetAt':justElapsed},now),
+      isNull, reason: 'A reset already passed must not activate Reset +1');
   });
 
   test('persisted draft and Windows task payload retain selected seconds', () async {
