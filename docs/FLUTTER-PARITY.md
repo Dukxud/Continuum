@@ -19,7 +19,7 @@ Task Scheduler, history and worker functions; this is not a backend rewrite.
 | Approved Windows v1.8 pixels and v3 Aero Liquid optical GLSL | Exact source PNGs; mechanically adapted original fragment shader | Source byte/hash checked; GPU visual pending |
 | Rounded partial droplet; square full tip | Original GLSL cap contract retained | Visual pending |
 | Independent 5-hour / weekly / countdown / working colors | Same v1.16 barAppearance schema | Unit tested; visual pending |
-| Custom RGB, glass/enamel/pearl, studio modes, shimmer, speed, toggle | Full transactional appearance editor, live preview/Cancel/Defaults/Save | Unit/widget coverage; Windows visual pending |
+| Custom RGB, glass/enamel/pearl, studio modes, shimmer, speed, toggle | Two-tab appearance editor with live preview, automatic persistence, Defaults/Done; no explicit Save | Unit/widget coverage; Windows visual pending |
 | Pinned runtime and one-time task registration | Existing PowerShell RuntimeBundle + OneTimeTasks | Source checked; real task pending |
 | Workspace identity, model/effort, quota, branch and overlap checks | Existing worker plus server-side registration preflight | Real task pending |
 | Cancellation before worker starts, never cancels running process | Original OneTimeTasks with post-cancel reconciliation | Real task pending |
@@ -44,9 +44,13 @@ The accepted Windows sources are `CodexUiForms.ps1`,
   with 117 pixels between card starts, not squeezed side by side; bottom
   actions right aligned. No task means 391-pixel client height, one upcoming
   task means approximately 572 pixels.
-- Appearance: 566×752 client layout, four selectors at y=78/116/154/192,
-  524×190 live preview at (19,240), 4 different bars, original option rows
-  and footer actions at y=699.
+- Appearance: the accepted WinForms editor was 566×752 with all controls on
+  one page. Following native BP152 feedback, Flutter intentionally uses a
+  566×514 two-tab editor: Colors has all four selectors and full-height
+  preview; Optics has material, lighting, both sliders, optical toggle and
+  a live four-bar compact preview. Defaults and Done remain visible in the
+  ordinary full window without scrolling. Settings auto-save as changed;
+  closing the editor flushes the pending write, including Escape and backdrop.
 - Aero: original GL shader and PNG sources are necessary but not sufficient.
   Check pixel composition, optical reflectance, softened terminal columns,
   partial rounded cap, full square cap, custom RGB and animation against
@@ -55,14 +59,16 @@ The accepted Windows sources are `CodexUiForms.ps1`,
   platform accessibility as a workaround. Distinguish any Flutter engine issue
   from UI-specific semantics churn by reproducing with a minimal case.
 
-The v1.16 coordinate-driven Flutter view and geometry tests were authored
-**after** BP149. They are **not device-accepted** until a new Windows
-build, screenshots (full/compact/editor), and adversarial comparison pass.
+Native BP152 screenshots confirmed the geometry-based main layout and exposed
+three editor/window issues: clipped controls, explicit Save friction, and
+stale full-mode sizes. The current draft corrects these in source, but the
+revised two-tab editor, auto-save, and serialized native sizing are **not
+accepted** until exact-head Windows CI and renewed BLACK-PUDDLE inspection.
 
 ## Conditions for acceptance
 
 1. Run a single bounded source-integrity, Dart analyzer and widget/unit-test pass with Run-WindowsReview.ps1 on BLACK-PUDDLE. Stop on any failure; no automatic retries or unbounded CI.
-2. Compare full and compact Flutter windows directly to accepted v1.16. Verify actual window resize, original optical reflections, each appearance control, color customizations, reset, and transactionality.
+2. Compare full and compact Flutter windows directly to accepted v1.16. Verify exact content-fit size after repeated switches, the original Aero optics, all controls on both appearance tabs, custom RGB, Defaults, and persistence after Done, Escape, and outside close. No scrolling or hidden controls.
 3. Schedule **one safe read-only** test run in a disposable Git repository and a verified CLI session. Read the actual worker result and evidence; Task Scheduler exit 0 alone is insufficient.
 4. Schedule and cancel a separate future run. Verify the Windows task is unregistered, the cancelled outcome is visible, and no worker was started.
 5. Inspect model/effort, workspace verification and quota fail-closed behavior, conflicting repository hints, near-past times, and user-preserved settings.
