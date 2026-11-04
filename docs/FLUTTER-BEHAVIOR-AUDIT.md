@@ -65,6 +65,27 @@ leave its root unresolved; guessing the previous checkout would be a safety
 regression. Final native acceptance must test both a known Git-backed CLI
 conversation and the specific `Nathan` conversation separately.
 
+## November 4 owner-approved chooser and scheduling layout
+
+The original WinForms conversation reader identifies a session by its **starting
+folder**, timestamp and full UUID, so unrelated sessions that start in a
+user-home directory appear to have the same name. The Flutter-only Windows
+bridge now projects a more legible label: **Git: project name** when the starting
+directory belongs to a verified Git checkout; otherwise **Outside Git: folder**.
+Both include the timestamp and final eight characters of the original UUID.
+The underlying full session ID and actual repository discovery remain unchanged.
+A session started outside Git may still resolve a later worktree; a label is
+never permission to infer or substitute a repository.
+
+The full-mode form now places **Model / Reasoning / Access** immediately after
+**Repository root**. **Run at / Instruction / Schedule once** share one visually
+unified panel. Existing coordinates below that group, full/compact sizing,
+worker configuration and scheduling safeguards are preserved.
+
+**Evidence required:** isolated real-Windows bridge labels for Git and non-Git
+sessions; widget geometry and interaction tests; exact-head Windows CI; native
+BLACK-PUDDLE visual and conversation-selection confirmation.
+
 ## High-impact corrections in this pass
 
 - **Scheduling:** Preserve ability to create a future run at 0% while preserving worker-time quota enforcement.
