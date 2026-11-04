@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:codex_resume_flutter/bridge.dart';
+import 'package:codex_resume_flutter/date_labels.dart';
 import 'package:codex_resume_flutter/aero_appearance.dart';
 import 'package:codex_resume_flutter/scheduler_controller.dart';
 
@@ -211,6 +212,17 @@ class ConflictingRepositoryScheduler extends FakeScheduler {
 }
 
 void main() {
+  test('user-facing dates consistently use day then abbreviated month', () {
+    final at = DateTime(2026, 11, 4, 14, 13, 17);
+    expect(formatDayMonth(at), '4 Nov');
+    expect(formatDayMonth(at, year: true), '4 Nov 2026');
+    expect(formatLocalDateTime(at), '4 Nov · 2:13 PM');
+    expect(formatLocalDateTime(at, year: true, seconds: true),
+      '4 Nov 2026 · 2:13:17 PM');
+    expect(formatLocalDateTime(DateTime(2027, 1, 11, 0, 5, 1),
+      seconds: true), '11 Jan · 12:05:01 AM');
+  });
+
   test('adapter timeout never asserts failed registration or cancellation', () {
     for (final action in ['schedule', 'cancel', 'save', 'hide']) {
       final outcome = adapterTimeoutError(action);
