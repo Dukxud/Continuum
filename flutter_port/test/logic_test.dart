@@ -194,6 +194,21 @@ void main() {
     controller.dispose();
   });
 
+  test('schedule and cancel trigger one complete system refresh without blocking the result', () async {
+    final fake = FakeScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    final initial = fake.actions.where((x) => x == 'load').length;
+    await controller.schedule(confirmUnrestricted:false,confirmOverlap:false);
+    await Future<void>.delayed(const Duration(milliseconds:10));
+    expect(fake.actions.where((x) => x == 'load').length, initial + 1);
+    await controller.cancel('CodexResume-20261103-1400-12345678');
+    await Future<void>.delayed(const Duration(milliseconds:10));
+    expect(fake.actions.where((x) => x == 'load').length, initial + 2);
+    expect(fake.actions.where((x) => x == 'usage').length, 3);
+    controller.dispose();
+  });
+
   test('exhausted live quota does not disable future scheduling', () async {
     final fake = ExhaustedQuotaScheduler();
     final controller = SchedulerController(fake);
