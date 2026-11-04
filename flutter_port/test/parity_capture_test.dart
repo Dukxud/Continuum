@@ -28,7 +28,7 @@ class _SnapshotAdapter implements SchedulerAdapter {
       return {
         'sessions': [{
           'Id': id,
-          'Display': 'BP105-Scheduler-QA | 11/03 13:18 | $id',
+          'Display': 'Git: BP105-Scheduler-QA | 3 Nov 13:18 | 11111111',
         }],
         'pending': showUpcoming ? [_run()] : [],
         'history': [],
@@ -131,22 +131,22 @@ void main() {
   }
 
   testWidgets('full desktop layout', (tester) async {
-    await capture(tester, name: 'full', size: const Size(920, 566),
+    await capture(tester, name: 'full', size: const Size(1240, 810),
       compact: false);
   });
 
   testWidgets('compact quota layout', (tester) async {
-    await capture(tester, name: 'compact', size: const Size(464, 391),
+    await capture(tester, name: 'compact', size: const Size(540, 495),
       compact: true);
   });
 
   testWidgets('full layout with upcoming run', (tester) async {
-    await capture(tester, name: 'full-upcoming', size: const Size(920, 700),
+    await capture(tester, name: 'full-upcoming', size: const Size(1240, 810),
       compact: false, showUpcoming: true);
   });
 
   testWidgets('compact upcoming-run layout', (tester) async {
-    await capture(tester, name: 'compact-upcoming', size: const Size(464, 572),
+    await capture(tester, name: 'compact-upcoming', size: const Size(540, 645),
       compact: true, showUpcoming: true);
   });
 
