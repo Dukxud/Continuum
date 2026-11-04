@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:codex_resume_flutter/bridge.dart';
 import 'package:codex_resume_flutter/aero_appearance.dart';
@@ -44,6 +45,43 @@ class FakeScheduler implements SchedulerAdapter {
   }
 }
 
+class DeferredSaveScheduler extends FakeScheduler {
+  final firstSaveEntered = Completer<void>();
+  final releaseFirstSave = Completer<void>();
+  int inProgress = 0;
+  int maxSimultaneous = 0;
+
+  @override
+  Future<Map<String, dynamic>> call(String action,
+      [Map<String, dynamic> payload = const {}]) async {
+    if (action != 'save') return super.call(action, payload);
+    inProgress++;
+    if (inProgress > maxSimultaneous) maxSimultaneous = inProgress;
+    final snapshot = Map<String, dynamic>.from(payload);
+    if (saves.isEmpty) {
+      firstSaveEntered.complete();
+      await releaseFirstSave.future;
+    }
+    saves.add(snapshot);
+    inProgress--;
+    return {'saved': true};
+  }
+}
+
+class RepositoryLookupScheduler extends FakeScheduler {
+  @override
+  Future<Map<String, dynamic>> call(String action,
+      [Map<String, dynamic> payload = const {}]) async {
+    if (action == 'select') {
+      return {
+        'model': 'gpt-test',
+        'found': {'Root': r'C:\verified\checkout', 'AlternativeRoots': []},
+      };
+    }
+    return super.call(action, payload);
+  }
+}
+
 void main() {
   test('adapter timeout never asserts failed registration or cancellation', () {
     for (final action in ['schedule', 'cancel', 'save', 'hide']) {
@@ -76,6 +114,38 @@ void main() {
     expect(name, startsWith('CodexResume-'));
     expect(fake.actions, contains('usage'));
     expect(fake.actions, contains('schedule'));
+    controller.dispose();
+  });
+
+  test('concurrent saves cannot overwrite a later draft with earlier data', () async {
+    final fake = DeferredSaveScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    controller.edit(instruction: 'Earlier preference');
+    final first = controller.save();
+    await fake.firstSaveEntered.future;
+    controller.edit(instruction: 'Latest preference');
+    final second = controller.save();
+    // The second call is queued until the first disk write is complete.
+    expect(fake.maxSimultaneous, 1);
+    fake.releaseFirstSave.complete();
+    await Future.wait([first, second]);
+    expect(fake.maxSimultaneous, 1);
+    expect(fake.saves.length, 2);
+    expect((fake.saves.last['draft'] as Map)['message'], 'Latest preference');
+    controller.dispose();
+  });
+
+  test('resolved session repository is automatically persisted', () async {
+    final fake = RepositoryLookupScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    await controller.selectSession(null);
+    await controller.selectSession('11111111-1111-1111-1111-111111111111');
+    expect(controller.repo, r'C:\verified\checkout');
+    await Future<void>.delayed(const Duration(milliseconds: 760));
+    expect(fake.saves, isNotEmpty);
+    expect((fake.saves.last['draft'] as Map)['repo'], r'C:\verified\checkout');
     controller.dispose();
   });
 
