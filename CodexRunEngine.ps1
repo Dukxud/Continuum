@@ -151,9 +151,24 @@ function Invoke-CodexScheduledJob {
         $sessionGuard = Enter-CodexSessionRun -SessionId ([string]$job.sessionId)
         if (-not $sessionGuard) {
             $message = 'Another scheduled continuation is active for this Codex conversation; duplicate execution refused.'
-            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode 1 -Message $message
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode 1 -Attempt ([int]$job.retryAttempt) -Message $message
             Write-Host $message -ForegroundColor Yellow
             return 1
+        }
+        # A process may stop after creating its child but before the parent
+        # outcome is written. Reconcile the persisted intent instead of
+        # executing the same Codex turn or registering another child.
+        $intentPath=Join-Path $appDir ([IO.Path]::GetFileNameWithoutExtension($JobFile)+'.continuation.json')
+        if(Test-Path -LiteralPath $intentPath -PathType Leaf){
+            try {
+                $linked=Get-RegisteredCodexQuotaContinuation -Job $job -JobFile $JobFile -Directory $appDir
+                Set-CodexRunOutcome -JobFile $JobFile -Status 'deferred' -Attempt ([int]$job.retryAttempt) -NextJob $linked.Name -Message "Existing quota continuation: $($linked.Name)"
+                Write-Host "Existing continuation preserved: $($linked.Name)" -ForegroundColor Cyan
+                return 0
+            }catch{
+                Write-Warning "Continuation registration requires review; refusing to run this parent twice: $($_.Exception.Message)"
+                return 1
+            }
         }
         $logFolder = Split-Path -Parent ([string]$job.log)
         [void](New-Item -ItemType Directory -Path $logFolder -Force)
@@ -178,7 +193,7 @@ function Invoke-CodexScheduledJob {
         if ($state.canAttempt -ne $true) {
             if(Try-DeferCodexQuotaJob -Job $job -JobFile $JobFile -AppDirectory $appDir -RuntimeDirectory $RuntimeDirectory -Quota $state -ExitCode 1){return 0}
             $message = if ($state.blockedReason) { [string]$state.blockedReason } else { 'Codex reports usage unavailable for the selected model.' }
-            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode 1 -Message $message
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode 1 -Attempt ([int]$job.retryAttempt) -Message $message
             Write-Host $message -ForegroundColor Yellow
             return 1
         }
@@ -202,11 +217,11 @@ function Invoke-CodexScheduledJob {
         # Report native thread-writer conflicts rather than a generic failure.
         if ($result -ne 0 -and (Select-String -LiteralPath $events -Pattern 'thread-store conflict|already has an active writer' -Quiet)) {
             $message = 'Codex reports an existing active writer for this conversation. Scheduled run blocked.'
-            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode ([int]$result) -Message $message
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode ([int]$result) -Attempt ([int]$job.retryAttempt) -Message $message
             return [int]$result
         }
         if ([int]$result -eq 0) {
-            Set-CodexRunOutcome -JobFile $JobFile -Status 'completed' -ExitCode 0
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'completed' -ExitCode 0 -Attempt ([int]$job.retryAttempt)
             return 0
         }
         if((Test-CodexContinuationPolicy $job) -and
