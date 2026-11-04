@@ -102,6 +102,19 @@ try {
     Require ([string]$payload.message -match 'do not repeat completed changes') 'Child lacks duplicate-side-effect caution.'
     $again=Register-CodexQuotaContinuation -Job $job -JobFile $jobFile -AppDirectory $temp -RuntimeDirectory $runtime -When $scheduled.AddMinutes(5)
     Require ($again.Name -ceq $child.Name -and $script:taskMap.Count -eq 1) 'Repeated parent created a second child.'
+    # Exercise the worker boundary, not just registration: a verified quota
+    # deferral must persist the parent outcome and reference exactly that child.
+    $quota.recommendedResetAt=[DateTimeOffset]::UtcNow.AddHours(2).ToUnixTimeSeconds()
+    Require (Try-DeferCodexQuotaJob -Job $job -JobFile $jobFile -AppDirectory $temp -RuntimeDirectory $runtime -Quota $quota -ExitCode 1) 'Worker failed to record verified quota deferral.'
+    $deferred=Read-JobOutcome -Path (Join-Path $temp ($parent+'.result.json'))
+    Require ($deferred.status -ceq 'deferred' -and $deferred.attempt -eq 0 -and
+      $deferred.nextJob -ceq $child.Name -and $deferred.exitCode -eq 1) 'Parent outcome missing deferred status or child link.'
+    Require ($script:taskMap.Count -eq 1) 'Worker created a second child for a deferred parent.'
+    $quota.model='another-model'
+    Require (-not (Try-DeferCodexQuotaJob -Job $job -JobFile $jobFile -AppDirectory $temp -RuntimeDirectory $runtime -Quota $quota -ExitCode 1)) 'Worker must not defer mismatched model quota.'
+    Require ($script:taskMap.Count -eq 1) 'Mismatched model created a continuation.'
+    $quota.model='test-model'
+
 
     # A manually removed pending child must not be recreated by an old parent.
     [void]$script:taskMap.Remove($child.Name)
