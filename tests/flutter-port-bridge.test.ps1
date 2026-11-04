@@ -42,6 +42,13 @@ try {
         id=$sessionId;source='exec';cwd=$repository
     }} | ConvertTo-Json -Depth 8 -Compress
     Set-Content -LiteralPath (Join-Path $sessions ('rollout-'+$sessionId+'.jsonl')) -Value $metadata -Encoding utf8
+    # The latest explicit user activity identifies a session more reliably
+    # than its original working directory or a guessed conversation title.
+    $gitRollout=Join-Path $sessions ('rollout-'+$sessionId+'.jsonl')
+    $userActivity=@{type='event_msg';payload=@{
+        type='user_message';message='Review shared-EC2 architecture'
+    }} | ConvertTo-Json -Depth 8 -Compress
+    Add-Content -LiteralPath $gitRollout -Value $userActivity -Encoding utf8
     $env:CODEX_HOME=Join-Path $fixture 'codex-home'
     $payload=@{sessionId=$sessionId} | ConvertTo-Json -Compress
     $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
@@ -97,7 +104,7 @@ try {
     if($gitSession.Count -ne 1 -or $outsideSession.Count -ne 1){
         throw 'Git-backed and non-Git sessions must both appear in the chooser.'
     }
-    if(-not $gitSession[0].Display.StartsWith('Git: qa-repository | ') -or
+    if(-not $gitSession[0].Display.StartsWith('Review shared-EC2 architecture | Git: qa-repository | ') -or
        -not $gitSession[0].Display.EndsWith($sessionId.Substring(28))){
         throw 'Git-backed session label must show the project, time and short ID.'
     }
