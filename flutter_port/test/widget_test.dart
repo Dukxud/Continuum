@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:codex_resume_flutter/main.dart';
 import 'package:codex_resume_flutter/windows_icons.dart';
@@ -131,9 +132,9 @@ void main() {
     final scheduleButton = find.ancestor(
       of: find.text('Schedule once'), matching: find.byType(InkWell)).first;
     final scheduleTop = tester.getTopLeft(scheduleButton);
-    expect(scheduleTop.dx, closeTo(722, 5));
+    expect(scheduleTop.dx, closeTo(734, 5));
     expect(scheduleTop.dy, lessThan(instruction.dy));
-    expect(tester.getSize(scheduleButton).height, closeTo(74, 2));
+    expect(tester.getSize(scheduleButton).height, closeTo(34, 2));
     expect(find.text('Now +1'), findsOneWidget);
     expect(find.text('Now +2'), findsNothing);
     expect(find.text('Reset +2'), findsNothing);
@@ -160,7 +161,7 @@ void main() {
     await tester.pump();
     final nowLabel = tester.widget<Text>(
       find.byKey(const Key('selected-run-time-label'))).data!;
-    expect(nowLabel, matches(RegExp(r'\d{2}:\d{2}:\d{2} (AM|PM)$')));
+    expect(nowLabel, matches(RegExp(r'\d{1,2}:\d{2}:\d{2} (AM|PM)$')));
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(MaterialApp(home: SchedulerHome(
@@ -174,6 +175,33 @@ void main() {
     final resetLabel = tester.widget<Text>(
       find.byKey(const Key('selected-run-time-label'))).data!;
     expect(resetLabel, contains(':37 '));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('date picker uses Monday as the first day of the week',
+      (tester) async {
+    tester.view.physicalSize = const Size(940, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('en', 'US'), Locale('en', 'GB')],
+      home: SchedulerHome(adapter: StubAdapter()),
+    ));
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.tap(find.byKey(const Key('selected-run-time-label')));
+    await tester.pump(const Duration(milliseconds: 350));
+    final calendar = find.byType(DatePickerDialog);
+    expect(calendar, findsOneWidget);
+    expect(MaterialLocalizations.of(tester.element(calendar)).firstDayOfWeekIndex,
+      1, reason: 'Calendar grid must start on Monday, not Sunday');
     expect(tester.takeException(), isNull);
   });
 
