@@ -152,12 +152,14 @@ extension _DashboardMonitor on _SchedulerHomeState {
 
   Widget _runTile(Map<String, dynamic> run) {
     final running = stringField(run, 'Status') == 'Running';
+    final waitingForQuota = !running && field(run, 'QuotaContinuation') == true;
     final when = dateField(run, 'When');
     final name = stringField(run, 'Name');
     final chosen = name == selectedRun;
     final project = stringField(run, 'Repo')
       .split(RegExp(r'[\\/]')).last;
-    final tone = running ? DeckColor.gold : DeckColor.aqua;
+    final tone = running ? DeckColor.gold :
+      waitingForQuota ? DeckColor.iris : DeckColor.aqua;
     final percent = running ? null :
       runElapsedPercent(when, field(run, 'CreatedAt'))?.toDouble();
     return Material(color: Colors.transparent, child: InkWell(
@@ -184,7 +186,8 @@ extension _DashboardMonitor on _SchedulerHomeState {
               maxLines: 1, overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: DeckColor.text,
                 fontSize: 12.5, fontWeight: FontWeight.w800))),
-            Text(running ? 'RUNNING' : countdown(when),
+            Text(running ? 'RUNNING' :
+              waitingForQuota ? 'WAITING FOR QUOTA' : countdown(when),
               style: TextStyle(color: tone, fontSize: 11,
                 fontWeight: FontWeight.w800)),
           ]),
