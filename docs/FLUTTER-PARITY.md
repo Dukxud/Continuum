@@ -22,7 +22,7 @@ Task Scheduler, history and worker functions; this is not a backend rewrite.
 | Custom RGB, glass/enamel/pearl, studio modes, shimmer, speed, toggle | Two-tab appearance editor with live preview, automatic persistence, Defaults/Done; no explicit Save | Unit/widget coverage; Windows visual pending |
 | Pinned runtime and one-time task registration | Existing PowerShell RuntimeBundle + OneTimeTasks | Source checked; real task pending |
 | Workspace identity, model/effort, quota, branch and overlap checks | Existing worker plus server-side registration preflight | Real task pending |
-| Cancellation before worker starts, never cancels running process | Original OneTimeTasks with post-cancel reconciliation | Real task pending |
+| One-click cancellation of a selected future task; never cancels running process | No redundant dialog; original OneTimeTasks enforces pre-start eligibility with post-cancel reconciliation | Owner GUI removal observed; independent Windows task/outcome verification pending |
 | Upcoming and recently completed/legacy Windows results | Task Scheduler + saved JobOutcomes | Windows manual pending |
 | Detailed history: result, time, exit code, attempt, next task, message | Flutter history dialog, response and worker transcript | Windows manual pending |
 | Copy response / copy worker log / remove from history (non-destructive) | Flutter dialog / bridge | Windows manual pending |
