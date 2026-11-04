@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:codex_resume_flutter/bridge.dart';
 import 'package:codex_resume_flutter/aero_appearance.dart';
@@ -64,6 +65,31 @@ class ExhaustedQuotaScheduler extends FakeScheduler {
       'recommendationKind': 'exhausted-window',
       'recommendedResetAt': 1793736000,
     };
+  }
+}
+
+class FailOnceLoadScheduler extends FakeScheduler {
+  bool firstLoad = true;
+  @override
+  Future<Map<String, dynamic>> call(String action,
+      [Map<String, dynamic> payload = const {}]) {
+    if (action == 'load' && firstLoad) {
+      firstLoad = false;
+      return Future.error(SchedulerException('Temporary launch failure'));
+    }
+    return super.call(action, payload);
+  }
+}
+
+class RejectSaveScheduler extends FakeScheduler {
+  bool reject = true;
+  @override
+  Future<Map<String, dynamic>> call(String action,
+      [Map<String, dynamic> payload = const {}]) {
+    if (action == 'save' && reject) {
+      return Future.error(SchedulerException('Permission denied'));
+    }
+    return super.call(action, payload);
   }
 }
 
@@ -179,6 +205,88 @@ void main() {
     expect(name, startsWith('CodexResume-'));
     expect(fake.actions, contains('schedule'));
     controller.dispose();
+  });
+
+  test('startup recovers and restores the draft after a transient load error', () async {
+    final fake = FailOnceLoadScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    expect(controller.ready, isFalse);
+    await controller.load();
+    expect(controller.ready, isTrue);
+    expect(controller.sessionId, '11111111-1111-1111-1111-111111111111');
+    expect(controller.repo, r'C:\source\test');
+    controller.dispose();
+  });
+
+  test('focus refreshes stale data, not every quick return', () async {
+    final fake = FakeScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    final initialReads = fake.actions.where((x) => x == 'load').length;
+    await controller.refreshOnFocus();
+    expect(fake.actions.where((x) => x == 'load').length, initialReads);
+    await controller.refreshOnFocus(DateTime.now().add(const Duration(seconds: 16)));
+    expect(fake.actions.where((x) => x == 'load').length, initialReads + 1);
+    controller.dispose();
+  });
+
+  test('closing flushes pending edits and refuses to silently lose failed saves', () async {
+    final fake = RejectSaveScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    controller.edit(instruction: 'Last-moment edit');
+    expect(await controller.flushPreferences(), isFalse);
+    expect(controller.error, contains('Preferences save could not be confirmed'));
+    fake.reject = false;
+    expect(await controller.flushPreferences(), isTrue);
+    expect((fake.saves.last['draft'] as Map)['message'], 'Last-moment edit');
+    expect(controller.error, isNull);
+    controller.dispose();
+  });
+
+  test('countdown matches WinForms day/hour/minute and UTC instants', () {
+    final now = DateTime.utc(2026, 11, 1, 1, 2, 3);
+    expect(countdownText(null, now), 'Unknown');
+    expect(countdownText(now, now), 'Due now');
+    expect(countdownText(now.subtract(const Duration(seconds: 1)), now), 'Due now');
+    expect(countdownText(now.add(const Duration(days: 2, hours: 3, minutes: 4)), now), '2d 3h 4m');
+    expect(countdownText(now.add(const Duration(hours: 2, minutes: 3)), now), '2h 3m');
+    expect(countdownText(now.add(const Duration(minutes: 3, seconds: 4)), now), '3m 4s');
+    expect(countdownText(now.add(const Duration(milliseconds: 1)), now), '1s');
+  });
+
+  test('countdown fill matches WinForms bounded integer elapsed percentage', () {
+    const created = 1793600000;
+    final begin = DateTime.fromMillisecondsSinceEpoch(created * 1000, isUtc:true);
+    final due = begin.add(const Duration(minutes: 10));
+    expect(runElapsedPercent(due, created, begin.subtract(const Duration(seconds:1))), 0);
+    expect(runElapsedPercent(due, created, begin.add(const Duration(minutes:5))), 50);
+    expect(runElapsedPercent(due, created, due.add(const Duration(minutes:1))), 100);
+    expect(runElapsedPercent(due, null, begin), isNull);
+    expect(runElapsedPercent(due, 0, begin), isNull);
+    expect(runElapsedPercent(begin, created, begin), isNull);
+  });
+
+  test('packaged worker takes priority over untrusted current directory', () {
+    if (!Platform.isWindows) return;
+    final sandbox = Directory.systemTemp.createTempSync('flutter-worker-search-');
+    addTearDown(() => sandbox.deleteSync(recursive:true));
+    final sep = Platform.pathSeparator;
+    Directory createSource(String name) {
+      final dir = Directory('${sandbox.path}$sep$name')..createSync();
+      File('${dir.path}${sep}CodexRunEngine.ps1').createSync();
+      File('${dir.path}${sep}flutter_port${sep}windows_bridge.ps1')
+        .createSync(recursive:true);
+      return dir;
+    }
+    final bundled = createSource('bundle');
+    final untrusted = createSource('cwd');
+    final exeDir = Directory('${bundled.path}${sep}bin')..createSync();
+    expect(WindowsSchedulerAdapter.findSourceDirectoryFrom(
+      executableDirectory: exeDir, workingDirectory: untrusted), bundled.path);
+    expect(WindowsSchedulerAdapter.findSourceDirectoryFrom(
+      executableDirectory: sandbox, workingDirectory: untrusted), untrusted.path);
   });
 
   test('concurrent saves cannot overwrite a later draft with earlier data', () async {
