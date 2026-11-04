@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:codex_resume_flutter/main.dart';
+import 'package:codex_resume_flutter/windows_icons.dart';
 import 'package:codex_resume_flutter/bridge.dart';
 
 class StubAdapter implements SchedulerAdapter {
@@ -62,6 +63,9 @@ void main() {
     expect(model.dy, closeTo(206, 8));
     expect(instruction.dy, closeTo(250, 8));
     expect(usage.dy, closeTo(328, 8));
+    expect(find.text('Browse'), findsOneWidget);
+    expect(find.byType(WindowsCalendarGlyph), findsOneWidget);
+    expect(find.byType(WindowsCaret), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
