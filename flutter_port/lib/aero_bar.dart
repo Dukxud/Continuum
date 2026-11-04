@@ -86,7 +86,7 @@ class _AeroLiquidBarState extends State<AeroLiquidBar>
     _clock = AnimationController(
       vsync: this, duration: const Duration(seconds: 100),
       value: math.Random().nextDouble(),
-    )..repeat();
+    );
     _load();
   }
 
@@ -101,10 +101,27 @@ class _AeroLiquidBarState extends State<AeroLiquidBar>
         _sprites = loaded[0] as Map<String, ui.Image>;
         _shaderProgram = loaded[1] as ui.FragmentProgram?;
       });
+      _syncClock();
     } catch (_) {
       // Flutter's non-GPU test harness and unavailable assets retain the
       // deterministic native fallback drawn by _AeroPainter.
     }
+  }
+
+  bool get _opticsActive => widget.appearance.aero && _shaderProgram != null;
+
+  void _syncClock() {
+    if (_opticsActive && !_clock.isAnimating) {
+      _clock.repeat();
+    } else if (!_opticsActive && _clock.isAnimating) {
+      _clock.stop();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AeroLiquidBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.appearance.aero != widget.appearance.aero) _syncClock();
   }
 
   @override
@@ -126,7 +143,7 @@ class _AeroLiquidBarState extends State<AeroLiquidBar>
         animation: _clock,
         builder: (context, child) {
           if (target != null) {
-            if (!_initializedValue || widget.working || target == 100) {
+            if (!_opticsActive || !_initializedValue || widget.working || target == 100) {
               _visible = target;
               _initializedValue = true;
             } else {
