@@ -123,20 +123,18 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
     required String name,required T? selected,
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?> onChanged,
-  })=>DropdownButtonFormField<T>(
-    key:ValueKey(name+':'+selected.toString()),
-    initialValue:selected,
-    isExpanded:true,
-    isDense:true,
-    icon:const Icon(Icons.arrow_drop_down,size:19,color:_legacyInk),
-    style:const TextStyle(fontFamily:'Segoe UI',fontSize:13,color:_legacyInk),
-    decoration:const InputDecoration(
-      isDense:true,filled:true,fillColor:_legacyInput,
-      contentPadding:EdgeInsets.symmetric(horizontal:7,vertical:4),
-      enabledBorder:_LegacyInputBorder(),
-      focusedBorder:OutlineInputBorder(borderRadius:BorderRadius.zero,
-        borderSide:BorderSide(color:Color(0xff547fd2),width:1.3))),
-    items:items,onChanged:onChanged,
+  })=>Container(
+    padding:const EdgeInsets.symmetric(horizontal:6),
+    decoration:BoxDecoration(color:_legacyInput,
+      border:Border.all(color:const Color(0xffb8c6d8))),
+    child:DropdownButtonHideUnderline(child:DropdownButton<T>(
+      key:ValueKey(name+':'+selected.toString()),
+      value:selected,
+      isExpanded:true,isDense:true,
+      icon:const Icon(Icons.arrow_drop_down,size:19,color:_legacyInk),
+      style:const TextStyle(fontFamily:'Segoe UI',fontSize:13,color:_legacyInk),
+      items:items,onChanged:onChanged,
+    )),
   );
 
   String _dateLabel(DateTime date,{bool long=false}) {

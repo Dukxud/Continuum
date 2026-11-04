@@ -91,22 +91,26 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
         padding:EdgeInsets.zero),
       child:Text(label,style:const TextStyle(fontFamily:'Segoe UI',fontSize:13)));
 
-  InputDecoration get _input => const InputDecoration(
-    isDense:true,filled:true,fillColor:Color(0xfffbfdff),
-    contentPadding:EdgeInsets.symmetric(horizontal:7,vertical:5),
-    enabledBorder:OutlineInputBorder(borderRadius:BorderRadius.zero,
-      borderSide:BorderSide(color:Color(0xffb8c6d8))),
-    focusedBorder:OutlineInputBorder(borderRadius:BorderRadius.zero,
-      borderSide:BorderSide(color:Color(0xff547fd2),width:1.3)),
+  Widget _selectSurface<T>({
+    required Key key,required T? selected,required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+  })=>Container(
+    padding:const EdgeInsets.symmetric(horizontal:6),
+    decoration:BoxDecoration(color:const Color(0xfffbfdff),
+      border:Border.all(color:const Color(0xffb8c6d8))),
+    child:DropdownButtonHideUnderline(child:DropdownButton<T>(
+      key:key,value:selected,isExpanded:true,isDense:true,
+      items:items,onChanged:onChanged,
+      style:const TextStyle(fontFamily:'Segoe UI',fontSize:13,color:Color(0xff253a58)),
+      icon:const Icon(Icons.arrow_drop_down,size:19,color:Color(0xff253a58)),
+    )),
   );
 
   Widget _colorSelect(String kind) {
     final selected = draft.selection(kind);
     final choice = AeroAppearance.presetColors.containsKey(selected)?selected:'custom';
-    return DropdownButtonFormField<String>(
-      key:ValueKey(kind+':'+selected),
-      initialValue:choice,
-      isExpanded:true,isDense:true,decoration:_input,
+    return _selectSurface<String>(
+      key:ValueKey(kind+':'+selected), selected:choice,
       items:[
         for(final key in AeroAppearance.presetColors.keys)
           DropdownMenuItem(value:key,child:Row(children:[
@@ -150,10 +154,9 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
   }
 
   Widget _enumSelect(int value,List<String> names,ValueChanged<int> onChange) =>
-    DropdownButtonFormField<int>(
+    _selectSurface<int>(
       key:ValueKey('enum:'+names.first+':'+value.toString()),
-      initialValue:value,
-      isExpanded:true,isDense:true,decoration:_input,
+      selected:value,
       items:List.generate(names.length,(i)=>DropdownMenuItem(
         value:i,child:Text(names[i],overflow:TextOverflow.ellipsis))),
       onChanged:(v){if(v!=null)onChange(v);});
