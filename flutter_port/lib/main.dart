@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'aero_bar.dart';
 import 'appearance_dialog.dart';
@@ -55,7 +56,7 @@ class SchedulerHome extends StatefulWidget {
   State<SchedulerHome> createState() => _SchedulerHomeState();
 }
 
-class _SchedulerHomeState extends State<SchedulerHome> {
+class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
   SchedulerController? controller;
   String? startupError;
   final repository = TextEditingController();
@@ -69,6 +70,7 @@ class _SchedulerHomeState extends State<SchedulerHome> {
   }
 
   bool _dialogOpen = false;
+  bool _closing = false;
   String _lastWindowKey = '';
 
   void updateWindowSize() {
@@ -91,6 +93,7 @@ class _SchedulerHomeState extends State<SchedulerHome> {
   @override
   void initState() {
     super.initState();
+    if (widget.windowHost != null) windowManager.addListener(this);
     try {
       controller = SchedulerController(widget.adapter ?? WindowsSchedulerAdapter());
       controller!.addListener(_notify);
@@ -115,7 +118,37 @@ class _SchedulerHomeState extends State<SchedulerHome> {
   }
 
   @override
+  void onWindowFocus() {
+    if (!mounted || _dialogOpen) return;
+    final state = controller;
+    if (state != null) unawaited(state.refreshOnFocus());
+  }
+
+  @override
+  void onWindowClose() {
+    if (_closing) return;
+    _closing = true;
+    unawaited(_closeAfterSave());
+  }
+
+  Future<void> _closeAfterSave() async {
+    try {
+      final saved = await controller?.flushPreferences() ?? true;
+      if (!saved) {
+        toast('Preferences could not be saved. Window remains open.');
+        _closing = false;
+        return;
+      }
+      await windowManager.destroy();
+    } catch (error) {
+      _closing = false;
+      toast('Unable to close safely: $error');
+    }
+  }
+
+  @override
   void dispose() {
+    if (widget.windowHost != null) windowManager.removeListener(this);
     controller?.removeListener(_notify);
     controller?.dispose();
     repository.dispose();
@@ -148,18 +181,7 @@ class _SchedulerHomeState extends State<SchedulerHome> {
       hour.toString() + ':' + pad(time.minute) + (time.hour < 12 ? ' AM' : ' PM');
   }
 
-  String countdown(DateTime? due) {
-    if (due == null) return 'Unknown';
-    final left = due.difference(DateTime.now());
-    if (left.isNegative) return 'Due now';
-    if (left.inDays > 0) return left.inDays.toString() + 'd ' +
-        (left.inHours % 24).toString() + 'h';
-    if (left.inHours > 0) return left.inHours.toString() + 'h ' +
-        (left.inMinutes % 60).toString() + 'm';
-    if (left.inMinutes > 0) return left.inMinutes.toString() + 'm ' +
-        (left.inSeconds % 60).toString() + 's';
-    return left.inSeconds.toString() + 's';
-  }
+  String countdown(DateTime? due) => countdownText(due);
 
   Future<void> pickTime() async {
     final state = controller!;
