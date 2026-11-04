@@ -37,6 +37,10 @@ jobs:
         run: |
           pwsh -NoProfile -File ./tests/flutter-port-source.test.ps1
 
+      - name: Test real Windows JSON bridge without registering tasks
+        shell: pwsh
+        run: pwsh -NoProfile -STA -File ./tests/flutter-port-bridge.test.ps1
+
       - name: Generate Windows runner
         shell: pwsh
         working-directory: flutter_port
