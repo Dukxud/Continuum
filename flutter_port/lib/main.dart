@@ -127,6 +127,10 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
   @override
   void onWindowClose() {
     if (_closing) return;
+    if (controller?.busy == true) {
+      toast('Scheduling or cancellation is still in progress.');
+      return;
+    }
     _closing = true;
     unawaited(_closeAfterSave());
   }
