@@ -12,7 +12,7 @@ Task Scheduler, history and worker functions; this is not a backend rewrite.
 | CLI conversations, model/effort/access | Live bridge to original data/Codex catalog | Windows manual pending |
 | Repository discovery, alternatives and explicit Browse | Bridge resolution + conflict UI | Windows manual pending |
 | Manual time, minus/plus, Now+2, reset+2 | Flutter controls, server checks before scheduling | Windows manual pending |
-| Live model-specific 5-hour/weekly usage | Official CodexUsage.js, no estimated quota | Windows manual pending |
+| Live model-specific 5-hour/weekly usage | Official CodexUsage.js; verified identity permits future scheduling even at 0% (WinForms parity), with worker quota recheck at execution | Windows 0%-quota scheduling acceptance pending |
 | Full run form and compact next-run view | Flutter, separate desktop window sizing | Window test added; Windows visual pending |
 | No upcoming-run message in compact mode | Hide next-run area when no task | Widget covered |
 | Distinct countdown progress / running state | Native renderer with original working mode | Visual pending |
@@ -64,6 +64,25 @@ three editor/window issues: clipped controls, explicit Save friction, and
 stale full-mode sizes. The current draft corrects these in source, but the
 revised two-tab editor, auto-save, and serialized native sizing are **not
 accepted** until exact-head Windows CI and renewed BLACK-PUDDLE inspection.
+
+## Native November 4 scheduling investigation
+
+The cancellation-only update did not change repository discovery or the
+scheduling button's eligibility predicate. In the reported BP161 screenshot,
+the selected conversation was a newer generic Nathan CLI session, not the
+previously verified BP155-Flutter-QA session; no Git root was shown for that
+new conversation. This is not evidence that BP155's discovery regressed.
+The displayed five-hour quota was exhausted (0%).
+
+A source comparison exposed a separate **real** Flutter parity defect:
+the Flutter controller and bridge refused scheduling while
+`ordinaryUsageAllowed=false`; original WinForms v1.16 required a fresh,
+model-bound quota/catalog and verified workspace ID, but deliberately
+allowed creating a future run after a quota reset. The pinned worker always
+rechecks quota before execution. The Flutter port now preserves that split
+so **Reset +2** remains useful with exhausted current quota, without
+permitting an already-exhausted worker to start. Regression coverage added;
+renewed exact-head CI and native acceptance still required.
 
 ## Conditions for acceptance
 
