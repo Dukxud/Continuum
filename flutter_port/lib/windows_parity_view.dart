@@ -75,10 +75,10 @@ class _LegacyButton extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             border: Border.all(color: enabled
-              ? Color.lerp(color,Colors.black,.22)! : const Color(0xffb8c6d8)),
+              ? Color.lerp(color,Colors.black,.22)! : const Color(0xffb8c6d8))),
           child: Stack(children:[
             Positioned(left:4,right:4,top:2,
-              child: Container(height:1,color:Colors.white.withValues(alpha: primary?.52:.28))),
+              child: Container(height:1,color:Colors.white.withValues(alpha: primary ? .52 : .28))),
             Positioned(right:4,top:5,
               child: Container(width:3,height:3,color:Colors.white.withValues(alpha:.35))),
             Center(child: Text(text,textAlign:TextAlign.center,
