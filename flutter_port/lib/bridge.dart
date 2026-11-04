@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -12,6 +13,22 @@ class SchedulerException implements Exception {
   final String message;
   @override
   String toString() => message;
+}
+
+/// The underlying Windows action may have completed despite a transport timeout.
+/// Callers must not imply that retrying is safe until outcomes are reconciled.
+class SchedulerOutcomeUncertain extends SchedulerException {
+  SchedulerOutcomeUncertain(super.message);
+}
+
+SchedulerException adapterTimeoutError(String action) {
+  const mutations = {'schedule', 'cancel', 'save', 'hide'};
+  if (mutations.contains(action)) {
+    return SchedulerOutcomeUncertain(
+      'Outcome uncertain: $action exceeded the response limit. '
+      'Check Windows Scheduler and recent results before retrying.');
+  }
+  return SchedulerException('Scheduler $action request timed out.');
 }
 
 class WindowsSchedulerAdapter implements SchedulerAdapter {
@@ -52,27 +69,47 @@ class WindowsSchedulerAdapter implements SchedulerAdapter {
         r'\PowerShell\7\pwsh.exe';
     if (!File(executable).existsSync()) throw SchedulerException('PowerShell 7 is required.');
     final encoded = base64Encode(utf8.encode(jsonEncode(payload)));
-    ProcessResult result;
+    // Process.run(...).timeout() only stops waiting; it leaves a live
+    // PowerShell process that could still register/cancel a Windows task.
+    // Process.start permits terminating the direct child on timeout.
+    Process process;
     try {
-      result = await Process.run(
+      process = await Process.start(
         executable,
         ['-NoLogo', '-NoProfile', '-NonInteractive', '-STA', '-WindowStyle',
          'Hidden', '-File', bridge, '-Action', action, '-Payload', encoded],
         workingDirectory: sourceDirectory,
-      ).timeout(const Duration(seconds: 55));
+      );
     } catch (error) {
-      throw SchedulerException('Scheduler adapter did not respond: $error');
+      throw SchedulerException('Unable to start Scheduler adapter: $error');
     }
-    final lines = result.stdout.toString().split(RegExp(r'\r?\n'))
+    final stdout = process.stdout.transform(utf8.decoder).join();
+    final stderr = process.stderr.transform(utf8.decoder).join();
+    await process.stdin.close();
+    late final int exitCode;
+    late final String output;
+    late final String errors;
+    try {
+      exitCode = await process.exitCode.timeout(
+        action == 'browse'
+          ? const Duration(minutes: 10)
+          : const Duration(seconds: 55));
+      output = await stdout.timeout(const Duration(seconds: 5));
+      errors = await stderr.timeout(const Duration(seconds: 5));
+    } on TimeoutException {
+      process.kill();
+      throw adapterTimeoutError(action);
+    }
+    final lines = output.split(RegExp(r'\r?\n'))
         .where((line) => line.trim().isNotEmpty).toList();
-    if (lines.isEmpty) throw SchedulerException('No adapter response. ' + result.stderr.toString());
+    if (lines.isEmpty) throw SchedulerException('No adapter response. $errors');
     Map<String, dynamic> response;
     try {
       response = Map<String, dynamic>.from(jsonDecode(lines.last) as Map);
     } catch (_) {
-      throw SchedulerException('Invalid adapter response. ' + result.stderr.toString());
+      throw SchedulerException('Invalid adapter response. $errors');
     }
-    if (result.exitCode != 0 || response['ok'] != true) {
+    if (exitCode != 0 || response['ok'] != true) {
       throw SchedulerException((response['error'] ?? 'Adapter failed.').toString());
     }
     final body = response['result'];

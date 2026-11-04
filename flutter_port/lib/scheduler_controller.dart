@@ -297,7 +297,7 @@ class SchedulerController extends ChangeNotifier {
         },
       });
     } catch (e) {
-      error = 'Preferences were not saved: $e';
+      error = 'Preferences save could not be confirmed: $e';
       _changed();
     }
   }

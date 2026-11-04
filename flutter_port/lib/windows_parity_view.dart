@@ -466,6 +466,8 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
       selectedRun=null;
       final warning=stringField(result,'warning');
       if(warning.isNotEmpty)toast('Cancelled with warning: '+warning);
+    }on SchedulerOutcomeUncertain catch(error){
+      toast(error.toString());
     }catch(error){toast('Cancellation failed: '+error.toString());}
   }
 }

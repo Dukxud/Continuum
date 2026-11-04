@@ -45,6 +45,16 @@ class FakeScheduler implements SchedulerAdapter {
 }
 
 void main() {
+  test('adapter timeout never asserts failed registration or cancellation', () {
+    for (final action in ['schedule', 'cancel', 'save', 'hide']) {
+      final outcome = adapterTimeoutError(action);
+      expect(outcome, isA<SchedulerOutcomeUncertain>());
+      expect(outcome.toString(), contains('Outcome uncertain'));
+    }
+    expect(adapterTimeoutError('usage'), isNot(isA<SchedulerOutcomeUncertain>()));
+    expect(adapterTimeoutError('browse'), isNot(isA<SchedulerOutcomeUncertain>()));
+  });
+
   test('date helpers round forward and never schedule too close to now', () {
     final now = DateTime(2026, 11, 3, 14, 3, 48);
     expect(suggestedRunAt(now), DateTime(2026, 11, 3, 14, 6));

@@ -200,6 +200,8 @@ class _SchedulerHomeState extends State<SchedulerHome> {
       final name = await state.schedule(
         confirmUnrestricted: unrestricted, confirmOverlap: overlap);
       toast('Scheduled: $name');
+    } on SchedulerOutcomeUncertain catch (e) {
+      toast(e.toString());
     } catch (e) {
       toast('Scheduling failed: $e');
     }
