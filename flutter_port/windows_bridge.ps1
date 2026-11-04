@@ -13,7 +13,8 @@ try {
     . (Join-Path $source 'CodexRunEngine.ps1')
     . (Join-Path $source 'CodexData.ps1')
     function Get-FlutterHistory {
-        $recentTasks=@(Get-UpcomingCodexTasks -AppDirectory $appDir)
+        param([object[]]$Tasks=@())
+        $recentTasks=@($Tasks)
         $records=@(Get-CodexRunHistory -Directory $appDir -Limit 100)
         $known=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         foreach($entry in $records){[void]$known.Add([string]$entry.Name)}
@@ -32,18 +33,20 @@ try {
     $result=$null
     switch($Action){
         'load' {
+            $tasks=@(Get-UpcomingCodexTasks -AppDirectory $appDir)
             $result=@{
                 sessions=@(Get-RecentCliSessions)
-                pending=@(Get-UpcomingCodexTasks -AppDirectory $appDir)
-                history=@(Get-FlutterHistory)
+                pending=$tasks
+                history=@(Get-FlutterHistory -Tasks $tasks)
                 settings=Read-CodexUiSettings $appDir
                 logDirectory=$appDir
             }
         }
         'pending' {
+            $tasks=@(Get-UpcomingCodexTasks -AppDirectory $appDir)
             $result=@{
-                pending=@(Get-UpcomingCodexTasks -AppDirectory $appDir)
-                history=@(Get-FlutterHistory)
+                pending=$tasks
+                history=@(Get-FlutterHistory -Tasks $tasks)
             }
         }
         'usage' {

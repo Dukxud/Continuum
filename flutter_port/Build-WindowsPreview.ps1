@@ -17,6 +17,8 @@ if((Test-Path -LiteralPath $destination) -or (Test-Path -LiteralPath $zip)){
 if($LASTEXITCODE -ne 0){throw 'Flutter source integrity check failed.'}
 Push-Location $project
 try{
+    & pwsh -NoProfile -STA -File (Join-Path $root 'tests/flutter-port-bridge.test.ps1')
+    if($LASTEXITCODE -ne 0){throw 'Live Windows bridge integration failed.'}
     & $flutter.Source create --platforms=windows --project-name codex_resume_flutter .
     if($LASTEXITCODE -ne 0){throw 'Flutter Windows runner creation failed.'}
     & $flutter.Source pub get

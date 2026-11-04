@@ -16,6 +16,8 @@ if(-not $flutter){
 Push-Location $project
 try{
     $env:CODEX_SCHEDULER_SOURCE=$root
+    & pwsh -NoProfile -STA -File (Join-Path $root 'tests/flutter-port-bridge.test.ps1')
+    if($LASTEXITCODE -ne 0){throw 'Live Windows bridge integration failed.'}
     & $flutter.Source create --platforms=windows --project-name codex_resume_flutter .
     if($LASTEXITCODE -ne 0){throw 'Flutter Windows runner generation failed.'}
     & $flutter.Source pub get
