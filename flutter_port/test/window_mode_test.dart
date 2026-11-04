@@ -85,8 +85,9 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(calls, ['first-start']);
     gate.complete();
+    final rejected = expectLater(second, throwsStateError);
     await first;
-    await expectLater(second, throwsStateError);
+    await rejected;
     await last;
     expect(calls, ['first-start', 'first-end', 'second', 'final-mode']);
   });
