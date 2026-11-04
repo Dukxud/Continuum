@@ -43,7 +43,9 @@ try {
                 $when=(Get-Item -LiteralPath $session.File -ErrorAction Stop).LastWriteTime
                 $id=[string]$session.Id
                 $date=$when.ToString('d MMM HH:mm',[Globalization.CultureInfo]::InvariantCulture)
-                $session.Display=('{0} | {1} | {2}' -f $title,$date,$id.Substring($id.Length-8))
+                $activity=Get-CodexSessionActivity -SessionFile ([string]$session.File)
+                $identity=('{0} | {1} | {2}' -f $title,$date,$id.Substring($id.Length-8))
+                $session.Display=if($activity){$activity+' | '+$identity}else{$identity}
             }catch{
                 # A disappearing/invalid session file must not hide the choice.
                 # Its original reader label remains usable.
