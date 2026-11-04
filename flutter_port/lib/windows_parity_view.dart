@@ -165,17 +165,8 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
     ),
   );
 
-  String _dateLabel(DateTime date,{bool long=false}) {
-    const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    String d(int x)=>x.toString().padLeft(2,'0');
-    final hour=date.hour%12==0?12:date.hour%12;
-    if(long) return days[date.weekday-1]+' '+months[date.month-1]+' '+
-      d(date.day)+', '+date.year.toString()+'  '+d(hour)+':'+d(date.minute)+
-      ':'+d(date.second)+(date.hour>=12?' PM':' AM');
-    return days[date.weekday-1]+' '+months[date.month-1]+' '+date.day.toString()+
-      ', '+hour.toString()+':'+d(date.minute)+(date.hour>=12?' PM':' AM');
-  }
+  String _dateLabel(DateTime date, {bool long = false}) =>
+      formatLocalDateTime(date, year: long, seconds: long);
 
   Widget _usageSurface(Map<String,dynamic>? window,String fallback,String kind) {
     final state=controller!;
@@ -187,8 +178,8 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
     final title=stringField(window,'label').isEmpty?fallback:stringField(window,'label');
     final body=<Widget>[
       _at(0,0,428,108,_LegacyBand(
-        fill:kind=='quota'?const Color(0xffe7f8f2):const Color(0xffe7f5fc),
-        accent:kind=='quota'?const Color(0xff219a74):const Color(0xff188fb5))),
+        fill:kind=='quota'?const Color(0xfff8fcfa):const Color(0xfff8fbfe),
+        accent:kind=='quota'?const Color(0xff6cb7a3):const Color(0xff7caecf))),
       _at(12,10,225,27,_label(title,fontSize:13,bold:true)),
       _at(237,7,176,32,Align(alignment:Alignment.centerRight,
         child:Text(remaining==null?'Unavailable':remaining.toStringAsFixed(1)+'% remaining',
@@ -229,27 +220,27 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
       )),
   );
 
-  /// Time and instruction are one operation. A single action column, with
-  /// deliberate alignment and separation, replaces disconnected row buttons.
+  /// One scheduling task: time and instruction flow directly to a modest
+  /// action button. Keep the same column on both rows for visual continuity.
   Widget _schedulePanel(SchedulerController state) {
     final resetAt = state.resetSuggestion;
     return Stack(children: [
-      const _LegacyBand(fill:Color(0xffe8f5fc),accent:Color(0xff2887b5)),
-      _at(8,18,132,30,_label('Run at (local)')),
-      _at(145,18,38,30,_LegacyButton('−',
+      const _LegacyBand(fill: Color(0xfff8fbff),
+        accent: Color(0xff9dbbd4)),
+      _at(8,10,132,34,_label('Run at (local)')),
+      _at(145,10,38,34,_LegacyButton('−',
         ()=>state.edit(time:stepRunAt(state.runAt,-1)))),
-      _at(190,18,260,30,_datePickerControl(state.runAt)),
-      _at(457,18,38,30,_LegacyButton('+',
+      _at(191,10,425,34,_datePickerControl(state.runAt)),
+      _at(624,10,38,34,_LegacyButton('+',
         ()=>state.edit(time:stepRunAt(state.runAt,1)))),
-      _at(502,18,185,30,_LegacyButton(resetAt==null?'Now +1':'Reset +1',
+      _at(724,10,164,34,_LegacyButton(resetAt==null?'Now +1':'Reset +1',
         ()=>state.edit(time:resetAt ?? suggestedRunAt()))),
-      _at(8,65,132,30,_label('Instruction')),
-      _at(145,65,542,30,_textbox(instruction,
+      _at(8,65,132,34,_label('Instruction')),
+      _at(145,65,565,34,_textbox(instruction,
         (v)=>state.edit(instruction:v))),
-      _at(697,13,1,89,Container(color:const Color(0xffafc9d8))),
-      _at(712,20,176,74,_LegacyButton('Schedule once',
+      _at(724,65,164,34,_LegacyButton('Schedule once',
         state.canSchedule?schedule:null,
-        color:const Color(0xff2277a1),primary:true)),
+        color: const Color(0xff267391),primary:true)),
     ]);
   }
 
@@ -268,12 +259,12 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
     final validModel=state.models.any((m)=>stringField(m,'id')==state.model);
     final effortOptions=state.efforts.map((e)=>DropdownMenuItem<String>(value:e,child:Text(e))).toList();
     final children=<Widget>[
-      _at(10,54,898,46,const _LegacyBand(fill:Color(0xffe8f1ff),accent:Color(0xff547fd2))),
-      _at(10,102,898,44,const _LegacyBand(fill:Color(0xffe6f8f3),accent:Color(0xff168e87))),
-      // Model configuration precedes one unified scheduling block: choose
-      // the time, write the instruction, then schedule from that same area.
-      _at(10,148,898,44,const _LegacyBand(fill:Color(0xfffff3e4),accent:Color(0xffc98737))),
-      _at(10,194,898,115,_schedulePanel(state)),
+      // One quiet configuration card with consistent input baselines.
+      _at(10,54,898,138,const _LegacyBand(
+        fill:Colors.white,accent:Color(0xffb5c6d8))),
+      _at(27,99,864,1,Container(color:const Color(0xffedf1f5))),
+      _at(27,146,864,1,Container(color:const Color(0xffedf1f5))),
+      _at(10,196,898,116,_schedulePanel(state)),
       _at(18,61,125,30,_label('Conversation')),
       _at(155,61,743,30,_combo<String>(
         name:'session',selected:state.sessions.any((m)=>stringField(m,'Id')==state.sessionId)?state.sessionId:null,
@@ -285,22 +276,21 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
       _at(155,108,605,30,_textbox(repository,
         (v)=>state.edit(repository:v),key:const Key('repository-root-field'))),
       _at(773,106,125,31,_LegacyButton('Browse',_browseRepo,color:const Color(0xff168e87))),
-      _at(18,154,64,30,_label('Model')),
-      _at(90,154,258,30,_combo<String>(name:'model',
+      _at(18,154,132,30,_label('Model')),
+      _at(155,154,255,30,_combo<String>(name:'model',
         selected:validModel?state.model:null,
         items:modelOptions,onChanged:state.selectModel)),
-      _at(361,154,86,30,_label('Reasoning')),
-      _at(450,154,122,30,_combo<String>(name:'effort',
+      _at(422,154,80,30,_label('Reasoning')),
+      _at(508,154,114,30,_combo<String>(name:'effort',
         selected:state.efforts.contains(state.effort)?state.effort:null,
         items:effortOptions,onChanged:(s){if(s!=null)state.edit(reasoning:s);})),
-      _at(586,154,60,30,_label('Access')),
-      _at(652,154,246,30,_combo<String>(name:'access',selected:state.access,
+      _at(637,154,58,30,_label('Access')),
+      _at(701,154,197,30,_combo<String>(name:'access',selected:state.access,
         items:const[
           DropdownMenuItem(value:'workspace-write',child:Text('Workspace write')),
           DropdownMenuItem(value:'yolo',child:Text('Full access (YOLO)')),
           DropdownMenuItem(value:'read-only',child:Text('Read-only test')),
         ],onChanged:(s){if(s!=null)state.edit(accessMode:s);})),
-      _at(18,309,880,2,Container(color:const Color(0xffc6d2e3))),
       _at(18,322,300,30,_label('Usage remaining',fontSize:16,bold:true)),
       _at(18,358,428,108,_usageSurface(state.quotaWindows.isNotEmpty?state.quotaWindows.first:null,
         'Primary window','quota')),
@@ -335,9 +325,12 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
   }
 
   Widget _legacyRunGrid(List<Map<String,dynamic>> runs) => Container(
-    decoration:BoxDecoration(color:Colors.white,border:Border.all(color:const Color(0xffb8c6d8))),
+    clipBehavior:Clip.antiAlias,
+    decoration:BoxDecoration(color:Colors.white,
+      borderRadius:BorderRadius.circular(7),
+      border:Border.all(color:const Color(0xffd0dbe7))),
     child:Column(children:[
-      SizedBox(height:31,child:Row(children:[
+      Container(height:31,color:const Color(0xffeef3f9),child:Row(children:[
         _gridHead('Scheduled (local)',149),
         _gridHead('Time to run',205),
         _gridHead('Project',145),
