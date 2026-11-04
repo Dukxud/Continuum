@@ -108,10 +108,17 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
     if (state == null || !mounted) return;
     if (state.ready && !hydrated) {
       hydrated = true;
-      repository.text = state.repo;
       instruction.text = state.message;
-    } else if (repository.text.isEmpty && state.repo.isNotEmpty) {
-      repository.text = state.repo;
+    }
+    // A refreshed session list can select a different conversation. Keep the
+    // visible field paired with the controller's repository, including when
+    // the prior checkout must be cleared. TextField.onChanged already updates
+    // state.repo before _notify, so ordinary typing does not reset the cursor.
+    if (repository.text != state.repo) {
+      repository.value = TextEditingValue(
+        text: state.repo,
+        selection: TextSelection.collapsed(offset: state.repo.length),
+      );
     }
     updateWindowSize();
     setState(() {});
