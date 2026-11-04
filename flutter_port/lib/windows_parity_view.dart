@@ -305,6 +305,13 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
       if(state.error!=null) _at(18,actionY+39,880,30,
         GestureDetector(onTap:()=>state.error=null,
           child:_label(state.error!,fontSize:12,color:const Color(0xff8a3121)))),
+      if(state.error==null && state.repositoryWarning!=null)
+        _at(18,actionY+39,880,30,Tooltip(
+          message:state.repositoryWarning! +
+            (state.repositoryAlternatives.isEmpty ? '' :
+              '\\nOther checkout(s): '+state.repositoryAlternatives.join('; ')),
+          child:_label(state.repositoryWarning!,fontSize:12,
+            color:const Color(0xff8a3121)))),
     ];
     return _viewport(width:920,height:totalHeight,compact:false,children:children);
   }

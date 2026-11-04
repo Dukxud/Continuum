@@ -206,7 +206,11 @@ class SchedulerController extends ChangeNotifier {
     String? repository, String? instruction, String? accessMode,
     String? reasoning, bool? compactMode, DateTime? time,
   }) {
-    if (repository != null) repo = repository;
+    if (repository != null) {
+      repo = repository;
+      repositoryWarning = null;
+      repositoryAlternatives = [];
+    }
     if (instruction != null) message = instruction;
     if (accessMode != null) access = accessMode;
     if (reasoning != null) effort = reasoning;
@@ -239,12 +243,17 @@ class SchedulerController extends ChangeNotifier {
       final found = f is Map ? Map<String, dynamic>.from(f) : null;
       if (repo.trim().isEmpty) repo = stringField(found, 'Root');
       final rawAlternatives = field(found, 'AlternativeRoots');
+      final candidateRoots = field(found, 'Candidates');
       repositoryAlternatives = rawAlternatives is List
-        ? rawAlternatives.whereType<String>().toList() : [];
+        ? rawAlternatives.whereType<String>().toList()
+        : [];
+      if (repo.isEmpty && candidateRoots is List && candidateRoots.length > 1) {
+        repositoryAlternatives = candidateRoots.whereType<String>().toList();
+      }
       if (repositoryAlternatives.isNotEmpty) {
-        repositoryWarning = stringField(found, 'Source') == 'conflicting fallback worktrees'
-          ? 'Conflicting repository evidence: choose the correct checkout.'
-          : 'Alternate checkouts found: verify the selected repository.';
+        repositoryWarning = repo.isEmpty
+          ? 'Conflicting checkouts: choose Browse to select the active repository.'
+          : 'Other checkouts found: verify the selected repository.';
       } else {
         repositoryWarning = repo.isEmpty ? 'Repository unresolved; use Browse.' : null;
       }

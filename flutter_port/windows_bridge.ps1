@@ -207,7 +207,9 @@ try {
             $dialog.Description='Select the Git repository for this conversation'
             try {
                 $result=if($dialog.ShowDialog() -eq [Windows.Forms.DialogResult]::OK){
-                    @{path=[string]$dialog.SelectedPath}
+                    $root=Get-RepositoryRoot ([string]$dialog.SelectedPath)
+                    if(-not $root){throw 'Select a folder inside an existing Git repository.'}
+                    @{path=[string]$root}
                 }else{@{path=''}}
             }finally{$dialog.Dispose()}
         }
