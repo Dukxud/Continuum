@@ -85,6 +85,7 @@ class _AeroLiquidBarState extends State<AeroLiquidBar>
     super.initState();
     _clock = AnimationController(
       vsync: this, duration: const Duration(seconds: 100),
+      value: math.Random().nextDouble(),
     )..repeat();
     _load();
   }
@@ -224,7 +225,11 @@ class _AeroPainter extends CustomPainter {
       case 'violet': return [.47, .22, 1.0];
       case 'amber': return [1.0, .47, .035];
       case 'red': return [1.0, .045, .14];
-      default: return [color.r, color.g, color.b];
+      default: return [
+        math.pow(color.r, 1.09).toDouble(),
+        math.pow(color.g, 1.09).toDouble(),
+        math.pow(color.b, 1.09).toDouble(),
+      ];
     }
   }
 
@@ -279,6 +284,12 @@ class _AeroPainter extends CustomPainter {
     canvas.drawImageRect(sprite, const Rect.fromLTWH(399, 0, 1, 13),
       Rect.fromLTWH(size.width - side, 0, side, size.height),
       Paint()..filterQuality = paint);
+    // Approved Windows source softens terminal columns only AFTER restoring
+    // both original source-pixel edges; retaining the black caps is not parity.
+    final endCap = Paint()..color = appearance.selection(kind) == 'blue'
+      ? const Color(0xffb4c8e5) : const Color(0xffb3cfc2);
+    canvas.drawRect(Rect.fromLTWH(0, 0, side, size.height), endCap);
+    canvas.drawRect(Rect.fromLTWH(size.width-side, 0, side, size.height), endCap);
   }
 
   void _fallback(Canvas canvas, Size size, Color tint) {
