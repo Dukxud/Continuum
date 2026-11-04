@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -19,17 +19,10 @@ class WindowActionQueue {
 Size schedulerWindowSize({required bool compact, required int upcomingRunCount,
   required int quotaWindowCount}) {
   if (compact) {
-    final count = quotaWindowCount.clamp(0, 2);
-    final hasRun = upcomingRunCount > 0;
-    final clientHeight = count == 0
-      ? (hasRun ? 338 : 166)
-      : (hasRun ? 338 : 157) + count * 117;
-    return Size(482, clientHeight.toDouble() + 43);
+    // An independent live monitor; never a squeezed full workbench.
+    return Size(540, upcomingRunCount > 0 ? 685 : 535);
   }
-  final visibleRows = upcomingRunCount.clamp(0, 4);
-  final contentHeight = visibleRows == 0
-    ? 566.0 : 660.0 + 40.0 * visibleRows;
-  return Size(952, math.max(610.0, contentHeight + 44));
+  return const Size(1240, 850);
 }
 
 abstract class SchedulerWindowHost {
@@ -46,14 +39,14 @@ class DesktopWindowHost implements SchedulerWindowHost {
     await windowManager.ensureInitialized();
     await windowManager.waitUntilReadyToShow(
       const WindowOptions(
-        size: Size(952, 610),
+        size: Size(1240, 850),
         center: true,
       ),
       () async {
         // Intercept native X/Alt+F4 so the controller can flush pending edits.
         await windowManager.setPreventClose(true);
-        await windowManager.setMinimumSize(const Size(940, 590));
-        await windowManager.setTitle('Codex Resume Scheduler v1.16.0 — Flutter review');
+        await windowManager.setMinimumSize(const Size(1100, 750));
+        await windowManager.setTitle('Codex Resume Scheduler — Continuum preview');
         await windowManager.show();
         await windowManager.focus();
       },
@@ -70,7 +63,7 @@ class DesktopWindowHost implements SchedulerWindowHost {
       upcomingRunCount: upcomingRunCount,
       quotaWindowCount: quotaWindowCount);
     await windowManager.setMinimumSize(compact
-      ? const Size(480, 195) : const Size(940, 590));
+      ? const Size(520, 490) : const Size(1100, 750));
     await windowManager.setSize(size);
     _lastCompact = compact;
   });
@@ -81,9 +74,9 @@ class DesktopWindowHost implements SchedulerWindowHost {
       if (!_lastCompact) return;
       // Dialogs share the main native window. Expand temporarily, then
       // restore the exact content size through setMode after closing.
-      await windowManager.setMinimumSize(const Size(480, 380));
+      await windowManager.setMinimumSize(const Size(520, 490));
       await windowManager.setSize(history
         ? const Size(1040, 780)
-        : const Size(610, 610));
+        : const Size(750, 820));
     });
 }
