@@ -43,10 +43,14 @@ try {
     $payload=@{sessionId=$sessionId} | ConvertTo-Json -Compress
     $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
     $output=@(& pwsh -NoLogo -NoProfile -NonInteractive -STA -File $bridge -Action select -Payload $encoded)
-    if($LASTEXITCODE -ne 0 -or -not $output){throw 'Real bridge could not select disposable Codex session.'}
+    $exitCode=$LASTEXITCODE
+    if(-not $output){throw "Bridge select returned no response (exit $exitCode)."}
     $answer=($output | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
-    if($answer.ok -ne $true -or $answer.result.sessionId -cne $sessionId){
-        throw "Bridge selected wrong session: $($answer.error)"
+    if($exitCode -ne 0 -or $answer.ok -ne $true){
+        throw "Bridge select rejected disposable session (exit $exitCode): $($answer.error)"
+    }
+    if($answer.result.sessionId -cne $sessionId){
+        throw "Bridge selected the wrong session (expected $sessionId)."
     }
     $actual=[string]$answer.result.found.Root
     $expected=(& git -C $repository rev-parse --show-toplevel)
