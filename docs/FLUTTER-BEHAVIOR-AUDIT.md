@@ -91,21 +91,26 @@ and native BLACK-PUDDLE visual review.
 The original WinForms conversation reader identifies a session by its **starting
 folder**, timestamp and full UUID, so unrelated sessions that start in a
 user-home directory appear to have the same name. The Flutter-only Windows
-bridge now projects a more legible label: **Git: project name** when the starting
-directory belongs to a verified Git checkout; otherwise **Outside Git: folder**.
-Both include the timestamp and final eight characters of the original UUID.
-The underlying full session ID and actual repository discovery remain unchanged.
-A session started outside Git may still resolve a later worktree; a label is
-never permission to infer or substitute a repository.
+bridge now leads with a bounded excerpt of the **latest explicit Codex user
+request or thread goal** from that session's own rollout. Generic "Resume"
+instructions, agent output, tool calls, and malformed records cannot supply
+the label. If no meaningful activity is available, it falls back to the
+original location label. It still shows **Git: project name** when the starting
+directory is a verified Git checkout, otherwise **Outside Git: folder**, plus
+the last-activity timestamp and final eight characters of the UUID. This is
+an activity excerpt, not an invented conversation title. The full session ID
+and authoritative repository discovery remain unchanged. A session started
+outside Git may still work in a later checkout; its label never authorizes
+substituting a repository.
 
 The full-mode form now places **Model / Reasoning / Access** immediately after
 **Repository root**. **Run at / Instruction / Schedule once** share one visually
 unified panel. Existing coordinates below that group, full/compact sizing,
 worker configuration and scheduling safeguards are preserved.
 
-**Evidence required:** isolated real-Windows bridge labels for Git and non-Git
-sessions; widget geometry and interaction tests; exact-head Windows CI; native
-BLACK-PUDDLE visual and conversation-selection confirmation.
+**Evidence required:** isolated bridge tests with real-shaped rollout events,
+long-session fallback, Git/non-Git labels, widget tests, exact-head Windows CI,
+and native BLACK-PUDDLE confirmation of the active conversation title and ID.
 
 ## High-impact corrections in this pass
 
