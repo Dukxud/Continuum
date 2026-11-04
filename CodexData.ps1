@@ -7,6 +7,10 @@ Import-Module (Join-Path $PSScriptRoot 'components/SettingsStore/SettingsStore.p
 
 function Get-RepositoryRoot {
     param([string]$Path)
+    # App Server thread/read may return no CWD. An empty optional hint must
+    # fall through to session-local Git evidence, not reach the generic
+    # GitRepository module's mandatory Path parameter and abort discovery.
+    if([string]::IsNullOrWhiteSpace($Path)){return $null}
     return Get-GitRepositoryRoot -Path $Path
 }
 
