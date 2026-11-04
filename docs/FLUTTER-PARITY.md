@@ -26,7 +26,7 @@ Task Scheduler, history and worker functions; this is not a backend rewrite.
 | Upcoming and recently completed/legacy Windows results | Task Scheduler + saved JobOutcomes | Windows manual pending |
 | Detailed history: result, time, exit code, attempt, next task, message | Flutter history dialog, response and worker transcript | Windows manual pending |
 | Copy response / copy worker log / remove from history (non-destructive) | Flutter dialog / bridge | Windows manual pending |
-| Autosaved draft without preview leakage | Same schema; preview freeze during appearance dialog | Source and unit checks; Windows manual pending |
+| Autosaved draft and appearance | Original v1.16 settings schema; appearance changes now persist live with final close flush | Source and unit checks; Windows manual pending |
 | No terminal after launch | Native Flutter Windows executable in local unsigned preview bundle | Windows manual pending |
 | Mac, Linux and web execution | Not implemented: independent platform adapters needed | Out of Windows-port scope |
 
