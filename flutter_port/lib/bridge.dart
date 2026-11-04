@@ -218,10 +218,9 @@ DateTime? recommendedResetRunAt(Map<String, dynamic>? quota, [DateTime? now]) {
     return null;
   }
   try {
-    final reset = DateTime.fromMillisecondsSinceEpoch(
-      raw.toInt() * 1000,
-    ).add(const Duration(minutes: 1));
-    return reset.isAfter(earliestRunAt(now)) ? reset : null;
+    final reset = DateTime.fromMillisecondsSinceEpoch(raw.toInt() * 1000);
+    if (!reset.isAfter(now ?? DateTime.now())) return null;
+    return reset.add(const Duration(minutes: 1));
   } catch (_) {
     return null;
   }
