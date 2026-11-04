@@ -123,7 +123,9 @@ try {
             Assert-ModelEffortSupported -Models @($usage.models) -Model $model -Effort $effort
             if($usage.model -cne $model){throw 'Quota response does not match the chosen model.'}
             if(-not (Test-CanonicalWorkspaceIdentity ([string]$usage.accountId))){throw 'Workspace identity could not be verified.'}
-            if($usage.ordinaryUsageAllowed -eq $false){throw 'Codex quota is currently restricted. No task was registered.'}
+            # Matching WinForms v1.16: a future task may be registered while
+            # current quota is exhausted. The pinned worker independently
+            # fails closed if quota is still unavailable at execution time.
             $upcoming=@(Get-UpcomingCodexTasks -AppDirectory $appDir | Where-Object { $_.Status -in @('Running','Scheduled') })
             if(@($upcoming | Where-Object {$_.Status -eq 'Running' -and $_.Session -ceq $sessionId}).Count){
                 throw 'This conversation is already running in a Scheduler worker.'
