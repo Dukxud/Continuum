@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:codex_resume_flutter/main.dart';
@@ -7,16 +8,21 @@ import 'package:codex_resume_flutter/bridge.dart';
 class StubAdapter implements SchedulerAdapter {
   StubAdapter({this.includePending = false, this.pendingCount = 0,
     this.verifiedSession = false, this.exhaustedQuota = false,
-    this.failUsage = false, this.pendingStatus = 'Scheduled'});
+    this.failUsage = false, this.pendingStatus = 'Scheduled',
+    this.pendingSchedule});
   final bool includePending;
   final int pendingCount;
   final bool verifiedSession;
   final bool exhaustedQuota;
   final bool failUsage;
   final String pendingStatus;
+  final Completer<Map<String, dynamic>>? pendingSchedule;
   final List<String> cancellations = [];
   @override
   Future<Map<String, dynamic>> call(String action, [Map<String, dynamic> payload = const {}]) async {
+    if (action == 'schedule' && pendingSchedule != null) {
+      return pendingSchedule!.future;
+    }
     if (action == 'cancel') {
       cancellations.add(payload['name'] as String);
       return {'status': 'Cancelled', 'warning': ''};
@@ -182,6 +188,31 @@ void main() {
       adapter: StubAdapter(failUsage: true))));
     await tester.pump(const Duration(milliseconds: 150));
     expect(find.text('Usage unavailable; retrying automatically'), findsNWidgets(2));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('close does not terminate an in-flight scheduling operation',
+      (tester) async {
+    tester.view.physicalSize = const Size(940, 750);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final request = Completer<Map<String, dynamic>>();
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: StubAdapter(verifiedSession: true, pendingSchedule: request))));
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.tap(find.text('Schedule once'));
+    await tester.pump();
+    final state = tester.state(find.byType(SchedulerHome));
+    // Exercise the actual public WindowListener callback without installing
+    // a native window_manager plugin in a headless widget test.
+    (state as dynamic).onWindowClose();
+    await tester.pump();
+    expect(find.text('Scheduling or cancellation is still in progress.'), findsOneWidget);
+    request.complete({'name': 'CodexResume-20261104-1500-12345678'});
+    await tester.pump(const Duration(milliseconds: 150));
     expect(tester.takeException(), isNull);
   });
 
