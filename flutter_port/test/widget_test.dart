@@ -9,7 +9,7 @@ class StubAdapter implements SchedulerAdapter {
   StubAdapter({this.includePending = false, this.pendingCount = 0,
     this.verifiedSession = false, this.exhaustedQuota = false,
     this.failUsage = false, this.pendingStatus = 'Scheduled',
-    this.pendingSchedule});
+    this.pendingSchedule, this.pendingLabels});
   final bool includePending;
   final int pendingCount;
   final bool verifiedSession;
@@ -17,11 +17,15 @@ class StubAdapter implements SchedulerAdapter {
   final bool failUsage;
   final String pendingStatus;
   final Completer<Map<String, dynamic>>? pendingSchedule;
+  final Completer<Map<String, dynamic>>? pendingLabels;
   final List<String> cancellations = [];
   @override
   Future<Map<String, dynamic>> call(String action, [Map<String, dynamic> payload = const {}]) async {
     if (action == 'schedule' && pendingSchedule != null) {
       return pendingSchedule!.future;
+    }
+    if (action == 'labels') {
+      return pendingLabels?.future ?? {'sessions': []};
     }
     if (action == 'cancel') {
       cancellations.add(payload['name'] as String);
@@ -144,6 +148,36 @@ void main() {
     final roundedCard = find.ancestor(of: handoffStack, matching: find.byType(ClipRRect)).first;
     expect(tester.widget<ClipRRect>(roundedCard).clipBehavior, isNot(Clip.none),
       reason: 'Glow remains constrained by the outer rounded card.');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('slow activity labels cannot block startup or quota', (tester) async {
+    tester.view.physicalSize = const Size(1240, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final labels = Completer<Map<String, dynamic>>();
+    final adapter = StubAdapter(verifiedSession: true, pendingLabels: labels);
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(adapter: adapter)));
+    await tester.pump(const Duration(milliseconds: 150));
+
+    // Cosmetic label request is deliberately unresolved. Essential data
+    // must nevertheless be ready, selectable, and populated.
+    expect(find.text('CONNECTED'), findsOneWidget);
+    expect(find.text('QA project | verified CLI session'), findsOneWidget);
+    expect(find.text('5-HOUR'), findsOneWidget);
+    expect(find.text('Now +1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    labels.complete({'sessions': [{
+      'Id': '11111111-1111-1111-1111-111111111111',
+      'Display': 'Review shared-EC2 architecture | Outside Git: Nathan | 4 Nov 17:19 | 28dd756b',
+    }]});
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.textContaining('Review shared-EC2 architecture'), findsOneWidget);
+    expect(find.text('CONNECTED'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
