@@ -8,6 +8,7 @@ import 'package:codex_resume_flutter/scheduler_controller.dart';
 class FakeScheduler implements SchedulerAdapter {
   final List<String> actions = [];
   final List<Map<String, dynamic>> saves = [];
+  final List<Map<String, dynamic>> schedules = [];
   @override
   Future<Map<String, dynamic>> call(String action, [Map<String, dynamic> payload = const {}]) async {
     actions.add(action);
@@ -36,6 +37,7 @@ class FakeScheduler implements SchedulerAdapter {
       case 'pending':
         return {'pending': [], 'history': []};
       case 'schedule':
+        schedules.add(payload);
         return {'name': 'CodexResume-20261103-1400-12345678', 'status': 'Scheduled'};
       case 'save':
         saves.add(payload);
@@ -60,10 +62,10 @@ class ExhaustedQuotaScheduler extends FakeScheduler {
       'windows': [{
         'label': '5-hour',
         'remainingPercent': 0.0,
-        'resetsAt': 1793736000,
+        'resetsAt': DateTime.now().add(const Duration(hours:1)).millisecondsSinceEpoch ~/ 1000,
       }],
       'recommendationKind': 'exhausted-window',
-      'recommendedResetAt': 1793736000,
+      'recommendedResetAt': DateTime.now().add(const Duration(hours:1)).millisecondsSinceEpoch ~/ 1000,
     };
   }
 }
@@ -219,15 +221,64 @@ void main() {
     expect(adapterTimeoutError('browse'), isNot(isA<SchedulerOutcomeUncertain>()));
   });
 
-  test('date helpers round forward and never schedule too close to now', () {
+  test('Now +1 retains seconds without minute rounding', () {
+    final now = DateTime(2026, 11, 3, 14, 3, 48, 700);
+    expect(suggestedRunAt(now), DateTime(2026, 11, 3, 14, 4, 48, 700));
+    expect(earliestRunAt(now), DateTime(2026, 11, 3, 14, 4, 18, 700));
+    expect(stepRunAt(DateTime(2026, 11, 3, 14, 2, 9), 1, now),
+      earliestRunAt(now));
+    expect(stepRunAt(DateTime(2026, 11, 3, 14, 2, 9), -1, now),
+      DateTime(2026, 11, 3, 14, 2, 9));
+    expect(stepRunAt(DateTime(2026, 11, 3, 14, 7, 31), -1, now),
+      DateTime(2026, 11, 3, 14, 6, 31));
+    expect(localIsoSecond(now), '2026-11-03T14:03:48');
+  });
+
+  test('Reset +1 uses only valid future exhausted-window reset seconds', () {
     final now = DateTime(2026, 11, 3, 14, 3, 48);
-    expect(suggestedRunAt(now), DateTime(2026, 11, 3, 14, 6));
-    expect(earliestRunAt(now), DateTime(2026, 11, 3, 14, 5));
-    expect(stepRunAt(DateTime(2026, 11, 3, 14, 2), 1, now),
-      DateTime(2026, 11, 3, 14, 5));
-    expect(stepRunAt(DateTime(2026, 11, 3, 14, 2), -1, now),
-      DateTime(2026, 11, 3, 14, 2));
-    expect(localIsoMinute(now), '2026-11-03T14:03:00');
+    final original = DateTime(2026, 11, 3, 14, 59, 37);
+    final epoch = original.millisecondsSinceEpoch ~/ 1000;
+    final valid = {'recommendationKind':'exhausted-window',
+      'recommendedResetAt':epoch};
+    expect(recommendedResetRunAt(valid,now), original.add(const Duration(minutes:1)));
+    expect(localIsoSecond(recommendedResetRunAt(valid,now)!),
+      '2026-11-03T15:00:37');
+    expect(recommendedResetRunAt({...valid,'recommendationKind':'available'},now),isNull);
+    expect(recommendedResetRunAt({...valid,'recommendedResetAt':0},now),isNull);
+    expect(recommendedResetRunAt({...valid,'recommendedResetAt':double.nan},now),isNull);
+    expect(recommendedResetRunAt({...valid,'recommendedResetAt':'not a time'},now),isNull);
+    final expired = DateTime(2026, 11, 3, 14, 2, 37).millisecondsSinceEpoch ~/ 1000;
+    expect(recommendedResetRunAt({...valid,'recommendedResetAt':expired},now),isNull);
+  });
+
+  test('persisted draft and Windows task payload retain selected seconds', () async {
+    final fake = FakeScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    final future = DateTime.now().add(const Duration(minutes:20));
+    final selected = DateTime(future.year,future.month,future.day,
+      future.hour,future.minute,37);
+    controller.edit(time:selected);
+    await controller.flushPreferences();
+    expect((fake.saves.last['draft'] as Map)['runAt'],
+      localIsoSecond(selected));
+    await controller.schedule(confirmUnrestricted:false,confirmOverlap:false);
+    expect(fake.schedules.last['runAt'],localIsoSecond(selected));
+    controller.dispose();
+  });
+
+  test('Reset +1 is offered only for fresh matching quota data', () async {
+    final controller = SchedulerController(ExhaustedQuotaScheduler());
+    await controller.start();
+    expect(controller.resetSuggestion,isNotNull);
+    final expected = recommendedResetRunAt(controller.quota);
+    expect(controller.resetSuggestion,expected);
+    controller.quotaAt = DateTime.now().subtract(const Duration(minutes:3));
+    expect(controller.resetSuggestion,isNull);
+    controller.quotaAt = DateTime.now();
+    controller.quotaModel = 'different-model';
+    expect(controller.resetSuggestion,isNull);
+    controller.dispose();
   });
 
   test('controller uses live identity and model-specific catalog before scheduling', () async {
