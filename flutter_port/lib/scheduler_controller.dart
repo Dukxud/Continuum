@@ -66,11 +66,13 @@ class SchedulerController extends ChangeNotifier {
     return model ?? '';
   }
 
+  /// Quota exhaustion now does not forbid scheduling a later run. As with
+  /// WinForms v1.16, the pinned worker rechecks quota at execution time.
   bool get canSchedule {
     if (compact || busy || readingUsage || quota == null || quotaAt == null ||
         DateTime.now().difference(quotaAt!).inSeconds > 120 ||
         model == null || sessionId == null || !efforts.contains(effort) ||
-        quotaModel != model || (field(quota, 'ordinaryUsageAllowed') == false || stringField(quota, 'catalogError').isNotEmpty)) return false;
+        quotaModel != model || stringField(quota, 'catalogError').isNotEmpty) return false;
     return RegExp(r'^workspace-sha256:[a-f0-9]{64}$')
       .hasMatch(stringField(quota, 'accountId'));
   }
