@@ -101,9 +101,10 @@ No publisher authentication or full device acceptance is asserted.
             Where-Object { $_.Name -ne 'SHA256SUMS.txt' })
         if($manifest.Count -ne $actualFiles.Count){throw 'Packaged manifest file count mismatch.'}
         foreach($entry in $manifest){
-            if($entry -cnotmatch '^([0-9A-F]{64})  ([^\\]+)$'){throw 'Malformed package checksum entry.'}
-            $digest=$Matches[1]
-            $relative=$Matches[2]
+            $parsed=[regex]::Match($entry,'^([0-9A-F]{64})  ([^\\]+)$')
+            if(-not $parsed.Success){throw 'Malformed package checksum entry.'}
+            $digest=$parsed.Groups[1].Value
+            $relative=$parsed.Groups[2].Value
             if($relative.StartsWith('/') -or $relative.StartsWith('..') -or $relative.Contains('/../')){
                 throw 'Unsafe package checksum path.'
             }
