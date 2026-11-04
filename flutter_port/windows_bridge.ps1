@@ -9,7 +9,17 @@ $ErrorActionPreference='Stop'
 try {
     $source=Split-Path -Parent $PSScriptRoot
     $appDir=Join-Path $env:LOCALAPPDATA 'CodexResumeScheduler'
-    $request=if($Payload){[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Payload)) | ConvertFrom-Json -ErrorAction Stop}else{[pscustomobject]@{}}
+    # ConvertFrom-Json otherwise turns ISO strings into DateTime and loses the
+    # exact wire format. PowerShell 7.5+ can explicitly preserve JSON strings.
+    # Older PowerShell 7 versions retain the already-parsed local DateTime below.
+    $request=if($Payload){
+        $json=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Payload))
+        if((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')){
+            ConvertFrom-Json -InputObject $json -DateKind String -ErrorAction Stop
+        }else{
+            ConvertFrom-Json -InputObject $json -ErrorAction Stop
+        }
+    }else{[pscustomobject]@{}}
     . (Join-Path $source 'CodexRunEngine.ps1')
     . (Join-Path $source 'CodexData.ps1')
     function Get-FlutterHistory {
@@ -73,19 +83,27 @@ try {
         'schedule' {
             $sessionId=[string]$request.sessionId
             if($sessionId -notmatch '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$'){throw 'Invalid session ID.'}
-            if(-not @(Get-RecentCliSessions | Where-Object { $_.Id -ceq $sessionId }).Count){throw 'Selected CLI session not verified.'}
-            $root=Get-RepositoryRoot ([string]$request.repo).Trim().Trim('"')
-            if(-not $root){throw 'Choose an existing Git repository.'}
-            $branchName=Get-RepositoryBranch $root
+            # Validate the actual Flutter wall-clock value before any lookup or
+            # mutation. Reject UTC/offset inputs, which are not local times.
             $when=[datetime]::MinValue
-            if(-not [datetime]::TryParseExact([string]$request.runAt,'yyyy-MM-ddTHH:mm:ss',
-                    [Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::None,[ref]$when)){
+            $runAt=$request.runAt
+            if($runAt -is [datetime]){
+                if($runAt.Kind -ne [DateTimeKind]::Unspecified){throw 'Invalid local run time.'}
+                $when=$runAt
+            }elseif($runAt -isnot [string] -or -not [datetime]::TryParseExact(
+                    $runAt,'yyyy-MM-ddTHH:mm:ss',
+                    [Globalization.CultureInfo]::InvariantCulture,
+                    [Globalization.DateTimeStyles]::None,[ref]$when)){
                 throw 'Invalid local run time.'
             }
             if($when -lt (Get-Date).AddSeconds(30)){throw 'Choose a time at least 30 seconds ahead.'}
             if([TimeZoneInfo]::Local.IsAmbiguousTime($when) -or [TimeZoneInfo]::Local.IsInvalidTime($when)){
                 throw 'Run time is ambiguous or nonexistent due to daylight saving time.'
             }
+            if(-not @(Get-RecentCliSessions | Where-Object { $_.Id -ceq $sessionId }).Count){throw 'Selected CLI session not verified.'}
+            $root=Get-RepositoryRoot ([string]$request.repo).Trim().Trim('"')
+            if(-not $root){throw 'Choose an existing Git repository.'}
+            $branchName=Get-RepositoryBranch $root
             $model=[string]$request.model
             $effort=[string]$request.effort
             if($model -cnotmatch '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}$'){throw 'Invalid model.'}
