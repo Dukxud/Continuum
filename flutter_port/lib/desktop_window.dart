@@ -50,6 +50,8 @@ class DesktopWindowHost implements SchedulerWindowHost {
         center: true,
       ),
       () async {
+        // Intercept native X/Alt+F4 so the controller can flush pending edits.
+        await windowManager.setPreventClose(true);
         await windowManager.setMinimumSize(const Size(940, 590));
         await windowManager.setTitle('Codex Resume Scheduler v1.16.0 — Flutter review');
         await windowManager.show();
