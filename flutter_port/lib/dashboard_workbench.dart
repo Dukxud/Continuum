@@ -216,7 +216,29 @@ extension _DashboardWorkbench on _SchedulerHomeState {
             maxLines: 2,
             onChanged: (value) => state.edit(instruction: value),
           )),
-          const SizedBox(height: 9),
+          const SizedBox(height: 6),
+          Row(children: [
+            SizedBox(
+              height: 36,
+              child: Switch.adaptive(
+                key: const Key('auto-resume-on-limit'),
+                value: state.autoResumeOnLimit,
+                activeTrackColor: DeckColor.mint,
+                onChanged: (value) => state.edit(autoResumeOnLimit: value),
+              ),
+            ),
+            const SizedBox(width: 7),
+            const Expanded(child: Tooltip(
+              message: 'Up to 3 bounded continuations, only after a verified quota reset. Each resumes with the selected permissions.',
+              child: Text('Auto-resume if usage limits stop Codex',
+                maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: DeckColor.text, fontSize: 11.5,
+                  fontWeight: FontWeight.w600)),
+            )),
+            const SizedBox(width: 8),
+            const DeckInfo('OPT-IN', color: DeckColor.mint),
+          ]),
+          const SizedBox(height: 5),
           Row(children: [
             Expanded(child: Text(
               state.canSchedule
