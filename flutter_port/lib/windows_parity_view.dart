@@ -293,7 +293,7 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
         'Secondary window','weekly')),
       if(hasRuns)...[
         _at(18,485,880,2,Container(color:const Color(0xffc6d2e3))),
-        _at(18,499,400,30,_label('Upcoming runs',fontSize:16,bold:true)),
+        _at(18,499,400,30,_label('Upcoming runs (${runs.length})',fontSize:16,bold:true)),
         _at(18,536,880,gridHeight,_legacyRunGrid(runs)),
         _at(18,actionY,154,31,_LegacyButton('Cancel selected',
           selectedRun!=null && !state.busy?cancelSelected:null,color:const Color(0xffb86265))),
@@ -309,8 +309,6 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
     return _viewport(width:920,height:totalHeight,compact:false,children:children);
   }
 
-  List<Map<String,dynamic>> get _noMoreThanFour => controller!.upcoming.take(4).toList();
-
   Widget _legacyRunGrid(List<Map<String,dynamic>> runs) => Container(
     decoration:BoxDecoration(color:Colors.white,border:Border.all(color:const Color(0xffb8c6d8))),
     child:Column(children:[
@@ -322,8 +320,14 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
           child:Text('Model / access / instruction',style:TextStyle(fontSize:12,fontWeight:FontWeight.bold)))),
         _gridHead('Session',85),
       ])),
-      for(final run in _noMoreThanFour)
-        SizedBox(height:40,child:InkWell(
+      Expanded(child:ListView.builder(
+        key: const PageStorageKey<String>('upcoming-run-list'),
+        padding: EdgeInsets.zero,
+        physics: const ClampingScrollPhysics(),
+        itemCount: runs.length,
+        itemBuilder: (context, index) {
+          final run = runs[index];
+          return SizedBox(height:40,child:InkWell(
           onTap:()=>selectRun(stringField(run,'Name')),
           child:Container(
             color:selectedRun==stringField(run,'Name')?const Color(0xffd9e7f7):Colors.white,
@@ -337,7 +341,9 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
               _gridCell(stringField(run,'Session').length>=8?
                 stringField(run,'Session').substring(0,8):'—',85),
             ]),
-          ))),
+          )));
+        },
+      )),
     ]),
   );
 
@@ -375,25 +381,32 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
   Widget _compactParityView() {
     final state=controller!;
     final run=state.upcoming.isEmpty?null:state.upcoming.first;
-    final hasRun=run!=null;
-    final top=hasRun?246.0:65.0;
+    final top=run==null?65.0:246.0;
+    final windows=state.quotaWindows.take(2).toList();
     final cardTop=top+34;
-    final visibleCount=state.quotaWindows.isEmpty?1:math.min(2,state.quotaWindows.length);
-    final totalHeight=cardTop+visibleCount*117+58;
+    final contentBottom=windows.isEmpty
+      ? top+52
+      : cardTop+windows.length*117+18;
+    final totalHeight=math.max(166.0,contentBottom+40+
+      (state.error!=null?31:0));
     final children=<Widget>[
       if(run!=null)...[
         _at(18,65,430,26,_label('Next run',fontSize:16,bold:true)),
         _at(18,91,428,129,_compactRunSurface(run)),
       ],
-      _at(18,top,202,28,_label('Usage limits',fontSize:16,bold:true)),
-      _at(225,top,219,28,Align(alignment:Alignment.centerRight,
-        child:Text(state.quotaModel,maxLines:1,overflow:TextOverflow.ellipsis,
-          style:const TextStyle(fontFamily:'Segoe UI',fontSize:12,color:Color(0xff666666))))),
-      _at(18,cardTop,428,108,_usageSurface(
-        state.quotaWindows.isNotEmpty?state.quotaWindows.first:null,
-        'Primary window','quota')),
-      if(visibleCount>1)_at(18,cardTop+117,428,108,
-        _usageSurface(state.quotaWindows[1],'Secondary window','weekly')),
+      if(windows.isEmpty)
+        _at(18,top,428,28,_label(state.readingUsage
+          ? 'Reading usage limits...' : 'Usage limits unavailable',
+          fontSize:13,color:const Color(0xff666666))),
+      if(windows.isNotEmpty)...[
+        _at(18,top,202,28,_label('Usage limits',fontSize:16,bold:true)),
+        _at(225,top,219,28,Align(alignment:Alignment.centerRight,
+          child:Text(state.quotaModel,maxLines:1,overflow:TextOverflow.ellipsis,
+            style:const TextStyle(fontFamily:'Segoe UI',fontSize:12,color:Color(0xff666666))))),
+        _at(18,cardTop,428,108,_usageSurface(windows.first,'Primary window','quota')),
+        if(windows.length>1)_at(18,cardTop+117,428,108,
+          _usageSurface(windows[1],'Secondary window','weekly')),
+      ],
       _at(116,totalHeight-37,178,31,
         _LegacyButton('Recent runs',historyDialog,color:const Color(0xff466baa))),
       _at(306,totalHeight-37,140,31,

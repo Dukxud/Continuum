@@ -7,14 +7,18 @@ import 'package:codex_resume_flutter/main.dart';
 class SpyWindowHost implements SchedulerWindowHost {
   final List<String> modes = [];
   @override
-  Future<void> setMode({required bool compact, required bool hasRun}) async {
-    modes.add((compact ? 'compact' : 'standard') + (hasRun ? ':run' : ':empty'));
+  Future<void> setMode({required bool compact, required bool hasRun,
+      required int quotaWindowCount}) async {
+    modes.add((compact ? 'compact' : 'standard') +
+      (hasRun ? ':run' : ':empty') + ':quota:$quotaWindowCount');
   }
   @override
   Future<void> showDialogWindow({required bool history}) async {}
   @override
-  Future<void> restoreMode({required bool compact, required bool hasRun}) async {
-    await setMode(compact: compact, hasRun: hasRun);
+  Future<void> restoreMode({required bool compact, required bool hasRun,
+      required int quotaWindowCount}) async {
+    await setMode(compact: compact, hasRun: hasRun,
+      quotaWindowCount: quotaWindowCount);
   }
 }
 
@@ -63,12 +67,12 @@ void main() {
       adapter: WindowAdapter(startCompact: false),
       windowHost: host)));
     await tester.pump(const Duration(milliseconds: 160));
-    expect(host.modes, contains('standard:empty'));
+    expect(host.modes, contains('standard:empty:quota:0'));
     await tester.tap(find.text('Compact mode: OFF'));
     await tester.pump(const Duration(milliseconds: 160));
-    expect(host.modes, contains('compact:empty'));
+    expect(host.modes, contains('compact:empty:quota:0'));
     expect(find.text('Schedule once'), findsNothing);
-    expect(find.text('Usage limits'), findsOneWidget);
+    expect(find.text('Usage limits unavailable'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -78,7 +82,7 @@ void main() {
       adapter: WindowAdapter(startCompact: true),
       windowHost: host)));
     await tester.pump(const Duration(milliseconds: 160));
-    expect(host.modes.first, 'compact:empty');
+    expect(host.modes.first, 'compact:empty:quota:0');
     expect(tester.takeException(), isNull);
   });
 }

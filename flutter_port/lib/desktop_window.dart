@@ -4,9 +4,11 @@ import 'package:window_manager/window_manager.dart';
 /// Platform window integration is isolated from the Flutter UI and worker.
 /// Widget tests inject no host; no native window operations run in tests.
 abstract class SchedulerWindowHost {
-  Future<void> setMode({required bool compact, required bool hasRun});
+  Future<void> setMode({required bool compact, required bool hasRun,
+    required int quotaWindowCount});
   Future<void> showDialogWindow({required bool history});
-  Future<void> restoreMode({required bool compact, required bool hasRun});
+  Future<void> restoreMode({required bool compact, required bool hasRun,
+    required int quotaWindowCount});
 }
 
 class DesktopWindowHost implements SchedulerWindowHost {
@@ -30,14 +32,20 @@ class DesktopWindowHost implements SchedulerWindowHost {
   }
 
   @override
-  Future<void> setMode({required bool compact, required bool hasRun}) async {
+  Future<void> setMode({required bool compact, required bool hasRun,
+    required int quotaWindowCount}) async {
     if (await windowManager.isMaximized()) {
       await windowManager.unmaximize();
     }
     if (compact) {
       if (!_lastCompact) _fullSize = await windowManager.getSize();
-      await windowManager.setMinimumSize(const Size(480, 380));
-      await windowManager.setSize(Size(482, hasRun ? 615 : 434));
+      final count = quotaWindowCount.clamp(0, 2);
+      // Match CodexDashboard.ps1: window chrome adds ~43px to ClientSize.
+      final clientHeight = count == 0
+        ? (hasRun ? 338 : 166)
+        : (hasRun ? 338 : 157) + count * 117;
+      await windowManager.setMinimumSize(const Size(480, 195));
+      await windowManager.setSize(Size(482, clientHeight.toDouble() + 43));
     } else {
       await windowManager.setSize(_fullSize);
       await windowManager.setMinimumSize(const Size(940, 590));
@@ -57,7 +65,9 @@ class DesktopWindowHost implements SchedulerWindowHost {
   }
 
   @override
-  Future<void> restoreMode({required bool compact, required bool hasRun}) async {
-    await setMode(compact: compact, hasRun: hasRun);
+  Future<void> restoreMode({required bool compact, required bool hasRun,
+    required int quotaWindowCount}) async {
+    await setMode(compact: compact, hasRun: hasRun,
+      quotaWindowCount: quotaWindowCount);
   }
 }
