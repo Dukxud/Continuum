@@ -87,3 +87,18 @@ makes no antivirus-exclusion or signing-bypass changes.
 The Flutter interface and original fragment program are portable assets.
 The only current scheduler adapter is Windows. A macOS, Linux or web product
 requires explicit platform worker/scheduler adapters and independent acceptance.
+
+## Accessibility root cause and mitigation
+
+The appearance dialog contains two Material sliders in a pushed modal route.
+Flutter issue [#190357](https://github.com/flutter/flutter/issues/190357)
+reproduces a Windows `ui::AXTree` orphan-node failure with precisely this
+combination; reports include accessibility-tree freezes. The documented
+mitigation wraps each slider in its own `Overlay.wrap(alwaysSizeToContent:
+true, clipBehavior: Clip.none, child: Slider(...))`, retaining keyboard and
+screen-reader slider semantics. This mitigation is now applied and widget
+coverage checks the two local overlays. It does **not** establish that all
+AXTree errors are fixed: tooltip/list errors and engine null-parent crashes
+remain separate upstream concerns; native Windows accessibility acceptance
+is mandatory. See [Flutter API](https://api.flutter.dev/flutter/widgets/Overlay/wrap.html)
+and [Flutter issue #182444](https://github.com/flutter/flutter/issues/182444).

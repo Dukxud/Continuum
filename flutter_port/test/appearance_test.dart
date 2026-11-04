@@ -74,6 +74,10 @@ void main() {
     expect(find.text('Countdown color'), findsOneWidget);
     expect(find.text('Working color'), findsOneWidget);
     expect(find.text('Save and close'), findsOneWidget);
+    // One Navigator overlay plus two local overlays housing the Material
+    // sliders. Prevent a regression to bare sliders in the pushed modal.
+    expect(find.byType(Slider), findsNWidgets(2));
+    expect(find.byType(Overlay), findsAtLeastNWidgets(3));
     await tester.tap(find.text('Cancel').first);
     await tester.pump(const Duration(milliseconds: 200));
     expect(accepted, isNull);

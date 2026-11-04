@@ -165,8 +165,13 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
   Widget _settingsSlider(String label,int value,int low,int high,double y,
       ValueChanged<int> changed)=>Stack(children:[
     _at(19,y+5,145,24,_label(label)),
-    _at(158,y,315,40,Slider(value:value.toDouble(),min:low.toDouble(),
-      max:high.toDouble(),onChanged:(v)=>changed(v.round()))),
+    // Flutter's Material Slider uses OverlayPortal. A Slider inside a pushed
+    // modal can orphan accessibility nodes on Windows (flutter/flutter#190357).
+    // Keep the portal inside a local Overlay; preserve slider semantics.
+    _at(158,y,315,40,Overlay.wrap(
+      alwaysSizeToContent:true,clipBehavior:Clip.none,
+      child:Slider(value:value.toDouble(),min:low.toDouble(),
+        max:high.toDouble(),onChanged:(v)=>changed(v.round())))),
     _at(481,y+4,62,25,Align(alignment:Alignment.centerRight,
       child:Text(value.toString()+'%',style:const TextStyle(fontFamily:'Segoe UI',fontSize:13)))),
   ]);
