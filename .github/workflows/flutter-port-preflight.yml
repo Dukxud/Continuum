@@ -38,6 +38,16 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -File ./tests/flutter-port-source.test.ps1
 
+      - name: Verify isolated worker and bounded quota continuations
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -STA -File ./tests/quota-continuation.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Quota continuation acceptance failed.' }
+          pwsh -NoProfile -STA -File ./tests/codex-worker-integration.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned worker integration failed.' }
+          pwsh -NoProfile -STA -File ./tests/quota-continuation-lifecycle.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Quota lifecycle integration failed.' }
+
       - name: Install pinned Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -53,16 +63,6 @@ jobs:
       - name: Test real Windows JSON bridge without registering tasks
         shell: pwsh
         run: pwsh -NoProfile -STA -File ./tests/flutter-port-bridge.test.ps1
-
-      - name: Verify isolated worker and bounded quota continuations
-        shell: pwsh
-        run: |
-          pwsh -NoProfile -STA -File ./tests/quota-continuation.test.ps1
-          if ($LASTEXITCODE -ne 0) { throw 'Quota continuation acceptance failed.' }
-          pwsh -NoProfile -STA -File ./tests/codex-worker-integration.test.ps1
-          if ($LASTEXITCODE -ne 0) { throw 'Pinned worker integration failed.' }
-          pwsh -NoProfile -STA -File ./tests/quota-continuation-lifecycle.test.ps1
-          if ($LASTEXITCODE -ne 0) { throw 'Quota lifecycle integration failed.' }
 
       - name: Generate Windows runner
         shell: pwsh
