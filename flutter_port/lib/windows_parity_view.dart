@@ -137,6 +137,33 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
     )),
   );
 
+  Widget _datePickerControl(DateTime selected) => Material(
+    color: _legacyInput,
+    child: InkWell(
+      onTap: pickTime,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xffb8c6d8))),
+        padding: const EdgeInsets.only(left: 8, right: 4),
+        child: Row(children: [
+          Expanded(child: Text(
+            _dateLabel(selected, long: true),
+            maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontFamily: 'Segoe UI',
+              fontSize: 12, color: _legacyInk))),
+          Container(
+            width: 27,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(border: Border(
+              left: BorderSide(color: Color(0xffc4cfde)))),
+            child: const Icon(Icons.calendar_month_outlined,
+              size: 17, color: Color(0xff516f98))),
+          const Icon(Icons.arrow_drop_down, size: 14, color: _legacyInk),
+        ]),
+      ),
+    ),
+  );
+
   String _dateLabel(DateTime date,{bool long=false}) {
     const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
     const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -234,8 +261,7 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
       _at(773,106,125,31,_LegacyButton('Browse',_browseRepo,color:const Color(0xff168e87))),
       _at(18,154,132,30,_label('Run at (local)')),
       _at(155,154,38,30,_LegacyButton('−',()=>state.edit(time:stepRunAt(state.runAt,-1)))),
-      _at(202,154,237,30,_LegacyButton(_dateLabel(state.runAt,long:true),pickTime,
-        color:const Color(0xff516f98))),
+      _at(202,154,237,30,_datePickerControl(state.runAt)),
       _at(446,154,38,30,_LegacyButton('+',()=>state.edit(time:stepRunAt(state.runAt,1)))),
       _at(637,154,112,30,_LegacyButton('Now +2',()=>state.edit(time:suggestedRunAt()))),
       _at(761,154,137,30,_LegacyButton('Reset +2',
