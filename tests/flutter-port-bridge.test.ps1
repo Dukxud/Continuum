@@ -84,6 +84,30 @@ try {
         throw "Unrelated CLI session must not inherit another session's Git repository."
     }
     Write-Host 'Flutter real bridge correctly leaves a non-Git CLI session unresolved PASS.' -ForegroundColor Green
+    $listed=@(& pwsh -NoLogo -NoProfile -NonInteractive -STA -File $bridge -Action load)
+    $listedExit=$LASTEXITCODE
+    if($listedExit -ne 0 -or -not $listed){throw "Could not list disposable sessions (exit $listedExit)."}
+    $listedResult=($listed | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+    if($listedResult.ok -ne $true){throw "Cannot list sessions: $($listedResult.error)"}
+    $gitSession=@($listedResult.result.sessions | Where-Object Id -eq $sessionId)
+    $outsideSession=@($listedResult.result.sessions | Where-Object Id -eq $otherId)
+    if($gitSession.Count -ne 1 -or $outsideSession.Count -ne 1){
+        throw 'Git-backed and non-Git sessions must both appear in the chooser.'
+    }
+    if(-not $gitSession[0].Display.StartsWith('Git: qa-repository | ') -or
+       -not $gitSession[0].Display.EndsWith($sessionId.Substring(28))){
+        throw 'Git-backed session label must show the project, time and short ID.'
+    }
+    if(-not $outsideSession[0].Display.StartsWith('Outside Git: outside-git | ') -or
+       -not $outsideSession[0].Display.EndsWith($otherId.Substring(28))){
+        throw 'Non-Git session label must distinguish its starting folder, time and short ID.'
+    }
+    if($gitSession[0].Display.Contains($sessionId) -or
+       $outsideSession[0].Display.Contains($otherId)){
+        throw 'Full UUID must not crowd out session identity in the chooser.'
+    }
+    Write-Host 'Flutter conversation labels clearly distinguish Git-backed and outside-Git sessions PASS.' -ForegroundColor Green
+
 } finally {
     if($null -eq $originalCodexHome){Remove-Item Env:CODEX_HOME -ErrorAction SilentlyContinue}
     else{$env:CODEX_HOME=$originalCodexHome}
