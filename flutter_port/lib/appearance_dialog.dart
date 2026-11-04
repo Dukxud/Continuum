@@ -4,16 +4,16 @@ import 'aero_appearance.dart';
 import 'aero_bar.dart';
 import 'windows_icons.dart';
 
-/// A transactional, live-preview editor for the v1.16 appearance contract.
-/// The caller applies onPreview temporarily and restores initial on Cancel.
+/// Live appearance editor: changes are persisted by the owning controller.
+/// The two pages keep every control visible without scrolling.
 class AeroAppearanceEditor extends StatefulWidget {
   const AeroAppearanceEditor({
     super.key,
     required this.initial,
-    required this.onPreview,
+    required this.onChanged,
   });
   final AeroAppearance initial;
-  final ValueChanged<AeroAppearance> onPreview;
+  final ValueChanged<AeroAppearance> onChanged;
 
   @override
   State<AeroAppearanceEditor> createState() => _AeroAppearanceEditorState();
@@ -30,7 +30,7 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
 
   void preview(AeroAppearance next) {
     setState(() => draft = next);
-    widget.onPreview(next);
+    widget.onChanged(next);
   }
 
   Future<void> chooseCustom(String kind) async {
@@ -154,6 +154,22 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
       ]));
   }
 
+  Widget _opticsPreview() {
+    const captions = ['5-HOUR   68%', 'WEEKLY   50%', 'COUNTDOWN   75%',
+      'WORKING   duration unknown'];
+    const kinds = ['quota', 'weekly', 'time', 'working'];
+    const values = [68.0, 50.0, 75.0, 100.0];
+    return Container(color: Colors.white, child: Stack(children: [
+      for (var index = 0; index < 4; index++) ...[
+        _at(12 + (index % 2) * 252, 8 + (index ~/ 2) * 62, 239, 21,
+          _label(captions[index], bold: true, font: 12)),
+        _at(12 + (index % 2) * 252, 30 + (index ~/ 2) * 62, 239, 17,
+          AeroLiquidBar(amount: index == 3 ? null : values[index],
+            kind: kinds[index], appearance: draft, working: index == 3)),
+      ],
+    ]));
+  }
+
   Widget _enumSelect(int value,List<String> names,ValueChanged<int> onChange) =>
     _selectSurface<int>(
       key:ValueKey('enum:'+names.first+':'+value.toString()),
@@ -176,61 +192,78 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
       child:Text(value.toString()+'%',style:const TextStyle(fontFamily:'Segoe UI',fontSize:13)))),
   ]);
 
+  Widget _colorsTab() => Stack(children: [
+    _at(0, 2, 566, 30, _colorRow('5-hour color', 'quota', 0)),
+    _at(0, 40, 566, 30, _colorRow('Weekly color', 'weekly', 0)),
+    _at(0, 78, 566, 30, _colorRow('Countdown color', 'time', 0)),
+    _at(0, 116, 566, 30, _colorRow('Working color', 'working', 0)),
+    _at(19, 164, 524, 190, Container(
+      decoration: BoxDecoration(border: Border.all(color: const Color(0xffb8c6d8))),
+      child: _previewSurface())),
+  ]);
+
+  Widget _opticsTab(String? diagnostic) => Stack(children: [
+    _at(19, 12, 140, 25, _label('Liquid material')),
+    _at(163, 7, 379, 30, _enumSelect(draft.finish,
+      const ['Optical glass', 'Mirror enamel', 'Iridescent pearl'],
+      (v) => preview(draft.copyWith(finish: v)))),
+    _at(19, 50, 140, 25, _label('Studio lighting')),
+    _at(163, 45, 379, 30, _enumSelect(draft.lighting,
+      const ['Product studio', 'Aero daylight', 'Neon showroom'],
+      (v) => preview(draft.copyWith(lighting: v)))),
+    _at(0, 87, 566, 40, _settingsSlider('Reflection strength',
+      draft.shimmer, 0, 200, 0, (v) => preview(draft.copyWith(shimmer: v)))),
+    _at(0, 130, 566, 40, _settingsSlider('Reflection speed',
+      draft.speed, 25, 300, 0, (v) => preview(draft.copyWith(speed: v)))),
+    _at(20, 178, 350, 30, Row(children: [
+      Checkbox(value: draft.aero,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+        onChanged: (v) { if (v != null) preview(draft.copyWith(aero: v)); }),
+      const SizedBox(width: 5),
+      _label('Enable Aero Liquid optics'),
+    ])),
+    _at(20, 207, 520, 23, _label(
+      diagnostic != null ? 'Aero Liquid unavailable: ' + diagnostic :
+        draft.aero ? 'Aero Liquid: Flutter GPU renderer' : 'Aero optics disabled',
+      color: const Color(0xff666666), font: 12)),
+    _at(19, 232, 524, 126, Container(
+      decoration: BoxDecoration(border: Border.all(color: const Color(0xffb8c6d8))),
+      child: _opticsPreview())),
+  ]);
+
   @override
   Widget build(BuildContext context) {
-    final diagnostic=AeroAssets.shaderError;
+    final diagnostic = AeroAssets.shaderError;
     return Dialog(
-      backgroundColor:const Color(0xfff6f9fd),
-      shape:const RoundedRectangleBorder(borderRadius:BorderRadius.zero),
-      insetPadding:const EdgeInsets.all(12),
-      child:SingleChildScrollView(scrollDirection:Axis.horizontal,child:SizedBox(
-        width:566,height:752,
-        child:Stack(children:[
-          _at(20,16,518,28,_label('Adjust the material. See it change below.',
-            font:16,bold:true)),
-          _at(20,45,525,23,_label(
-            'Changes are live. Cancel restores your previous appearance.',
-            color:const Color(0xff666666),font:12)),
-          _at(0,78,566,30,_colorRow('5-hour color','quota',0)),
-          _at(0,116,566,30,_colorRow('Weekly color','weekly',0)),
-          _at(0,154,566,30,_colorRow('Countdown color','time',0)),
-          _at(0,192,566,30,_colorRow('Working color','working',0)),
-          _at(19,240,524,190,Container(
-            decoration:BoxDecoration(border:Border.all(color:const Color(0xffb8c6d8))),
-            child:_previewSurface())),
-          _at(19,449,140,25,_label('Liquid material')),
-          _at(163,444,379,30,_enumSelect(draft.finish,
-            const ['Optical glass','Mirror enamel','Iridescent pearl'],
-            (v)=>preview(draft.copyWith(finish:v)))),
-          _at(19,488,140,25,_label('Studio lighting')),
-          _at(163,483,379,30,_enumSelect(draft.lighting,
-            const ['Product studio','Aero daylight','Neon showroom'],
-            (v)=>preview(draft.copyWith(lighting:v)))),
-          _at(0,524,566,40,_settingsSlider('Reflection strength',
-            draft.shimmer,0,200,0,(v)=>preview(draft.copyWith(shimmer:v)))),
-          _at(0,570,566,40,_settingsSlider('Reflection speed',
-            draft.speed,25,300,0,(v)=>preview(draft.copyWith(speed:v)))),
-          _at(20,617,350,30,Row(children:[
-            Checkbox(value:draft.aero,materialTapTargetSize:MaterialTapTargetSize.shrinkWrap,
-              visualDensity:VisualDensity.compact,
-              onChanged:(v){if(v!=null)preview(draft.copyWith(aero:v));}),
-            const SizedBox(width:5),
-            _label('Enable Aero Liquid optics'),
+      backgroundColor: const Color(0xfff6f9fd),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+      insetPadding: const EdgeInsets.all(12),
+      child: SizedBox(width: 566, height: 514,
+        child: DefaultTabController(length: 2, child: Stack(children: [
+          _at(20, 12, 518, 26,
+            _label('Adjust the material. See it change below.',
+              font: 16, bold: true)),
+          _at(20, 37, 525, 21,
+            _label('Changes are saved automatically.', 
+              color: const Color(0xff666666), font: 12)),
+          _at(20, 63, 524, 35, const TabBar(
+            labelColor: Color(0xff253a58),
+            unselectedLabelColor: Color(0xff52647c),
+            indicatorColor: Color(0xff2277a1),
+            tabs: [Tab(text: 'Colors'), Tab(text: 'Optics')],
+          )),
+          _at(0, 100, 566, 359, TabBarView(children: [
+            _colorsTab(),
+            _opticsTab(diagnostic),
           ])),
-          _at(20,648,520,23,_label(
-            diagnostic!=null?'Aero Liquid unavailable: '+diagnostic:
-              draft.aero?'Aero Liquid: Flutter GPU renderer':'Aero optics disabled',
-            color:const Color(0xff666666),font:12)),
-          _at(19,683,524,2,Container(color:const Color(0xffb8c6d8))),
-          _at(19,699,98,33,_nativeButton('Defaults',
-            ()=>preview(AeroAppearance.defaults))),
-          _at(305,699,102,33,_nativeButton('Cancel',
-            ()=>Navigator.pop(context))),
-          _at(416,699,126,33,_nativeButton('Save and close',
-            ()=>Navigator.pop(context,draft),primary:true)),
-        ]),
-      )),
+          _at(19, 462, 524, 2,
+            Container(color: const Color(0xffb8c6d8))),
+          _at(19, 470, 98, 31, _nativeButton('Defaults',
+            () => preview(AeroAppearance.defaults))),
+          _at(442, 470, 100, 31, _nativeButton('Done',
+            () => Navigator.pop(context), primary: true)),
+        ]))),
     );
   }
-
 }
