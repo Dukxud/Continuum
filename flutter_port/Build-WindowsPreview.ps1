@@ -1,12 +1,21 @@
 # Local, unsigned engineering preview only. Never publishes or bypasses AV.
 [CmdletBinding()]
-param([string]$OutputDirectory=(Join-Path $HOME 'Downloads\CodexResumeSchedulerFlutter'))
+param(
+    [string]$OutputDirectory=(Join-Path $HOME 'Downloads\CodexResumeSchedulerFlutter'),
+    [switch]$PackageVerifiedBuild
+)
 $ErrorActionPreference='Stop'
 $project=$PSScriptRoot
 $root=Split-Path -Parent $project
-$flutter=(Get-Command flutter.bat -ErrorAction SilentlyContinue)
-if(-not $flutter){throw 'Flutter SDK not on PATH.'}
 if(-not $IsWindows){throw 'The preview package targets Windows.'}
+if($PackageVerifiedBuild -and $env:GITHUB_ACTIONS -ne 'true'){
+    throw 'Prevalidated-package mode is restricted to the isolated GitHub Actions build.'
+}
+$flutter=$null
+if(-not $PackageVerifiedBuild){
+    $flutter=(Get-Command flutter.bat -ErrorAction SilentlyContinue)
+    if(-not $flutter){throw 'Flutter SDK not on PATH.'}
+}
 $label='CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW'
 $destination=Join-Path $OutputDirectory $label
 $zip=Join-Path $OutputDirectory ($label+'.zip')
@@ -15,6 +24,7 @@ if((Test-Path -LiteralPath $destination) -or (Test-Path -LiteralPath $zip)){
 }
 & pwsh -NoProfile -File (Join-Path $root 'tests/flutter-port-source.test.ps1')
 if($LASTEXITCODE -ne 0){throw 'Flutter source integrity check failed.'}
+if(-not $PackageVerifiedBuild){
 Push-Location $project
 try{
     & pwsh -NoProfile -STA -File (Join-Path $root 'tests/flutter-port-bridge.test.ps1')
@@ -30,9 +40,15 @@ try{
     & $flutter.Source build windows --release
     if($LASTEXITCODE -ne 0){throw 'Flutter release build failed.'}
 }finally{Pop-Location}
+}
 $release=Join-Path $project 'build\windows\x64\runner\Release'
 $exe=Join-Path $release 'codex_resume_flutter.exe'
 if(-not (Test-Path -LiteralPath $exe -PathType Leaf)){throw 'Flutter executable is missing.'}
+foreach($required in @('flutter_windows.dll','data')){
+    if(-not (Test-Path -LiteralPath (Join-Path $release $required))){
+        throw "Flutter release payload incomplete: $required"
+    }
+}
 [void](New-Item -ItemType Directory -Path $OutputDirectory -Force)
 try{
     [void](New-Item -ItemType Directory -Path $destination -Force)
@@ -72,6 +88,7 @@ No publisher authentication or full device acceptance is asserted.
     $lines | Set-Content -LiteralPath (Join-Path $destination 'SHA256SUMS.txt') -Encoding utf8
     Compress-Archive -LiteralPath $destination -DestinationPath $zip -CompressionLevel Optimal
     if(-not (Test-Path -LiteralPath $zip -PathType Leaf)){throw 'Preview ZIP was not created.'}
+    if((Get-Item -LiteralPath $zip).Length -lt 1048576){throw 'Unexpectedly small Windows review package.'}
     Write-Host "Unsigned Windows Flutter review package: $zip" -ForegroundColor Green
     Write-Host "Standalone executable: $(Join-Path $destination 'codex_resume_flutter.exe')"
 }catch{

@@ -62,5 +62,25 @@ jobs:
         working-directory: flutter_port
         run: flutter build windows --debug
 
+      - name: Compile standalone Windows release
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter build windows --release
+
+      - name: Package verified unsigned Windows preview
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -STA -File ./flutter_port/Build-WindowsPreview.ps1 `
+            -PackageVerifiedBuild `
+            -OutputDirectory ./flutter_port/build/review-out
+
+      - name: Attach private review archive (not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-windows-unsigned-${{ github.event.pull_request.head.sha }}
+          path: flutter_port/build/review-out/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
 # Native rendering and Windows accessibility logs require separate on-device
 # review. A green workflow never certifies visual fidelity or task execution.
