@@ -336,31 +336,23 @@ class _SchedulerHomeState extends State<SchedulerHome> {
 
   Future<void> appearanceDialog() async {
     final state = controller!;
-    state.beginAppearancePreview();
     _dialogOpen = true;
     try {
       await widget.windowHost?.showDialogWindow(history: false);
-      if (!mounted) {
-        state.cancelAppearancePreview();
-        return;
-      }
-      final chosen = await showDialog<AeroAppearance>(
+      if (!mounted) return;
+      await showDialog<void>(
         context: context,
-        barrierDismissible: false,
-        builder: (dialog) => AeroAppearanceEditor(
+        barrierDismissible: true,
+        builder: (_) => AeroAppearanceEditor(
           initial: state.appearance,
-          onPreview: state.previewAppearance,
+          onChanged: state.updateAppearance,
         ),
       );
-      if (chosen == null) {
-        state.cancelAppearancePreview();
-      } else {
-        state.commitAppearance(chosen);
-      }
     } catch (error) {
-      state.cancelAppearancePreview();
       toast('Appearance editor: ' + error.toString());
     } finally {
+      // Persist the final choice even if the editor closes during debounce.
+      await state.flushPreferences();
       _dialogOpen = false;
       _lastWindowKey = '';
       updateWindowSize();
