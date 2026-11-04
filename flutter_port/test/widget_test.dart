@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:codex_resume_flutter/main.dart';
-import 'package:codex_resume_flutter/windows_icons.dart';
 import 'package:codex_resume_flutter/bridge.dart';
 
 class StubAdapter implements SchedulerAdapter {
