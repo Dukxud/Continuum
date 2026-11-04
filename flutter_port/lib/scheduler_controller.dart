@@ -55,7 +55,7 @@ class SchedulerController extends ChangeNotifier {
   /// Reset +1 is offered only for a fresh recommendation for this model.
   /// Expired or ambiguous quota data must not suggest an inaccurate reset.
   DateTime? get resetSuggestion {
-    if (readingUsage || quotaAt == null || quotaModel != model ||
+    if (quotaAt == null || quotaModel != model ||
         DateTime.now().difference(quotaAt!).inSeconds > 120 ||
         stringField(quota, 'catalogError').isNotEmpty) {
       return null;
@@ -83,10 +83,15 @@ class SchedulerController extends ChangeNotifier {
     return model ?? '';
   }
 
+  /// While refreshing, keep the *previous* verified account/model/quota
+  /// admissible until its 120-second TTL expires. A model switch clears quota
+  /// immediately, and a failed refresh clears it in readUsage(). Do not
+  /// flicker the primary action merely because a fresh lookup is in flight.
+  ///
   /// Quota exhaustion now does not forbid scheduling a later run. As with
   /// WinForms v1.16, the pinned worker rechecks quota at execution time.
   bool get canSchedule {
-    if (compact || busy || readingUsage || quota == null || quotaAt == null ||
+    if (compact || busy || quota == null || quotaAt == null ||
         DateTime.now().difference(quotaAt!).inSeconds > 120 ||
         model == null || sessionId == null || !efforts.contains(effort) ||
         quotaModel != model || stringField(quota, 'catalogError').isNotEmpty) return false;
