@@ -61,6 +61,29 @@ try {
         throw "Flutter bridge must resolve the original CodexData Git root. Expected '$expected', found '$actual'."
     }
     Write-Host 'Flutter real bridge selected disposable Git-backed CLI session PASS.' -ForegroundColor Green
+
+    # The same resolver must *not* borrow that root for a different CLI
+    # conversation whose recorded directory is outside any Git checkout.
+    $outside=Join-Path $fixture 'outside-git'
+    [void](New-Item -ItemType Directory -Path $outside)
+    $otherId=[guid]::NewGuid().ToString()
+    $otherMeta=@{type='session_meta';payload=@{
+        id=$otherId;source='cli';cwd=$outside
+    }} | ConvertTo-Json -Depth 8 -Compress
+    Set-Content -LiteralPath (Join-Path $sessions ('rollout-'+$otherId+'.jsonl')) -Value $otherMeta -Encoding utf8
+    $otherPayload=@{sessionId=$otherId} | ConvertTo-Json -Compress
+    $otherEncoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($otherPayload))
+    $otherOutput=@(& pwsh -NoLogo -NoProfile -NonInteractive -STA -File $bridge -Action select -Payload $otherEncoded)
+    $otherExit=$LASTEXITCODE
+    if(-not $otherOutput){throw "Non-repository CLI selection produced no response (exit $otherExit)."}
+    $otherAnswer=($otherOutput | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+    if($otherExit -ne 0 -or $otherAnswer.ok -ne $true){
+        throw "Non-repository CLI selection failed rather than remaining unresolved: $($otherAnswer.error)"
+    }
+    if($null -ne $otherAnswer.result.found){
+        throw 'Unrelated CLI session must not inherit another session\'s Git repository.'
+    }
+    Write-Host 'Flutter real bridge correctly leaves a non-Git CLI session unresolved PASS.' -ForegroundColor Green
 } finally {
     if($null -eq $originalCodexHome){Remove-Item Env:CODEX_HOME -ErrorAction SilentlyContinue}
     else{$env:CODEX_HOME=$originalCodexHome}
