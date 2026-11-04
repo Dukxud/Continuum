@@ -227,7 +227,7 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
       diagnostic != null ? 'Aero Liquid unavailable: ' + diagnostic :
         draft.aero ? 'Aero Liquid: Flutter GPU renderer' : 'Aero optics disabled',
       color: const Color(0xff666666), font: 12)),
-    _at(19, 232, 524, 126, Container(
+    _at(19, 232, 524, 122, Container(
       decoration: BoxDecoration(border: Border.all(color: const Color(0xffb8c6d8))),
       child: _opticsPreview())),
   ]);
@@ -247,13 +247,13 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
           _at(20, 37, 525, 21,
             _label('Changes are saved automatically.', 
               color: const Color(0xff666666), font: 12)),
-          _at(20, 63, 524, 35, const TabBar(
+          _at(20, 58, 524, 46, const TabBar(
             labelColor: Color(0xff253a58),
             unselectedLabelColor: Color(0xff52647c),
             indicatorColor: Color(0xff2277a1),
             tabs: [Tab(text: 'Colors'), Tab(text: 'Optics')],
           )),
-          _at(0, 100, 566, 359, TabBarView(children: [
+          _at(0, 105, 566, 354, TabBarView(children: [
             _colorsTab(),
             _opticsTab(diagnostic),
           ])),
