@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:codex_resume_flutter/bridge.dart';
@@ -15,12 +16,7 @@ class SpyWindowHost implements SchedulerWindowHost {
   }
   @override
   Future<void> showDialogWindow({required bool history}) async {}
-  @override
-  Future<void> restoreMode({required bool compact, required int upcomingRunCount,
-      required int quotaWindowCount}) async {
-    await setMode(compact: compact, upcomingRunCount: upcomingRunCount,
-      quotaWindowCount: quotaWindowCount);
-  }
+
 }
 
 class WindowAdapter implements SchedulerAdapter {
@@ -62,6 +58,39 @@ class WindowAdapter implements SchedulerAdapter {
 }
 
 void main() {
+  test('full and compact modes always fit content, regardless of prior size', () {
+    expect(schedulerWindowSize(compact: false,
+      upcomingRunCount: 0, quotaWindowCount: 2), const Size(952, 610));
+    expect(schedulerWindowSize(compact: false,
+      upcomingRunCount: 1, quotaWindowCount: 2), const Size(952, 744));
+    expect(schedulerWindowSize(compact: true,
+      upcomingRunCount: 0, quotaWindowCount: 2), const Size(482, 434));
+    expect(schedulerWindowSize(compact: true,
+      upcomingRunCount: 0, quotaWindowCount: 0), const Size(482, 209));
+    expect(schedulerWindowSize(compact: true,
+      upcomingRunCount: 1, quotaWindowCount: 2), const Size(482, 615));
+  });
+
+  test('resizes are serialized and one failure does not block later modes', () async {
+    final queue = WindowActionQueue();
+    final gate = Completer<void>();
+    final calls = <String>[];
+    final first = queue.enqueue(() async {
+      calls.add('first-start');
+      await gate.future;
+      calls.add('first-end');
+    });
+    final second = queue.enqueue(() async { calls.add('second'); throw StateError('boom'); });
+    final last = queue.enqueue(() async { calls.add('final-mode'); });
+    await Future<void>.delayed(Duration.zero);
+    expect(calls, ['first-start']);
+    gate.complete();
+    await first;
+    await expectLater(second, throwsStateError);
+    await last;
+    expect(calls, ['first-start', 'first-end', 'second', 'final-mode']);
+  });
+
   testWidgets('compact mode changes the host window size, not only controls', (tester) async {
     // The real noncompact desktop window is at least 940px wide; Flutter's
     // default 800px test viewport hides the original right-side control.
