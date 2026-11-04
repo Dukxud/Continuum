@@ -188,7 +188,8 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: SchedulerHome(
       adapter: AutoRepositoryAdapter())));
     await tester.pump(const Duration(milliseconds: 150));
-    final repositoryField = tester.widget<TextField>(find.byType(TextField).first);
+    final repositoryField = tester.widget<TextField>(
+      find.byKey(const Key('repository-root-field')));
     expect(repositoryField.controller?.text, r'C:\QA\auto-detected');
     expect(find.text('Repository unresolved; use Browse.'), findsNothing);
     expect(tester.takeException(), isNull);
