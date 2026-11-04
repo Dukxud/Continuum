@@ -68,7 +68,7 @@ void main() {
     )));
     await tester.tap(find.text('Open editor'));
     await tester.pump(const Duration(milliseconds: 200));
-    expect(find.text('Customize progress bars'), findsOneWidget);
+    expect(find.text('Adjust the material. See it change below.'), findsOneWidget);
     expect(find.text('5-hour color'), findsOneWidget);
     expect(find.text('Weekly color'), findsOneWidget);
     expect(find.text('Countdown color'), findsOneWidget);
