@@ -212,7 +212,7 @@ void main() {
     final controller = SchedulerController(fake);
     await controller.start();
     expect(controller.ready, isFalse);
-    await controller.load();
+    await controller.refreshOnFocus(DateTime.now().add(const Duration(seconds: 16)));
     expect(controller.ready, isTrue);
     expect(controller.sessionId, '11111111-1111-1111-1111-111111111111');
     expect(controller.repo, r'C:\source\test');
