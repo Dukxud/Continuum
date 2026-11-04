@@ -25,6 +25,7 @@ class SchedulerController extends ChangeNotifier {
   String repo = '';
   String message = 'Resume.';
   String access = 'workspace-write';
+  bool autoResumeOnLimit = false;
   bool compact = false;
   bool ready = false;
   bool busy = false;
@@ -144,6 +145,7 @@ class SchedulerController extends ChangeNotifier {
         final preferredAccess = stringField(draft, 'access');
         access = const ['workspace-write', 'read-only', 'yolo'].contains(preferredAccess)
           ? preferredAccess : 'workspace-write';
+        autoResumeOnLimit = field(draft, 'autoResumeOnLimit') == true;
         compact = field(settings, 'compactMode') == true;
         final savedTime = DateTime.tryParse(stringField(draft, 'runAt'));
         if (savedTime != null && savedTime.isAfter(earliestRunAt())) {
@@ -257,7 +259,7 @@ class SchedulerController extends ChangeNotifier {
 
   void edit({
     String? repository, String? instruction, String? accessMode,
-    String? reasoning, bool? compactMode, DateTime? time,
+    String? reasoning, bool? compactMode, bool? autoResumeOnLimit, DateTime? time,
   }) {
     if (repository != null) {
       ++_repositoryEditEpoch;
@@ -268,6 +270,7 @@ class SchedulerController extends ChangeNotifier {
     if (instruction != null) message = instruction;
     if (accessMode != null) access = accessMode;
     if (reasoning != null) effort = reasoning;
+    if (autoResumeOnLimit != null) this.autoResumeOnLimit = autoResumeOnLimit;
     if (compactMode != null && compact != compactMode) {
       compact = compactMode;
       quota = null; quotaAt = null; quotaModel = '';
@@ -399,6 +402,7 @@ class SchedulerController extends ChangeNotifier {
       'draft': {
         'sessionId': sessionId ?? '', 'repo': repo, 'model': model ?? '',
         'effort': effort ?? '', 'access': access, 'message': message,
+        'autoResumeOnLimit': autoResumeOnLimit,
         'runAt': localIsoSecond(runAt),
       },
     };
@@ -427,6 +431,7 @@ class SchedulerController extends ChangeNotifier {
       final response = await adapter.call('schedule', {
         'sessionId': sessionId, 'repo': repo, 'model': model, 'effort': effort,
         'access': access, 'message': message.trim(), 'runAt': localIsoSecond(runAt),
+        'autoResumeOnLimit': autoResumeOnLimit,
         'confirmUnrestricted': confirmUnrestricted, 'confirmOverlap': confirmOverlap,
       });
       // Once Windows has registered the task, never report a later preferences
