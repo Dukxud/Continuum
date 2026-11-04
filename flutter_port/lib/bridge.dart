@@ -196,20 +196,37 @@ int? runElapsedPercent(DateTime? due, Object? createdAt, [DateTime? now]) {
   }
 }
 
-String localIsoMinute(DateTime date) {
+/// Windows Task Scheduler accepts local wall-clock time to second precision.
+/// Keep the selected seconds instead of silently snapping to whole minutes.
+String localIsoSecond(DateTime date) {
   String d(int value) => value.toString().padLeft(2, '0');
-  return date.year.toString() + '-' + d(date.month) + '-' + d(date.day) +
-      'T' + d(date.hour) + ':' + d(date.minute) + ':00';
+  return '${date.year}-${d(date.month)}-${d(date.day)}T'
+      '${d(date.hour)}:${d(date.minute)}:${d(date.second)}';
 }
 
-DateTime nextWholeMinute(DateTime date) {
-  final base = DateTime(date.year, date.month, date.day, date.hour, date.minute);
-  return base.isBefore(date) ? base.add(const Duration(minutes: 1)) : base;
-}
 DateTime suggestedRunAt([DateTime? now]) =>
-    nextWholeMinute((now ?? DateTime.now()).add(const Duration(minutes: 2)));
+    (now ?? DateTime.now()).add(const Duration(minutes: 1));
 DateTime earliestRunAt([DateTime? now]) =>
-    nextWholeMinute((now ?? DateTime.now()).add(const Duration(seconds: 30)));
+    (now ?? DateTime.now()).add(const Duration(seconds: 30));
+
+/// Only an authoritative exhausted-window recommendation activates Reset +1.
+/// If it has already elapsed or is invalid, the UI offers Now +1 instead.
+DateTime? recommendedResetRunAt(Map<String, dynamic>? quota, [DateTime? now]) {
+  if (stringField(quota, 'recommendationKind') != 'exhausted-window') return null;
+  final raw = field(quota, 'recommendedResetAt');
+  if (raw is! num || !raw.isFinite || raw <= 0 || raw != raw.truncateToDouble()) {
+    return null;
+  }
+  try {
+    final reset = DateTime.fromMillisecondsSinceEpoch(
+      raw.toInt() * 1000,
+    ).add(const Duration(minutes: 1));
+    return reset.isAfter(earliestRunAt(now)) ? reset : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 DateTime stepRunAt(DateTime current, int direction, [DateTime? now]) {
   if (direction != 1 && direction != -1) throw ArgumentError('Invalid direction.');
   final candidate = current.add(Duration(minutes: direction));
