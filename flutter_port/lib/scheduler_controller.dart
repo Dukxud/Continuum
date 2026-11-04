@@ -354,6 +354,9 @@ class SchedulerController extends ChangeNotifier {
       // failure as a failed registration.
       await save();
       await poll();
+      // Like the WinForms coordinator, refresh catalog/quota and sessions
+      // after registration without holding the success response hostage.
+      unawaited(load());
       return stringField(response, 'name');
     } catch (_) {
       await poll();
@@ -369,6 +372,7 @@ class SchedulerController extends ChangeNotifier {
       return await adapter.call('cancel', {'name': name});
     } finally {
       await poll();
+      unawaited(load());
       busy = false; _changed();
     }
   }
