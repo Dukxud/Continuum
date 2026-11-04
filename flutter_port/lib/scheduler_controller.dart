@@ -43,6 +43,8 @@ class SchedulerController extends ChangeNotifier {
   bool _polling = false;
   bool _loading = false;
   bool _disposed = false;
+  bool _saveFailed = false;
+  DateTime? _lastFullRefresh;
 
   List<Map<String, dynamic>> get quotaWindows => recordList(field(quota, 'windows'));
 
@@ -95,6 +97,7 @@ class SchedulerController extends ChangeNotifier {
   Future<void> load({bool initial = false}) async {
     if (_loading) return;
     _loading = true;
+    _lastFullRefresh = DateTime.now();
     try {
       final data = await adapter.call('load');
       if (_disposed) return;
@@ -102,7 +105,8 @@ class SchedulerController extends ChangeNotifier {
       runs = recordList(field(data, 'pending'));
       history = recordList(field(data, 'history'));
       logDirectory = stringField(data, 'logDirectory');
-      if (initial) {
+      // A failed first read must not strand the app permanently uninitialized.
+      if (initial || !ready) {
         final settingsData = field(data, 'settings');
         final settings = settingsData is Map ? Map<String, dynamic>.from(settingsData) : <String, dynamic>{};
         final draftData = field(settings, 'draft');
@@ -132,6 +136,17 @@ class SchedulerController extends ChangeNotifier {
       _changed();
     } finally {
       _loading = false;
+    }
+  }
+
+  /// WinForms refreshes immediately on focus after 15 seconds away.
+  /// The periodic refresh remains the fallback while the window is idle.
+  Future<void> refreshOnFocus([DateTime? now]) async {
+    if (!ready || _loading || _disposed) return;
+    final current = now ?? DateTime.now();
+    if (_lastFullRefresh == null ||
+        current.difference(_lastFullRefresh!) >= const Duration(seconds: 15)) {
+      await load();
     }
   }
 
@@ -281,10 +296,12 @@ class SchedulerController extends ChangeNotifier {
     _queueSave();
   }
 
-  /// Flush a pending auto-save when the editor closes, without a Save button.
-  Future<void> flushPreferences() {
+  /// Closing the window must not discard edits made during the debounce.
+  /// Return false if storage rejected the write so the window can remain open.
+  Future<bool> flushPreferences() async {
     _saveTimer?.cancel();
-    return save();
+    await save();
+    return !_saveFailed;
   }
 
   void _queueSave() {
@@ -310,7 +327,13 @@ class SchedulerController extends ChangeNotifier {
       if (_disposed) return;
       try {
         await adapter.call('save', snapshot);
+        _saveFailed = false;
+        if (error?.startsWith('Preferences save could not be confirmed:') == true) {
+          error = null;
+          _changed();
+        }
       } catch (e) {
+        _saveFailed = true;
         error = 'Preferences save could not be confirmed: $e';
         _changed();
       }
