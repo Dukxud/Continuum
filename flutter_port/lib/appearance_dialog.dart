@@ -73,138 +73,154 @@ class _AeroAppearanceEditorState extends State<AeroAppearanceEditor> {
     }
   }
 
-  Widget colorEditor(String kind, String caption, double amount, {bool working = false}) {
+  Widget _at(double x,double y,double width,double height,Widget child) =>
+    Positioned(left:x,top:y,width:width,height:height,child:child);
+
+  Widget _label(String text,{bool bold=false,Color color=const Color(0xff253a58),double font=13}) =>
+    Align(alignment:Alignment.centerLeft,child:Text(text,
+      maxLines:1,overflow:TextOverflow.ellipsis,
+      style:TextStyle(fontFamily:'Segoe UI',fontSize:font,color:color,
+        fontWeight:bold?FontWeight.bold:FontWeight.normal)));
+
+  Widget _nativeButton(String label,VoidCallback? action,{bool primary=false}) =>
+    OutlinedButton(onPressed:action,
+      style:OutlinedButton.styleFrom(
+        backgroundColor:primary?const Color(0xff2277a1):const Color(0xff52749b),
+        foregroundColor:Colors.white,
+        shape:const RoundedRectangleBorder(borderRadius:BorderRadius.zero),
+        padding:EdgeInsets.zero),
+      child:Text(label,style:const TextStyle(fontFamily:'Segoe UI',fontSize:13)));
+
+  InputDecoration get _input => const InputDecoration(
+    isDense:true,filled:true,fillColor:Color(0xfffbfdff),
+    contentPadding:EdgeInsets.symmetric(horizontal:7,vertical:5),
+    enabledBorder:OutlineInputBorder(borderRadius:BorderRadius.zero,
+      borderSide:BorderSide(color:Color(0xffb8c6d8))),
+    focusedBorder:OutlineInputBorder(borderRadius:BorderRadius.zero,
+      borderSide:BorderSide(color:Color(0xff547fd2),width:1.3)),
+  );
+
+  Widget _colorSelect(String kind) {
     final selected = draft.selection(kind);
-    final value = AeroAppearance.presetColors.containsKey(selected) ? selected : 'custom';
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: Text(caption,
-            style: const TextStyle(fontWeight: FontWeight.w700))),
-          SizedBox(width: 192, child: DropdownButtonFormField<String>(
-            key: ValueKey('$kind:$selected'),
-            isExpanded: true, initialValue: value,
-            decoration: const InputDecoration(isDense: true),
-            items: [
-              for (final name in AeroAppearance.presetColors.keys)
-                DropdownMenuItem(value: name, child: Row(children: [
-                  CircleAvatar(backgroundColor: AeroAppearance.presetColors[name],
-                    radius: 7),
-                  const SizedBox(width: 7),
-                  Expanded(child: Text(AeroAppearance.presetNames[name]!,
-                    maxLines: 1, overflow: TextOverflow.ellipsis)),
-                ])),
-              const DropdownMenuItem(value: 'custom', child: Text('Custom RGB')),
-            ],
-            onChanged: (choice) {
-              if (choice == null) return;
-              if (choice == 'custom') {
-                chooseCustom(kind);
-              } else {
-                preview(draft.withColor(kind, choice));
-              }
-            },
-          )),
-          const SizedBox(width: 8),
-          OutlinedButton(
-            onPressed: () => chooseCustom(kind),
-            child: const Text('Choose...')),
-        ]),
-        const SizedBox(height: 7),
-        AeroLiquidBar(amount: working ? null : amount,
-          appearance: draft, kind: kind, working: working),
-      ]),
-    );
+    final choice = AeroAppearance.presetColors.containsKey(selected)?selected:'custom';
+    return DropdownButtonFormField<String>(
+      key:ValueKey(kind+':'+selected),
+      initialValue:choice,
+      isExpanded:true,isDense:true,decoration:_input,
+      items:[
+        for(final key in AeroAppearance.presetColors.keys)
+          DropdownMenuItem(value:key,child:Row(children:[
+            Container(width:25,height:15,
+              decoration:BoxDecoration(color:AeroAppearance.presetColors[key],
+                border:Border.all(color:const Color(0xff657387)))),
+            const SizedBox(width:9),
+            Expanded(child:Text(AeroAppearance.presetNames[key]!,
+              maxLines:1,overflow:TextOverflow.ellipsis)),
+          ])),
+        DropdownMenuItem(value:'custom',child:Text(selected.startsWith('#')
+          ? 'Custom  '+selected : 'Custom RGB')),
+      ],
+      onChanged:(value){
+        if(value==null)return;
+        if(value=='custom'){chooseCustom(kind);return;}
+        preview(draft.withColor(kind,value));
+      });
   }
 
-  Widget settingSlider(String title, int value, int min, int max,
-    ValueChanged<int> changed) {
-    return Row(children: [
-      Expanded(flex: 3, child: Text(title)),
-      Expanded(flex: 5, child: Slider(
-        value: value.toDouble(), min: min.toDouble(), max: max.toDouble(),
-        onChanged: (value) => changed(value.round()))),
-      SizedBox(width: 50, child: Text(value.toString() + '%',
-        textAlign: TextAlign.end)),
-    ]);
+  Widget _colorRow(String title,String kind,double top)=>Stack(children:[
+    _at(19,top+5,140,25,_label(title)),
+    _at(163,top,264,30,_colorSelect(kind)),
+    _at(438,top,104,29,_nativeButton('Choose...',()=>chooseCustom(kind))),
+  ]);
+
+  Widget _previewSurface(){
+    const captions=['5-HOUR   68%','WEEKLY   50%','COUNTDOWN   75%',
+      'WORKING   duration unknown'];
+    const kinds=['quota','weekly','time','working'];
+    const values=[68.0,50.0,75.0,100.0];
+    return Container(color:Colors.white,
+      child:Stack(children:[
+        for(var index=0;index<4;index++)...[
+          _at(16,4+index*45,487,23,_label(captions[index],bold:true,font:12)),
+          _at(16,25+index*45,488,17,AeroLiquidBar(
+            amount:index==3?null:values[index],
+            kind:kinds[index],appearance:draft,working:index==3)),
+        ],
+      ]));
   }
+
+  Widget _enumSelect(int value,List<String> names,ValueChanged<int> onChange) =>
+    DropdownButtonFormField<int>(
+      key:ValueKey('enum:'+names.first+':'+value.toString()),
+      initialValue:value,
+      isExpanded:true,isDense:true,decoration:_input,
+      items:List.generate(names.length,(i)=>DropdownMenuItem(
+        value:i,child:Text(names[i],overflow:TextOverflow.ellipsis))),
+      onChanged:(v){if(v!=null)onChange(v);});
+
+  Widget _settingsSlider(String label,int value,int low,int high,double y,
+      ValueChanged<int> changed)=>Stack(children:[
+    _at(19,y+5,145,24,_label(label)),
+    _at(158,y,315,40,Slider(value:value.toDouble(),min:low.toDouble(),
+      max:high.toDouble(),onChanged:(v)=>changed(v.round()))),
+    _at(481,y+4,62,25,Align(alignment:Alignment.centerRight,
+      child:Text(value.toString()+'%',style:const TextStyle(fontSize:13)))),
+  ]);
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 590, maxHeight: 760),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Padding(padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Customize progress bars',
-              style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 5),
-            const Text('Changes preview live. Cancel restores the previous appearance.',
-              style: TextStyle(fontSize: 12, color: Colors.black54)),
-          ])),
-        const Divider(height: 1),
-        Flexible(child: ListView(padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
-          shrinkWrap: true, children: [
-          colorEditor('quota', '5-hour color', 72),
-          colorEditor('weekly', 'Weekly color', 45),
-          colorEditor('time', 'Countdown color', 63),
-          colorEditor('working', 'Working color', 100, working: true),
-          const Divider(height: 22),
-          DropdownButtonFormField<int>(
-            key: ValueKey('finish:${draft.finish}'),
-            isExpanded: true, initialValue: draft.finish,
-            decoration: const InputDecoration(labelText: 'Liquid material'),
-            items: const [
-              DropdownMenuItem(value: 0, child: Text('Optical glass')),
-              DropdownMenuItem(value: 1, child: Text('Mirror enamel')),
-              DropdownMenuItem(value: 2, child: Text('Iridescent pearl')),
-            ],
-            onChanged: (v) { if (v != null) preview(draft.copyWith(finish: v)); },
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<int>(
-            key: ValueKey('lighting:${draft.lighting}'),
-            isExpanded: true, initialValue: draft.lighting,
-            decoration: const InputDecoration(labelText: 'Studio lighting'),
-            items: const [
-              DropdownMenuItem(value: 0, child: Text('Product studio')),
-              DropdownMenuItem(value: 1, child: Text('Aero daylight')),
-              DropdownMenuItem(value: 2, child: Text('Neon showroom')),
-            ],
-            onChanged: (v) { if (v != null) preview(draft.copyWith(lighting: v)); },
-          ),
-          const SizedBox(height: 10),
-          settingSlider('Reflection strength', draft.shimmer, 0, 200,
-            (v) => preview(draft.copyWith(shimmer: v))),
-          settingSlider('Reflection speed', draft.speed, 25, 300,
-            (v) => preview(draft.copyWith(speed: v))),
-          CheckboxListTile(
-            value: draft.aero,
-            onChanged: (v) { if (v != null) preview(draft.copyWith(aero: v)); },
-            title: const Text('Enable Aero Liquid optics'),
-            controlAffinity: ListTileControlAffinity.leading,
-            contentPadding: EdgeInsets.zero,
-          ),
-          if (AeroAssets.shaderError != null)
-            Text('GPU shader unavailable; using native Windows pixels: ' +
-              AeroAssets.shaderError!, style: const TextStyle(fontSize: 11,
-                color: Colors.deepOrange)),
-        ])),
-        const Divider(height: 1),
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(children: [
-            TextButton(
-              onPressed: () => preview(AeroAppearance.defaults),
-              child: const Text('Defaults')),
-            const Spacer(),
-            TextButton(onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
-            const SizedBox(width: 8),
-            FilledButton(onPressed: () => Navigator.pop(context, draft),
-              child: const Text('Save and close')),
-          ])),
-      ]),
-    ));
+    final diagnostic=AeroAssets.shaderError;
+    return Dialog(
+      backgroundColor:const Color(0xfff6f9fd),
+      shape:const RoundedRectangleBorder(borderRadius:BorderRadius.zero),
+      insetPadding:const EdgeInsets.all(12),
+      child:SingleChildScrollView(scrollDirection:Axis.horizontal,child:SizedBox(
+        width:566,height:752,
+        child:Stack(children:[
+          _at(20,16,518,28,_label('Adjust the material. See it change below.',
+            font:16,bold:true)),
+          _at(20,45,525,23,_label(
+            'Changes are live. Cancel restores your previous appearance.',
+            color:const Color(0xff666666),font:12)),
+          _at(0,78,566,30,_colorRow('5-hour color','quota',0)),
+          _at(0,116,566,30,_colorRow('Weekly color','weekly',0)),
+          _at(0,154,566,30,_colorRow('Countdown color','time',0)),
+          _at(0,192,566,30,_colorRow('Working color','working',0)),
+          _at(19,240,524,190,Container(
+            decoration:BoxDecoration(border:Border.all(color:const Color(0xffb8c6d8))),
+            child:_previewSurface())),
+          _at(19,449,140,25,_label('Liquid material')),
+          _at(163,444,379,30,_enumSelect(draft.finish,
+            const ['Optical glass','Mirror enamel','Iridescent pearl'],
+            (v)=>preview(draft.copyWith(finish:v)))),
+          _at(19,488,140,25,_label('Studio lighting')),
+          _at(163,483,379,30,_enumSelect(draft.lighting,
+            const ['Product studio','Aero daylight','Neon showroom'],
+            (v)=>preview(draft.copyWith(lighting:v)))),
+          _at(0,524,566,40,_settingsSlider('Reflection strength',
+            draft.shimmer,0,200,0,(v)=>preview(draft.copyWith(shimmer:v)))),
+          _at(0,570,566,40,_settingsSlider('Reflection speed',
+            draft.speed,25,300,0,(v)=>preview(draft.copyWith(speed:v)))),
+          _at(20,617,350,30,CheckboxListTile(
+            value:draft.aero,controlAffinity:ListTileControlAffinity.leading,
+            contentPadding:EdgeInsets.zero,dense:true,
+            title:const Text('Enable Aero Liquid optics',
+              style:TextStyle(fontFamily:'Segoe UI',fontSize:13)),
+            onChanged:(v){if(v!=null)preview(draft.copyWith(aero:v));})),
+          _at(20,648,520,23,_label(
+            diagnostic!=null?'Aero Liquid unavailable: '+diagnostic:
+              draft.aero?'Aero Liquid: Flutter GPU renderer':'Aero optics disabled',
+            color:const Color(0xff666666),font:12)),
+          _at(19,683,524,2,Container(color:const Color(0xffb8c6d8))),
+          _at(19,699,98,33,_nativeButton('Defaults',
+            ()=>preview(AeroAppearance.defaults))),
+          _at(305,699,102,33,_nativeButton('Cancel',
+            ()=>Navigator.pop(context))),
+          _at(416,699,126,33,_nativeButton('Save and close',
+            ()=>Navigator.pop(context,draft),primary:true)),
+        ]),
+      )),
+    );
   }
+
 }
