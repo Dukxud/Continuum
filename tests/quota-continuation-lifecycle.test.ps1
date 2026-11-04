@@ -42,7 +42,7 @@ node "%~dp0node_modules\@openai\codex\bin\codex.js" %*
 exit /b %errorlevel%
 '@ | Set-Content -LiteralPath (Join-Path $bin 'codex.cmd') -Encoding ascii
     $env:PATH="$bin;$originalPath"
-    $env:CODEX_STUB_EXECUTIONS=Join-Path $temp 'codex-executions.txt'
+    $env:CODEX_STUB_EXECUTIONS=(Join-Path $temp 'codex-executions.txt')
 
     $repo=Join-Path $temp 'workspace'
     [void](New-Item -ItemType Directory -Path $repo -Force)
