@@ -82,6 +82,35 @@ class RepositoryLookupScheduler extends FakeScheduler {
   }
 }
 
+class PendingRepositoryLookupScheduler extends FakeScheduler {
+  final lookup = Completer<Map<String, dynamic>>();
+
+  @override
+  Future<Map<String, dynamic>> call(String action,
+      [Map<String, dynamic> payload = const {}]) {
+    if (action == 'select') return lookup.future;
+    return super.call(action, payload);
+  }
+}
+
+class ConflictingRepositoryScheduler extends FakeScheduler {
+  @override
+  Future<Map<String, dynamic>> call(String action,
+      [Map<String, dynamic> payload = const {}]) async {
+    if (action == 'select') {
+      return {
+        'model': 'gpt-test',
+        'found': {
+          'Root': '',
+          'Source': 'conflicting fallback worktrees',
+          'Candidates': [r'C:\worktree\one', r'C:\worktree\two'],
+        },
+      };
+    }
+    return super.call(action, payload);
+  }
+}
+
 void main() {
   test('adapter timeout never asserts failed registration or cancellation', () {
     for (final action in ['schedule', 'cancel', 'save', 'hide']) {
@@ -146,6 +175,40 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 760));
     expect(fake.saves, isNotEmpty);
     expect((fake.saves.last['draft'] as Map)['repo'], r'C:\verified\checkout');
+    controller.dispose();
+  });
+
+  test('manual repository selection wins over a delayed lookup', () async {
+    final fake = PendingRepositoryLookupScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    await controller.selectSession(null);
+    final pending = controller.selectSession('11111111-1111-1111-1111-111111111111');
+    controller.edit(repository: r'C:\manual\repo');
+    fake.lookup.complete({
+      'found': {'Root': r'C:\stale\automatic',
+        'AlternativeRoots': [r'C:\stale\other']},
+      'model': 'gpt-test',
+    });
+    await pending;
+    expect(controller.repo, r'C:\manual\repo');
+    expect(controller.repositoryWarning, isNull);
+    expect(controller.repositoryAlternatives, isEmpty);
+    controller.dispose();
+  });
+
+  test('ambiguous repository evidence is visible and manually dismissible', () async {
+    final fake = ConflictingRepositoryScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    await controller.selectSession(null);
+    await controller.selectSession('11111111-1111-1111-1111-111111111111');
+    expect(controller.repo, isEmpty);
+    expect(controller.repositoryWarning, contains('Conflicting'));
+    expect(controller.repositoryAlternatives, hasLength(2));
+    controller.edit(repository: r'C:\verified\chosen');
+    expect(controller.repositoryWarning, isNull);
+    expect(controller.repositoryAlternatives, isEmpty);
     controller.dispose();
   });
 
