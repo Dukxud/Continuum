@@ -52,6 +52,17 @@ class SchedulerController extends ChangeNotifier {
 
   List<Map<String, dynamic>> get quotaWindows => recordList(field(quota, 'windows'));
 
+  /// Reset +1 is offered only for a fresh recommendation for this model.
+  /// Expired or ambiguous quota data must not suggest an inaccurate reset.
+  DateTime? get resetSuggestion {
+    if (readingUsage || quotaAt == null || quotaModel != model ||
+        DateTime.now().difference(quotaAt!).inSeconds > 120 ||
+        stringField(quota, 'catalogError').isNotEmpty) {
+      return null;
+    }
+    return recommendedResetRunAt(quota);
+  }
+
   List<Map<String, dynamic>> get upcoming =>
     runs.where((r) => const ['Scheduled', 'Running'].contains(stringField(r, 'Status'))).toList();
 
