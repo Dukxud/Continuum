@@ -45,6 +45,28 @@ class FakeScheduler implements SchedulerAdapter {
   }
 }
 
+/// An exhausted quota can still be scheduled for after its reset.
+/// The Windows worker remains responsible for execution-time admission.
+class ExhaustedQuotaScheduler extends FakeScheduler {
+  @override
+  Future<Map<String, dynamic>> call(String action,
+      [Map<String, dynamic> payload = const {}]) async {
+    final result = await super.call(action, payload);
+    if (action != 'usage') return result;
+    return {
+      ...result,
+      'ordinaryUsageAllowed': false,
+      'windows': [{
+        'label': '5-hour',
+        'remainingPercent': 0.0,
+        'resetsAt': 1793736000,
+      }],
+      'recommendationKind': 'exhausted-window',
+      'recommendedResetAt': 1793736000,
+    };
+  }
+}
+
 class DeferredSaveScheduler extends FakeScheduler {
   final firstSaveEntered = Completer<void>();
   final releaseFirstSave = Completer<void>();
@@ -142,6 +164,19 @@ void main() {
     final name = await controller.schedule(confirmUnrestricted: false, confirmOverlap: false);
     expect(name, startsWith('CodexResume-'));
     expect(fake.actions, contains('usage'));
+    expect(fake.actions, contains('schedule'));
+    controller.dispose();
+  });
+
+  test('exhausted live quota does not disable future scheduling', () async {
+    final fake = ExhaustedQuotaScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    expect(controller.canSchedule, isTrue,
+      reason: 'WinForms allows registering a future run after quota reset');
+    final name = await controller.schedule(
+      confirmUnrestricted: false, confirmOverlap: false);
+    expect(name, startsWith('CodexResume-'));
     expect(fake.actions, contains('schedule'));
     controller.dispose();
   });
