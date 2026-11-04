@@ -170,7 +170,7 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
     final hour=date.hour%12==0?12:date.hour%12;
     if(long) return days[date.weekday-1]+' '+months[date.month-1]+' '+
       d(date.day)+', '+date.year.toString()+'  '+d(hour)+':'+d(date.minute)+
-      (date.hour>=12?' PM':' AM');
+      ':'+d(date.second)+(date.hour>=12?' PM':' AM');
     return days[date.weekday-1]+' '+months[date.month-1]+' '+date.day.toString()+
       ', '+hour.toString()+':'+d(date.minute)+(date.hour>=12?' PM':' AM');
   }
@@ -227,6 +227,30 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
       )),
   );
 
+  /// Time and instruction are one operation. A single action column, with
+  /// deliberate alignment and separation, replaces disconnected row buttons.
+  Widget _schedulePanel(SchedulerController state) {
+    final resetAt = recommendedResetRunAt(state.quota);
+    return Stack(children: [
+      const _LegacyBand(fill:Color(0xffe8f5fc),accent:Color(0xff2887b5)),
+      _at(8,18,132,30,_label('Run at (local)')),
+      _at(145,18,38,30,_LegacyButton('−',
+        ()=>state.edit(time:stepRunAt(state.runAt,-1)))),
+      _at(190,18,260,30,_datePickerControl(state.runAt)),
+      _at(457,18,38,30,_LegacyButton('+',
+        ()=>state.edit(time:stepRunAt(state.runAt,1)))),
+      _at(502,18,185,30,_LegacyButton(resetAt==null?'Now +1':'Reset +1',
+        ()=>state.edit(time:resetAt ?? suggestedRunAt()))),
+      _at(8,65,132,30,_label('Instruction')),
+      _at(145,65,542,30,_textbox(instruction,
+        (v)=>state.edit(instruction:v))),
+      _at(697,13,1,89,Container(color:const Color(0xffafc9d8))),
+      _at(712,20,176,74,_LegacyButton('Schedule once',
+        state.canSchedule?schedule:null,
+        color:const Color(0xff2277a1),primary:true)),
+    ]);
+  }
+
   Widget _fullParityView() {
     final state=controller!;
     final runs=state.upcoming;
@@ -241,18 +265,13 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
         maxLines:1,overflow:TextOverflow.ellipsis))).toList();
     final validModel=state.models.any((m)=>stringField(m,'id')==state.model);
     final effortOptions=state.efforts.map((e)=>DropdownMenuItem<String>(value:e,child:Text(e))).toList();
-    final resetTime=field(state.quota,'recommendedResetAt');
-    final reset=stringField(state.quota,'recommendationKind')=='exhausted-window' &&
-      resetTime is num && resetTime>0
-        ? nextWholeMinute(DateTime.fromMillisecondsSinceEpoch(
-            resetTime.toInt()*1000).add(const Duration(minutes:2))):null;
     final children=<Widget>[
       _at(10,54,898,46,const _LegacyBand(fill:Color(0xffe8f1ff),accent:Color(0xff547fd2))),
       _at(10,102,898,44,const _LegacyBand(fill:Color(0xffe6f8f3),accent:Color(0xff168e87))),
       // Model configuration precedes one unified scheduling block: choose
       // the time, write the instruction, then schedule from that same area.
       _at(10,148,898,44,const _LegacyBand(fill:Color(0xfffff3e4),accent:Color(0xffc98737))),
-      _at(10,194,898,115,const _LegacyBand(fill:Color(0xffe8f5fc),accent:Color(0xff2887b5))),
+      _at(10,194,898,115,_schedulePanel(state)),
       _at(18,61,125,30,_label('Conversation')),
       _at(155,61,743,30,_combo<String>(
         name:'session',selected:state.sessions.any((m)=>stringField(m,'Id')==state.sessionId)?state.sessionId:null,
@@ -278,17 +297,6 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
           DropdownMenuItem(value:'yolo',child:Text('Full access (YOLO)')),
           DropdownMenuItem(value:'read-only',child:Text('Read-only test')),
         ],onChanged:(s){if(s!=null)state.edit(accessMode:s);})),
-      _at(18,199,132,30,_label('Run at (local)')),
-      _at(155,199,38,30,_LegacyButton('−',()=>state.edit(time:stepRunAt(state.runAt,-1)))),
-      _at(202,199,237,30,_datePickerControl(state.runAt)),
-      _at(446,199,38,30,_LegacyButton('+',()=>state.edit(time:stepRunAt(state.runAt,1)))),
-      _at(637,199,112,30,_LegacyButton('Now +2',()=>state.edit(time:suggestedRunAt()))),
-      _at(761,199,137,30,_LegacyButton('Reset +2',
-        reset==null?null:()=>state.edit(time:reset))),
-      _at(18,243,128,30,_label('Instruction')),
-      _at(155,243,743,30,_textbox(instruction,(v)=>state.edit(instruction:v))),
-      _at(720,274,178,31,_LegacyButton('Schedule once',
-        state.canSchedule?schedule:null,color:const Color(0xff2277a1),primary:true)),
       _at(18,309,880,2,Container(color:const Color(0xffc6d2e3))),
       _at(18,322,300,30,_label('Usage remaining',fontSize:16,bold:true)),
       _at(18,358,428,108,_usageSurface(state.quotaWindows.isNotEmpty?state.quotaWindows.first:null,
