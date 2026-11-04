@@ -76,13 +76,13 @@ class _SchedulerHomeState extends State<SchedulerHome> {
     final host = widget.windowHost;
     if (state == null || host == null || !state.ready || _dialogOpen) return;
     final quotaCount = math.min(2, state.quotaWindows.length);
+    final runCount = state.upcoming.length;
     final key = (state.compact ? 'compact' : 'standard') +
-      (state.upcoming.isEmpty ? '-empty' : '-has-run') +
-      '-quota:$quotaCount';
+      '-runs:${math.min(4, runCount)}-quota:$quotaCount';
     if (_lastWindowKey == key) return;
     _lastWindowKey = key;
     unawaited(host.setMode(compact: state.compact,
-      hasRun: state.upcoming.isNotEmpty,
+      upcomingRunCount: runCount,
       quotaWindowCount: quotaCount).catchError((Object error) {
         if (mounted) toast('Unable to resize window: ' + error.toString());
       }));

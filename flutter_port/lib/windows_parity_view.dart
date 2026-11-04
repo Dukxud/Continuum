@@ -229,9 +229,9 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
     final runs=state.upcoming;
     final hasRuns=runs.isNotEmpty;
     final extraRows=math.min(runs.length,4);
-    final gridHeight=hasRuns?math.max(90.0,extraRows*40.0+35):0.0;
+    final gridHeight=hasRuns?35.0+extraRows*40.0:0.0;
     final actionY=hasRuns?536+gridHeight+13:490.0;
-    final totalHeight=hasRuns?actionY+77:566.0;
+    final totalHeight=hasRuns?actionY+76:566.0;
     final modelOptions=state.models.map((m)=>DropdownMenuItem<String>(
       value:stringField(m,'id'),
       child:Text(stringField(m,'name').isEmpty?stringField(m,'id'):stringField(m,'name'),

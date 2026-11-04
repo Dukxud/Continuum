@@ -7,17 +7,18 @@ import 'package:codex_resume_flutter/main.dart';
 class SpyWindowHost implements SchedulerWindowHost {
   final List<String> modes = [];
   @override
-  Future<void> setMode({required bool compact, required bool hasRun,
+  Future<void> setMode({required bool compact, required int upcomingRunCount,
       required int quotaWindowCount}) async {
     modes.add((compact ? 'compact' : 'standard') +
-      (hasRun ? ':run' : ':empty') + ':quota:$quotaWindowCount');
+      (upcomingRunCount > 0 ? ':run' : ':empty') +
+      ':quota:$quotaWindowCount');
   }
   @override
   Future<void> showDialogWindow({required bool history}) async {}
   @override
-  Future<void> restoreMode({required bool compact, required bool hasRun,
+  Future<void> restoreMode({required bool compact, required int upcomingRunCount,
       required int quotaWindowCount}) async {
-    await setMode(compact: compact, hasRun: hasRun,
+    await setMode(compact: compact, upcomingRunCount: upcomingRunCount,
       quotaWindowCount: quotaWindowCount);
   }
 }

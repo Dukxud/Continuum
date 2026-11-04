@@ -1,13 +1,14 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 /// Platform window integration is isolated from the Flutter UI and worker.
 /// Widget tests inject no host; no native window operations run in tests.
 abstract class SchedulerWindowHost {
-  Future<void> setMode({required bool compact, required bool hasRun,
+  Future<void> setMode({required bool compact, required int upcomingRunCount,
     required int quotaWindowCount});
   Future<void> showDialogWindow({required bool history});
-  Future<void> restoreMode({required bool compact, required bool hasRun,
+  Future<void> restoreMode({required bool compact, required int upcomingRunCount,
     required int quotaWindowCount});
 }
 
@@ -32,11 +33,12 @@ class DesktopWindowHost implements SchedulerWindowHost {
   }
 
   @override
-  Future<void> setMode({required bool compact, required bool hasRun,
+  Future<void> setMode({required bool compact, required int upcomingRunCount,
     required int quotaWindowCount}) async {
     if (await windowManager.isMaximized()) {
       await windowManager.unmaximize();
     }
+    final hasRun = upcomingRunCount > 0;
     if (compact) {
       if (!_lastCompact) _fullSize = await windowManager.getSize();
       final count = quotaWindowCount.clamp(0, 2);
@@ -47,8 +49,13 @@ class DesktopWindowHost implements SchedulerWindowHost {
       await windowManager.setMinimumSize(const Size(480, 195));
       await windowManager.setSize(Size(482, clientHeight.toDouble() + 43));
     } else {
-      await windowManager.setSize(_fullSize);
+      final visibleRows = upcomingRunCount.clamp(0, 4);
+      // WinForms grows the full window to expose its four-row scrolling grid.
+      final contentHeight = visibleRows == 0
+        ? 566.0 : 660.0 + 40.0 * visibleRows;
       await windowManager.setMinimumSize(const Size(940, 590));
+      await windowManager.setSize(Size(_fullSize.width,
+        math.max(_fullSize.height, contentHeight + 44)));
     }
     _lastCompact = compact;
   }
@@ -65,9 +72,9 @@ class DesktopWindowHost implements SchedulerWindowHost {
   }
 
   @override
-  Future<void> restoreMode({required bool compact, required bool hasRun,
+  Future<void> restoreMode({required bool compact, required int upcomingRunCount,
     required int quotaWindowCount}) async {
-    await setMode(compact: compact, hasRun: hasRun,
+    await setMode(compact: compact, upcomingRunCount: upcomingRunCount,
       quotaWindowCount: quotaWindowCount);
   }
 }
