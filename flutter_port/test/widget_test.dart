@@ -97,7 +97,7 @@ class AutoRepositoryAdapter extends StubAdapter {
 }
 
 void main() {
-  testWidgets('v1.16 desktop geometry retains original row order and coordinates', (tester) async {
+  testWidgets('model and unified schedule group retain full-mode geometry', (tester) async {
     tester.view.physicalSize = const Size(940, 750);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() { tester.view.resetPhysicalSize(); tester.view.resetDevicePixelRatio(); });
@@ -112,10 +112,18 @@ void main() {
     expect(conversation.dx, closeTo(18, 4));
     expect(conversation.dy, closeTo(68, 8));
     expect(repository.dy, closeTo(115, 8));
-    expect(runtime.dy, closeTo(161, 8));
-    expect(model.dy, closeTo(206, 8));
+    expect(model.dy, closeTo(161, 8));
+    expect(runtime.dy, closeTo(206, 8));
     expect(instruction.dy, closeTo(250, 8));
     expect(usage.dy, closeTo(328, 8));
+    // Model follows the repository. Run time and instruction are a single
+    // scheduling area, with its action immediately below the instruction.
+    expect(model.dy, greaterThan(repository.dy));
+    expect(runtime.dy, greaterThan(model.dy));
+    expect(instruction.dy, greaterThan(runtime.dy));
+    final scheduleTop = tester.getTopLeft(find.text('Schedule once'));
+    expect(scheduleTop.dy, greaterThan(instruction.dy));
+    expect(scheduleTop.dy, lessThan(325));
     expect(find.text('Browse'), findsOneWidget);
     expect(find.byType(WindowsCalendarGlyph), findsOneWidget);
     expect(find.byType(WindowsCaret), findsWidgets);
