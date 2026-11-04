@@ -428,11 +428,12 @@ void main() {
       roots: [null, r'C:\recovered\project']);
     final controller = SchedulerController(fake);
     await controller.start();
-    await controller.selectSession(controller.sessionId);
+    await Future<void>.delayed(Duration.zero);
+    expect(fake.lookups, 1);
     expect(controller.repo, isEmpty);
     expect(controller.repositoryWarning, contains('unresolved'));
     await controller.load();
-    await controller.selectSession(controller.sessionId);
+    await Future<void>.delayed(Duration.zero);
     expect(fake.lookups, 2);
     expect(controller.repo, r'C:\recovered\project');
     controller.dispose();
