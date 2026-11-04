@@ -9,7 +9,7 @@ This is a requirements-to-implementation audit, not an assertion that native or 
 | ID | WinForms source of truth and required behavior | Flutter implementation | Verdict / acceptance check |
 |---|---|---|---|
 | P01 | `CodexData.Get-RecentCliSessions`: only resumable `cli`/`exec` sessions, not IDE/subagent | Original reader via `windows_bridge load` | N. Recheck restored and fresh sessions on native device |
-| P02 | `CodexData.Get-ReportedThreadDirectory` and `Find-SessionRepository`: authoritative `thread/read`, session-local fallbacks, conflicting worktrees explicit, Browse override | Original resolution via `select`; `SchedulerController.selectSession` selects only if current selection still matches, respects manual edit | E; isolated BP155 was detected and used. New `Nathan` conversation is different; inspect that conversation's recorded CWD before claiming a regression |
+| P02 | `CodexUiSelection.Apply-SessionList` immediately requests `Find-SessionRepository` via `CodexData.Get-ReportedThreadDirectory` for the selected saved/first CLI conversation, unless preserving an explicitly selected root; repeat on later full refresh while unresolved | Flutter bridge already reused the exact WinForms resolution but Flutter controller called `select` **only after the user changed the dropdown**, not after startup restoration or regular refresh; it also failed to select the newest session when a saved ID disappeared | **F: CONFIRMED root-cause divergence.** Restore automatic coalesced lookup on startup/refresh, select first existing conversation if saved ID disappeared, clear stale associated root, protect user edits (including clear-to-empty) and ignore stale async lookup results. Add regressions and native acceptance |
 | P03 | `CodexUiSelection`: one active model and supported non-Ultra efforts from live catalog | `readUsage`, `selectModel`, `efforts`, Windows preflight | E / tests; native catalog/effort changes still need exercise |
 | P04 | Canonical workspace hash required at scheduling and worker start; never email-only | Original `CodexUsage.js`/worker, live verified hash preflight | N. Native account-switch/unknown-identity rejection remains O |
 | P05 | `Update-SchedulingEligibility`: fresh (120s) model-matched quota/catalog and identity; unavailable/stale snapshot disables scheduling | `canSchedule` requires model, effort, fresh matching snapshot, verified hash | E by source review; negative tests must cover stale/invalid snapshot |
@@ -34,6 +34,36 @@ This is a requirements-to-implementation audit, not an assertion that native or 
 | P24 | Windows-only signing/security contract; GUI cannot substitute arbitrary worker code from user checkout | Earlier adapter searched current working directory **before** bundled executable parents | F: packaged executable path now authoritative, test synthetic conflicting workdirs; native O |
 | P25 | Native Windows task backend; Flutter UI portability does not imply cross-platform scheduling | Adapter requires Windows and PowerShell 7; no Linux/macOS scheduler | E. No cross-platform capability claims |
 | P26 | Original v1.16 must remain available, and PR merge/release require authorization | Draft PR only; CI packages private unsigned preview | E; never merge/publish automatically |
+
+## November 4 repository-discovery root cause
+
+**WinForms vs Flutter source diff:** `CodexUiSelection.Apply-SessionList` invokes
+`Request-SelectionLookup` whenever a selected conversation has no preserved
+root; the asynchronous `CodexUiRefresh` reader obtains the Codex App Server
+reported CWD and passes the selected session through `Find-SessionRepository`.
+Flutter's `windows_bridge.ps1` already exposed these **same functions** under
+`select`, but `SchedulerController.load` populated the selected session
+from preferences without ever calling `select`. The only caller was the
+dropdown's `onChanged`. Thus the bridge was functional (BP155 proved it),
+but startup and refresh never requested discovery. When the saved session ID
+vanished, Flutter also left `sessionId=null` instead of choosing the first
+available session as WinForms does, and could retain that vanished session's
+saved repository root.
+
+**Corrected controller behavior:** automatically resolve a selected session
+with no preserved repository on initial load and later full refresh, coalescing
+duplicate in-flight requests. Preserve the saved root only when its saved
+session still exists. Preserve explicit manual repository edits even if the
+user clears the field while lookup is underway; reject stale responses from
+earlier selections. Synchronize the displayed textbox after asynchronous
+changes so an old root never remains visually attached to a new session.
+
+**Honest limit:** the screenshot's selected `Nathan | 11/04 11:27` session
+is **not** the previously tested `BP155-Flutter-QA` session. If the original
+resolver receives no verifiable Git evidence for `Nathan`, both UIs must
+leave its root unresolved; guessing the previous checkout would be a safety
+regression. Final native acceptance must test both a known Git-backed CLI
+conversation and the specific `Nathan` conversation separately.
 
 ## High-impact corrections in this pass
 
