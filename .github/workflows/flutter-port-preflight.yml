@@ -7,6 +7,7 @@ on:
       - 'flutter_port/**'
       - 'tests/flutter-port-*.test.ps1'
       - 'tests/quota-continuation.test.ps1'
+      - 'tests/quota-continuation-lifecycle.test.ps1'
       - 'tests/codex-worker-integration.test.ps1'
       - 'CodexQuotaContinuation.ps1'
       - 'CodexRunEngine.ps1'
@@ -60,6 +61,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Quota continuation acceptance failed.' }
           pwsh -NoProfile -STA -File ./tests/codex-worker-integration.test.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Pinned worker integration failed.' }
+          pwsh -NoProfile -STA -File ./tests/quota-continuation-lifecycle.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Quota lifecycle integration failed.' }
 
       - name: Generate Windows runner
         shell: pwsh
