@@ -106,8 +106,8 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
         fontWeight:bold?FontWeight.bold:FontWeight.normal)));
 
   Widget _textbox(TextEditingController text, ValueChanged<String> change,
-      {String? hint}) => TextField(
-    controller:text,
+      {String? hint, Key? key}) => TextField(
+    key:key,controller:text,
     onChanged:change,
     maxLines:1,
     style:const TextStyle(fontFamily:'Segoe UI',fontSize:13,color:_legacyInk),
@@ -281,7 +281,8 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
             maxLines:1,overflow:TextOverflow.ellipsis))).toList(),
         onChanged:(id){repository.clear();state.selectSession(id);})),
       _at(18,108,132,30,_label('Repository root')),
-      _at(155,108,605,30,_textbox(repository,(v)=>state.edit(repository:v))),
+      _at(155,108,605,30,_textbox(repository,
+        (v)=>state.edit(repository:v),key:const Key('repository-root-field'))),
       _at(773,106,125,31,_LegacyButton('Browse',_browseRepo,color:const Color(0xff168e87))),
       _at(18,154,64,30,_label('Model')),
       _at(90,154,258,30,_combo<String>(name:'model',
