@@ -6,10 +6,14 @@ and premultiplied alpha), with an original-pixel fallback. It preserves the
 v1.16 barAppearance settings, four independent colors, custom RGB choices,
 liquid material and studio lighting, optical strength/speed, full/compact
 window resizing, completed/history details and the existing secured worker.
+The appearance dialog separates Colors and Optics into two visible tabs.
+Each tab previews changes immediately; edits persist automatically, and
+Done closes the editor without an additional Save action.
 
 **Do not merge or publish from this branch.** Code and test coverage have been
-authored, but compiling the revised shader and validating all behavior on
-BLACK-PUDDLE are still required. See docs/FLUTTER-PARITY.md.
+authored and passed in earlier builds, but renewed native visual, sizing,
+accessibility and real scheduling/cancellation acceptance on BLACK-PUDDLE
+are required for this revision. See docs/FLUTTER-PARITY.md.
 
 ## Run (Windows review)
 
