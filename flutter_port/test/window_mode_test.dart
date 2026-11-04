@@ -60,15 +60,15 @@ class WindowAdapter implements SchedulerAdapter {
 void main() {
   test('full and compact modes always fit content, regardless of prior size', () {
     expect(schedulerWindowSize(compact: false,
-      upcomingRunCount: 0, quotaWindowCount: 2), const Size(952, 610));
+      upcomingRunCount: 0, quotaWindowCount: 2), const Size(1240, 850));
     expect(schedulerWindowSize(compact: false,
-      upcomingRunCount: 1, quotaWindowCount: 2), const Size(952, 744));
+      upcomingRunCount: 1, quotaWindowCount: 2), const Size(1240, 850));
     expect(schedulerWindowSize(compact: true,
-      upcomingRunCount: 0, quotaWindowCount: 2), const Size(482, 434));
+      upcomingRunCount: 0, quotaWindowCount: 2), const Size(540, 535));
     expect(schedulerWindowSize(compact: true,
-      upcomingRunCount: 0, quotaWindowCount: 0), const Size(482, 209));
+      upcomingRunCount: 0, quotaWindowCount: 0), const Size(540, 535));
     expect(schedulerWindowSize(compact: true,
-      upcomingRunCount: 1, quotaWindowCount: 2), const Size(482, 615));
+      upcomingRunCount: 1, quotaWindowCount: 2), const Size(540, 685));
   });
 
   test('resizes are serialized and one failure does not block later modes', () async {
@@ -93,9 +93,8 @@ void main() {
   });
 
   testWidgets('compact mode changes the host window size, not only controls', (tester) async {
-    // The real noncompact desktop window is at least 940px wide; Flutter's
-    // default 800px test viewport hides the original right-side control.
-    tester.view.physicalSize = const Size(940, 750);
+    // The native workbench is wide; render it at the actual desktop size.
+    tester.view.physicalSize = const Size(1240, 850);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() { tester.view.resetPhysicalSize(); tester.view.resetDevicePixelRatio(); });
     final host = SpyWindowHost();
@@ -104,11 +103,11 @@ void main() {
       windowHost: host)));
     await tester.pump(const Duration(milliseconds: 160));
     expect(host.modes, contains('standard:empty:quota:0'));
-    await tester.tap(find.text('Compact mode: OFF'));
+    await tester.tap(find.text('Monitor'));
     await tester.pump(const Duration(milliseconds: 160));
     expect(host.modes, contains('compact:empty:quota:0'));
     expect(find.text('Schedule once'), findsNothing);
-    expect(find.text('Usage limits unavailable'), findsOneWidget);
+    expect(find.text('On watch.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -119,9 +118,9 @@ void main() {
       windowHost: host)));
     await tester.pump(const Duration(milliseconds: 200));
     expect(host.modes, contains('compact:empty:quota:2'));
-    expect(find.text('Usage limits'), findsOneWidget);
-    expect(find.text('5-hour'), findsOneWidget);
-    expect(find.text('Weekly'), findsOneWidget);
+    expect(find.text('CAPACITY'), findsOneWidget);
+    expect(find.text('5-HOUR'), findsOneWidget);
+    expect(find.text('WEEKLY'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
