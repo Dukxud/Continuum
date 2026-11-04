@@ -99,7 +99,7 @@ extension _DashboardMonitor on _SchedulerHomeState {
       padding: const EdgeInsets.all(17),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Icon(Icons.orbit_rounded,
+          const Icon(Icons.track_changes_rounded,
             color: DeckColor.iris, size: 20),
           const SizedBox(width: 10),
           const Expanded(child: Text('IN FLIGHT',
