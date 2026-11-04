@@ -81,7 +81,7 @@ try {
         throw "Non-repository CLI selection failed rather than remaining unresolved: $($otherAnswer.error)"
     }
     if($null -ne $otherAnswer.result.found){
-        throw 'Unrelated CLI session must not inherit another session\'s Git repository.'
+        throw "Unrelated CLI session must not inherit another session's Git repository."
     }
     Write-Host 'Flutter real bridge correctly leaves a non-Git CLI session unresolved PASS.' -ForegroundColor Green
 } finally {
