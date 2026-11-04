@@ -79,7 +79,9 @@ void main() {
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('Optics'));
-    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump(); // Begin the TabBarView transition.
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(DefaultTabController.of(tester.element(find.byType(TabBar))).index, 1);
     expect(find.text('Liquid material'), findsOneWidget);
     expect(find.text('Studio lighting'), findsOneWidget);
     expect(find.text('Reflection strength'), findsOneWidget);
