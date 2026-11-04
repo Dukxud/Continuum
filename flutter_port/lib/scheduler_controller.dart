@@ -10,6 +10,8 @@ class SchedulerController extends ChangeNotifier {
   final SchedulerAdapter adapter;
 
   List<Map<String, dynamic>> sessions = [];
+  final Map<String, String> _sessionLabels = {};
+  Future<void>? _sessionLabelsRequest;
   List<Map<String, dynamic>> runs = [];
   List<Map<String, dynamic>> history = [];
   List<Map<String, dynamic>> models = [];
@@ -122,7 +124,12 @@ class SchedulerController extends ChangeNotifier {
     try {
       final data = await adapter.call('load');
       if (_disposed) return;
+      // Keep enriched labels while loading a new essential snapshot.
       sessions = recordList(field(data, 'sessions'));
+      for (final session in sessions) {
+        final label = _sessionLabels[stringField(session, 'Id')];
+        if (label != null) session['Display'] = label;
+      }
       runs = recordList(field(data, 'pending'));
       history = recordList(field(data, 'history'));
       logDirectory = stringField(data, 'logDirectory');
@@ -170,11 +177,52 @@ class SchedulerController extends ChangeNotifier {
       // lookups; never block quota refresh or discard a manually chosen root.
       unawaited(_ensureRepositoryLookup());
       await readUsage();
+      unawaited(_refreshSessionLabels());
     } catch (e) {
       error = 'Refresh failed: $e';
       _changed();
     } finally {
       _loading = false;
+    }
+  }
+
+  // Decorative metadata is independent of startup, scheduling and quota.
+  // A busy or malformed Codex rollout must never blank the workbench.
+  Future<void> _refreshSessionLabels() async {
+    if (_disposed || sessions.isEmpty || _sessionLabelsRequest != null) return;
+    final request = _readSessionLabels();
+    _sessionLabelsRequest = request;
+    try {
+      await request;
+    } finally {
+      if (identical(_sessionLabelsRequest, request)) _sessionLabelsRequest = null;
+    }
+  }
+
+  Future<void> _readSessionLabels() async {
+    try {
+      final data = await adapter.call('labels');
+      if (_disposed) return;
+      final labels = <String, String>{};
+      for (final choice in recordList(field(data, 'sessions'))) {
+        final id = stringField(choice, 'Id');
+        final display = stringField(choice, 'Display');
+        if (id.isNotEmpty && display.isNotEmpty) labels[id] = display;
+      }
+      var changed = false;
+      for (final session in sessions) {
+        final id = stringField(session, 'Id');
+        final display = labels[id];
+        if (display == null) continue;
+        _sessionLabels[id] = display;
+        if (stringField(session, 'Display') != display) {
+          session['Display'] = display;
+          changed = true;
+        }
+      }
+      if (changed) _changed();
+    } catch (_) {
+      // Retain original labels. Never turn optional captions into load errors.
     }
   }
 
