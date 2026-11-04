@@ -37,6 +37,7 @@ function Get-RecentCliSessions {
                     File = [string]$item.FullName
                     Display = ('{0} | {1:MM/dd HH:mm} | {2}' -f $name,$item.LastWriteTime,$meta.id)
                 }
+                if ($sessions.Count -ge 30) { break }
             } catch { continue }
         }
     }
