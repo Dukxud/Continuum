@@ -193,8 +193,12 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
           maxLines:1,overflow:TextOverflow.ellipsis,
           style:const TextStyle(fontFamily:'Segoe UI',color:_legacyInk,fontSize:15,fontWeight:FontWeight.bold)))),
       _at(12,44,400,17,AeroLiquidBar(amount:remaining,appearance:state.appearance,kind:kind)),
-      _at(12,72,400,24,_label(reset==null?'Reset time unavailable':
-          'Resets '+_dateLabel(reset),fontSize:12,color:const Color(0xff666666))),
+      _at(12,72,400,24,Tooltip(
+        message:window==null && state.error != null ? state.error! : '',
+        child:_label(window==null && state.error?.startsWith('Usage unavailable:')==true
+          ? 'Usage unavailable; retrying automatically'
+          : reset==null?'Reset time unavailable':'Resets '+_dateLabel(reset),
+          fontSize:12,color:const Color(0xff666666)))),
     ];
     return SizedBox(width:428,height:108,child:Stack(children:body));
   }
@@ -295,7 +299,9 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
         _at(18,499,400,30,_label('Upcoming runs (${runs.length})',fontSize:16,bold:true)),
         _at(18,536,880,gridHeight,_legacyRunGrid(runs)),
         _at(18,actionY,154,31,_LegacyButton('Cancel selected',
-          selectedRun!=null && !state.busy?cancelSelected:null,color:const Color(0xffb86265))),
+          !state.busy && runs.any((r)=>stringField(r,'Name')==selectedRun &&
+            stringField(r,'Status')=='Scheduled') ? cancelSelected : null,
+          color:const Color(0xffb86265))),
       ],
       _at(hasRuns?185:18,actionY,154,31,
         _LegacyButton('Open logs folder',openLogs,color:const Color(0xff52749b))),
@@ -364,24 +370,29 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
         style:const TextStyle(fontSize:12)))));
 
   Widget _parityCountdown(Map<String,dynamic> run) {
-    final status=stringField(run,'Status');
-    final due=dateField(run,'When');
-    final created=field(run,'CreatedAt');
-    final working=status=='Running';
-    double? percent;
-    if(!working&&due!=null&&created is num){
-      final start=DateTime.fromMillisecondsSinceEpoch(created.toInt()*1000);
-      final total=due.difference(start).inMilliseconds;
-      if(total>0)percent=100*DateTime.now().difference(start).inMilliseconds/total;
-    }
-    return Padding(padding:const EdgeInsets.symmetric(horizontal:6),
-      child:Row(children:[
-        SizedBox(width:64,child:Text(working?'Running':countdown(due),
-          style:const TextStyle(fontSize:11,fontWeight:FontWeight.bold))),
-        const SizedBox(width:5),
-        Expanded(child:AeroLiquidBar(amount:percent,working:working,
-          kind:working?'working':'time',appearance:controller!.appearance,height:15)),
-      ]));
+    final working = stringField(run,'Status') == 'Running';
+    final due = dateField(run,'When');
+    final label = working ? 'Running' : countdown(due);
+    final percent = working ? null :
+      runElapsedPercent(due,field(run,'CreatedAt'))?.toDouble();
+    const style = TextStyle(fontSize:11,fontWeight:FontWeight.bold);
+    return LayoutBuilder(builder: (context, constraints) {
+      final painter = TextPainter(
+        text: TextSpan(text:label,style:style),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout();
+      final labelWidth = (painter.width + 8)
+          .clamp(24.0, constraints.maxWidth * .52);
+      painter.dispose();
+      return Padding(padding:const EdgeInsets.symmetric(horizontal:6),
+        child:Row(children:[
+          SizedBox(width:labelWidth,child:Text(label,maxLines:1,style:style)),
+          const SizedBox(width:5),
+          Expanded(child:AeroLiquidBar(amount:percent,working:working,
+            kind:working?'working':'time',appearance:controller!.appearance,height:15)),
+        ]));
+    });
   }
 
   Widget _compactParityView() {
@@ -402,7 +413,10 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
       ],
       if(windows.isEmpty)
         _at(18,top,428,28,_label(state.readingUsage
-          ? 'Reading usage limits...' : 'Usage limits unavailable',
+          ? 'Reading usage limits...' :
+          state.error?.startsWith('Usage unavailable:')==true
+            ? 'Usage unavailable; retrying automatically'
+            : 'Usage limits unavailable',
           fontSize:13,color:const Color(0xff666666))),
       if(windows.isNotEmpty)...[
         _at(18,top,202,28,_label('Usage limits',fontSize:16,bold:true)),
@@ -428,7 +442,8 @@ extension _LegacySchedulerVisuals on _SchedulerHomeState {
     _at(14,9,220,28,_label(
       stringField(run,'Repo').split(RegExp(r'[\\/]')).last,fontSize:15,bold:true)),
     _at(252,9,159,28,Align(alignment:Alignment.centerRight,
-      child:Text(countdown(dateField(run,'When')),
+      child:Text(stringField(run,'Status')=='Running'
+        ? 'Running' : countdown(dateField(run,'When')),
         style:const TextStyle(color:Color(0xff168dff),fontSize:14,fontWeight:FontWeight.bold)))),
     _at(14,42,395,24,_label(stringField(run,'Description'),fontSize:12)),
     _at(14,70,395,23,_label('Scheduled '+_dateLabel(
