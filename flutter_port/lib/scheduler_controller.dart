@@ -383,7 +383,7 @@ class SchedulerController extends ChangeNotifier {
       'draft': {
         'sessionId': sessionId ?? '', 'repo': repo, 'model': model ?? '',
         'effort': effort ?? '', 'access': access, 'message': message,
-        'runAt': localIsoMinute(runAt),
+        'runAt': localIsoSecond(runAt),
       },
     };
     _saveTail = _saveTail.then((_) async {
@@ -410,7 +410,7 @@ class SchedulerController extends ChangeNotifier {
     try {
       final response = await adapter.call('schedule', {
         'sessionId': sessionId, 'repo': repo, 'model': model, 'effort': effort,
-        'access': access, 'message': message.trim(), 'runAt': localIsoMinute(runAt),
+        'access': access, 'message': message.trim(), 'runAt': localIsoSecond(runAt),
         'confirmUnrestricted': confirmUnrestricted, 'confirmOverlap': confirmOverlap,
       });
       // Once Windows has registered the task, never report a later preferences
