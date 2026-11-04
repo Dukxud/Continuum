@@ -10,19 +10,19 @@ abstract class SchedulerWindowHost {
 }
 
 class DesktopWindowHost implements SchedulerWindowHost {
-  Size _fullSize = const Size(1000, 800);
+  Size _fullSize = const Size(952, 610);
   bool _lastCompact = false;
 
   Future<void> initialize() async {
     await windowManager.ensureInitialized();
     await windowManager.waitUntilReadyToShow(
       const WindowOptions(
-        size: Size(1000, 800),
+        size: Size(952, 610),
         center: true,
       ),
       () async {
-        await windowManager.setMinimumSize(const Size(800, 570));
-        await windowManager.setTitle('Codex Resume Scheduler — Flutter review');
+        await windowManager.setMinimumSize(const Size(940, 590));
+        await windowManager.setTitle('Codex Resume Scheduler v1.16.0 — Flutter review');
         await windowManager.show();
         await windowManager.focus();
       },
@@ -36,11 +36,11 @@ class DesktopWindowHost implements SchedulerWindowHost {
     }
     if (compact) {
       if (!_lastCompact) _fullSize = await windowManager.getSize();
-      await windowManager.setMinimumSize(const Size(475, 340));
-      await windowManager.setSize(Size(515, hasRun ? 555 : 370));
+      await windowManager.setMinimumSize(const Size(480, 380));
+      await windowManager.setSize(Size(482, hasRun ? 615 : 434));
     } else {
       await windowManager.setSize(_fullSize);
-      await windowManager.setMinimumSize(const Size(800, 570));
+      await windowManager.setMinimumSize(const Size(940, 590));
     }
     _lastCompact = compact;
   }
@@ -50,7 +50,7 @@ class DesktopWindowHost implements SchedulerWindowHost {
     if (!_lastCompact) return;
     // Flutter dialogs live in the same window; expand it temporarily so all
     // appearance and history controls remain accessible in compact mode.
-    await windowManager.setMinimumSize(const Size(475, 340));
+    await windowManager.setMinimumSize(const Size(480, 380));
     await windowManager.setSize(history
       ? const Size(1040, 780)
       : const Size(690, 830));
