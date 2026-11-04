@@ -142,7 +142,7 @@ class SchedulerController extends ChangeNotifier {
   /// WinForms refreshes immediately on focus after 15 seconds away.
   /// The periodic refresh remains the fallback while the window is idle.
   Future<void> refreshOnFocus([DateTime? now]) async {
-    if (!ready || _loading || _disposed) return;
+    if (_loading || _disposed) return;
     final current = now ?? DateTime.now();
     if (_lastFullRefresh == null ||
         current.difference(_lastFullRefresh!) >= const Duration(seconds: 15)) {
