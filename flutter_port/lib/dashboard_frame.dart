@@ -7,7 +7,7 @@ extension _DashboardFrame on _SchedulerHomeState {
     final state = controller!;
     return DeckAtmosphere(
       child: LayoutBuilder(builder: (context, bounds) {
-        final width = math.max(bounds.maxWidth, 1110.0);
+        final width = math.max(bounds.maxWidth, 1240.0);
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: SizedBox(width: width,
@@ -16,13 +16,13 @@ extension _DashboardFrame on _SchedulerHomeState {
               child: Column(children: [
                 SizedBox(height: 72, child: _deckHeader(state)),
                 const SizedBox(height: 17),
-                SizedBox(height: 646, child: Row(
+                SizedBox(height: 660, child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(flex: 7, child: Column(children: [
                       SizedBox(height: 320, child: _sourceCard(state)),
                       const SizedBox(height: 16),
-                      SizedBox(height: 310, child: _launchCard(state)),
+                      SizedBox(height: 324, child: _launchCard(state)),
                     ])),
                     const SizedBox(width: 18),
                     Expanded(flex: 5, child: _monitorColumn(state)),
