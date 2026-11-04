@@ -106,6 +106,10 @@ try {
        $outsideSession[0].Display.Contains($otherId)){
         throw 'Full UUID must not crowd out session identity in the chooser.'
     }
+    $displayStamp=(Get-Item -LiteralPath (Join-Path $sessions ('rollout-'+$sessionId+'.jsonl'))).LastWriteTime.ToString('d MMM HH:mm',[Globalization.CultureInfo]::InvariantCulture)
+    if(-not $gitSession[0].Display.Contains(" | $displayStamp | ")){
+        throw 'Session chooser date must use day then abbreviated month.'
+    }
     Write-Host 'Flutter conversation labels clearly distinguish Git-backed and outside-Git sessions PASS.' -ForegroundColor Green
 
 } finally {
