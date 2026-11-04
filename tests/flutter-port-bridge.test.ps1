@@ -133,7 +133,7 @@ function Assert-ScheduleRejected {
         throw "Schedule preflight '$RunAt' expected '$Expected', got '$($answer.error)' (exit $exit)"
     }
 }
-$future=(Get-Date).AddDays(2).Date.AddHours(13).ToString(
+$future=(Get-Date).AddDays(2).Date.AddHours(13).AddSeconds(37).ToString(
     'yyyy-MM-ddTHH:mm:ss',[Globalization.CultureInfo]::InvariantCulture)
 Assert-ScheduleRejected -RunAt $future -Expected 'Selected CLI session not verified.'
 Assert-ScheduleRejected -RunAt ($future+'Z') -Expected 'Invalid local run time.'
