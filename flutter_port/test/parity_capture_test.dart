@@ -163,7 +163,7 @@ void main() {
         key: const Key('capture'),
         child: AeroAppearanceEditor(
           initial: const AeroAppearance(aero: false),
-          onPreview: (_) {},
+          onChanged: (_) {},
         ),
       )),
     ));
