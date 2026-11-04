@@ -35,6 +35,7 @@ class SchedulerApp extends StatelessWidget {
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       useMaterial3: true,
+      fontFamily: 'Segoe UI',
       scaffoldBackgroundColor: const Color(0xfff5f7fb),
       colorScheme: ColorScheme.fromSeed(seedColor: accent),
       inputDecorationTheme: InputDecorationTheme(

@@ -85,17 +85,24 @@ class _SnapshotAdapter implements SchedulerAdapter {
   }
 }
 
-Future<void> _loadSegoeUiForWindows() async {
-  final font = File(r'C:\Windows\Fonts\segoeui.ttf');
-  if (!font.existsSync()) return;
-  final bytes = await font.readAsBytes();
-  final loader = FontLoader('Segoe UI')
-    ..addFont(Future.value(ByteData.sublistView(Uint8List.fromList(bytes))));
-  await loader.load();
+Future<void> _loadWindowsTestFonts() async {
+  Future<void> load(String family, File file) async {
+    if (!file.existsSync()) return;
+    final bytes = await file.readAsBytes();
+    final loader = FontLoader(family)
+      ..addFont(Future.value(ByteData.sublistView(Uint8List.fromList(bytes))));
+    await loader.load();
+  }
+  await load('Segoe UI', File(r'C:\Windows\Fonts\segoeui.ttf'));
+  final sdk = Platform.environment['FLUTTER_ROOT'];
+  if (sdk != null && sdk.isNotEmpty) {
+    await load('MaterialIcons',
+      File('$sdk/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf'));
+  }
 }
 
 void main() {
-  setUpAll(_loadSegoeUiForWindows);
+  setUpAll(_loadWindowsTestFonts);
 
   Future<void> capture(WidgetTester tester, {
     required String name,
@@ -110,6 +117,7 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
     await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(fontFamily: 'Segoe UI'),
       home: RepaintBoundary(
         key: const Key('capture'),
         child: SchedulerHome(adapter: _SnapshotAdapter(
@@ -150,6 +158,7 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
     await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(fontFamily: 'Segoe UI'),
       home: Scaffold(body: RepaintBoundary(
         key: const Key('capture'),
         child: AeroAppearanceEditor(
