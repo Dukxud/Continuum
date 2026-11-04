@@ -42,7 +42,8 @@ try {
                 }else{'Outside Git: '+$folder}
                 $when=(Get-Item -LiteralPath $session.File -ErrorAction Stop).LastWriteTime
                 $id=[string]$session.Id
-                $session.Display=('{0} | {1:MM/dd HH:mm} | {2}' -f $title,$when,$id.Substring($id.Length-8))
+                $date=$when.ToString('d MMM HH:mm',[Globalization.CultureInfo]::InvariantCulture)
+                $session.Display=('{0} | {1} | {2}' -f $title,$date,$id.Substring($id.Length-8))
             }catch{
                 # A disappearing/invalid session file must not hide the choice.
                 # Its original reader label remains usable.
