@@ -166,7 +166,7 @@ class StartupRepositoryScheduler extends FakeScheduler {
     if (action == 'select') {
       lookups++;
       if (deferredSelection != null) return deferredSelection!.future;
-      final index = (lookups - 1).clamp(0, roots.length - 1);
+      final index = (lookups - 1).clamp(0, roots.length - 1).toInt();
       final root = roots[index];
       return {
         'sessionId': payload['sessionId'],
