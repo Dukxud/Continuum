@@ -340,12 +340,51 @@ void main() {
       home: SchedulerHome(adapter: StubAdapter()),
     ));
     await tester.pump(const Duration(milliseconds: 150));
-    await tester.tap(find.byKey(const Key('selected-run-time-label')));
+    await tester.tap(find.byKey(const Key('scheduled-date-picker')));
     await tester.pump(const Duration(milliseconds: 350));
     final calendar = find.byType(DatePickerDialog);
     expect(calendar, findsOneWidget);
     expect(MaterialLocalizations.of(tester.element(calendar)).firstDayOfWeekIndex,
       1, reason: 'Calendar grid must start on Monday, not Sunday');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('time segment opens keyboard input, edits hour and minute, and preserves seconds',
+      (tester) async {
+    tester.view.physicalSize = const Size(1240, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(
+      home: SchedulerHome(adapter: StubAdapter())));
+    await tester.pump(const Duration(milliseconds: 150));
+    final home = tester.state(find.byType(SchedulerHome)) as dynamic;
+    final before = home.controller.runAt as DateTime;
+    await tester.tap(find.byKey(const Key('scheduled-time-picker')));
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsNothing,
+      reason: 'Editing the time must not open the date picker first.');
+    final dialog = find.byType(TimePickerDialog);
+    expect(dialog, findsOneWidget);
+    expect(tester.widget<TimePickerDialog>(dialog).initialEntryMode,
+      TimePickerEntryMode.input);
+    final fields = find.descendant(of: dialog,
+      matching: find.byType(TextFormField));
+    expect(fields, findsNWidgets(2),
+      reason: 'The time dialog must accept typed hours and minutes.');
+    await tester.enterText(fields.at(0), '10');
+    await tester.enterText(fields.at(1), '46');
+    await tester.tap(find.text('OK').last);
+    await tester.pumpAndSettle();
+    final after = home.controller.runAt as DateTime;
+    expect(after.hour, before.hour >= 12 ? 22 : 10);
+    expect(after.minute, 46);
+    expect(after.second, before.second);
+    expect(DateTime(after.year, after.month, after.day),
+      DateTime(before.year, before.month, before.day));
+    expect(find.byKey(const Key('selected-run-time-label')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
