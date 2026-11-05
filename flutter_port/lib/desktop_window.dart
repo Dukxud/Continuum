@@ -29,6 +29,12 @@ abstract class SchedulerWindowHost {
   Future<void> setMode({required bool compact, required int upcomingRunCount,
     required int quotaWindowCount});
   Future<void> showDialogWindow({required bool history});
+
+  // X/Alt+F4 hides the native window before any pending persistence I/O.
+  // The process stays alive only until those settings are safely stored.
+  Future<void> hideForShutdown();
+  Future<void> restoreAfterFailedShutdown();
+  Future<void> finishShutdown();
 }
 
 class DesktopWindowHost implements SchedulerWindowHost {
@@ -79,4 +85,17 @@ class DesktopWindowHost implements SchedulerWindowHost {
         ? const Size(1040, 780)
         : const Size(750, 820));
     });
+
+  // Do not queue hiding behind a slow resize; close should look immediate.
+  @override
+  Future<void> hideForShutdown() => windowManager.hide();
+
+  @override
+  Future<void> restoreAfterFailedShutdown() async {
+    await windowManager.show();
+    await windowManager.focus();
+  }
+
+  @override
+  Future<void> finishShutdown() => windowManager.destroy();
 }
