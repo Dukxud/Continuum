@@ -272,10 +272,11 @@ void main() {
     expect(plus, findsOneWidget);
     expect(tester.getCenter(minus).dx, lessThan(tester.getTopLeft(field).dx));
     expect(tester.getCenter(plus).dx, greaterThan(tester.getTopRight(field).dx));
+    // Compare painted outer surfaces, not InkWell's inset hit region.
     final minusButton = find.ancestor(of: minus,
-      matching: find.byType(InkWell)).first;
+      matching: find.byType(Ink)).first;
     final plusButton = find.ancestor(of: plus,
-      matching: find.byType(InkWell)).first;
+      matching: find.byType(Ink)).first;
     final dateHeight = tester.getSize(field).height;
     expect(dateHeight, greaterThanOrEqualTo(38));
     expect(dateHeight, tester.getSize(minusButton).height);
