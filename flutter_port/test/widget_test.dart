@@ -600,6 +600,10 @@ void main() {
       expect(find.text('Schedule once'), findsOneWidget);
       expect(find.text('CAPACITY / LIVE'), findsOneWidget);
       expect(find.text('1 ACTIVE'), findsOneWidget);
+      // Full workbench scrolls horizontally at narrow widths; reveal More
+      // before using it, as the original History action test did.
+      await tester.ensureVisible(find.byKey(const Key('more-menu')));
+      await tester.pump();
       await tester.tap(find.byKey(const Key('more-menu')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
