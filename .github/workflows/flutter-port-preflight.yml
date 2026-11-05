@@ -57,6 +57,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Session activity naming acceptance failed.' }
           pwsh -NoProfile -STA -File ./tests/session-repository-reference.test.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Session repository auto-discovery failed.' }
+          pwsh -NoProfile -STA -File ./tests/codex-run-activity.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Live Codex activity reader regression failed.' }
           node ./tests/codex-thread-title.test.js
           if ($LASTEXITCODE -ne 0) { throw 'Codex canonical thread-name support failed.' }
 
