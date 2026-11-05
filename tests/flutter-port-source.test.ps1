@@ -8,6 +8,7 @@ $bridge=Join-Path $folder 'windows_bridge.ps1'
 foreach($relative in @(
     'flutter_port/windows_bridge.ps1','CodexRunEngine.ps1',
     'CodexQuotaContinuation.ps1','CodexData.ps1','CodexSessionRepository.ps1',
+    'CodexRunActivity.ps1',
     'CodexResumeScheduler.ps1','components/JobOutcomes/JobOutcomes.psm1'
 )){
     $file=Join-Path $root $relative
