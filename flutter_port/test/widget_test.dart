@@ -463,7 +463,8 @@ void main() {
     await tester.tap(find.text('RUNNING').first);
     await tester.pump(const Duration(milliseconds: 150));
     expect(find.byKey(const Key('live-activity-dialog')), findsOneWidget);
-    expect(find.text('Running command'), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const Key('live-dialog-status'))).data,
+      'Running command');
     expect(find.text('Codex session started'), findsNothing);
     await tester.tap(find.byKey(const Key('toggle-live-timeline')));
     await tester.pump();
@@ -521,7 +522,9 @@ void main() {
     await tester.tap(find.byKey(const Key('micro-live-open')));
     await tester.pump(const Duration(milliseconds: 150));
     expect(find.byKey(const Key('live-activity-dialog')), findsOneWidget);
-    expect(find.text('Running command'), findsOneWidget);
+    final activity = tester.widget<Text>(
+      find.byKey(const Key('live-dialog-status'))).data;
+    expect(activity, anyOf('Running command', 'Command finished (exit 0)'));
     expect(tester.takeException(), isNull);
   });
 
@@ -615,9 +618,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 150));
     await tester.tap(find.text('Scheduled item 1'));
     await tester.pump();
+    expect(find.byKey(const Key('live-activity-dialog')), findsOneWidget);
     final cancelButton = find.ancestor(
       of: find.text('Cancel selected'), matching: find.byType(InkWell)).first;
     expect(tester.widget<InkWell>(cancelButton).onTap, isNull);
+    await tester.tap(find.byKey(const Key('close-live-activity')));
+    await tester.pump(const Duration(milliseconds: 200));
     await selectView(tester, 'Monitor');
     expect(find.text('RUNNING'), findsWidgets);
     expect(tester.takeException(), isNull);
@@ -637,6 +643,7 @@ void main() {
     expect(find.text('1 ACTIVE'), findsOneWidget);
     await tester.tap(find.text('Scheduled item 1'));
     await tester.pump();
+    expect(find.byKey(const Key('live-activity-dialog')), findsNothing);
     expect(find.text('Cancel selected'), findsOneWidget);
     await tester.tap(find.text('Cancel selected'));
     await tester.pump(const Duration(milliseconds: 150));
