@@ -163,6 +163,10 @@ extension _DashboardWorkbench on _SchedulerHomeState {
               letterSpacing: -.6)),
           const SizedBox(height: 10),
           SizedBox(height: 61, child: Row(children: [
+            SizedBox(width: 38, child: DeckAction(
+              label: '−', tone: DeckColor.gold, compact: true,
+              onTap: () => state.edit(time: stepRunAt(state.runAt, -1)))),
+            const SizedBox(width: 8),
             Expanded(child: Material(
               color: const Color(0xff221c36).withValues(alpha: .95),
               borderRadius: BorderRadius.circular(12),
@@ -174,32 +178,24 @@ extension _DashboardWorkbench on _SchedulerHomeState {
                   child: Row(children: [
                     const Icon(Icons.calendar_month_rounded,
                       size: 19, color: DeckColor.gold),
-                    const SizedBox(width: 11),
-                    Expanded(child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(formatDayMonth(date, year: true),
-                          maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: DeckColor.text, fontSize: 18,
-                            fontWeight: FontWeight.w800)),
-                        Text(formatLocalDateTime(date, seconds: true),
-                          key: const Key('selected-run-time-label'),
-                          maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: DeckColor.gold, fontSize: 11)),
-                      ],
-                    )),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(formatDayMonth(date, year: true),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: DeckColor.text, fontSize: 17,
+                        fontWeight: FontWeight.w800))),
+                    const SizedBox(width: 10),
+                    Text(formatLocalClock(date, seconds: true),
+                      key: const Key('selected-run-time-label'),
+                      maxLines: 1,
+                      style: const TextStyle(color: DeckColor.gold,
+                        fontSize: 15.5, fontWeight: FontWeight.w700,
+                        fontFeatures: [FontFeature.tabularFigures()])),
                   ]),
                 ),
               ),
             )),
-            const SizedBox(width: 9),
-            SizedBox(width: 38, child: DeckAction(
-              label: '−', tone: DeckColor.gold, compact: true,
-              onTap: () => state.edit(time: stepRunAt(state.runAt, -1)))),
-            const SizedBox(width: 5),
+            const SizedBox(width: 8),
             SizedBox(width: 38, child: DeckAction(
               label: '+', tone: DeckColor.gold, compact: true,
               onTap: () => state.edit(time: stepRunAt(state.runAt, 1)))),
