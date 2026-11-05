@@ -4,12 +4,12 @@ $ErrorActionPreference='Stop'
 function Assert-True([bool]$Condition,[string]$Reason){if(-not $Condition){throw $Reason}}
 function Normalize-Root([string]$Path){return $Path.Replace('\','/').TrimEnd('/')}
 $fixture=Join-Path ([IO.Path]::GetTempPath()) ('session-repository-'+[guid]::NewGuid().ToString('N'))
-$home=Join-Path $fixture 'home'
+$testHome=Join-Path $fixture 'home'
 $app=Join-Path $fixture 'app'
-[void](New-Item -ItemType Directory -Path $home,$app -Force)
+[void](New-Item -ItemType Directory -Path $testHome,$app -Force)
 try{
     function New-TestRepo([string]$Relative) {
-        $dir=Join-Path $home $Relative
+        $dir=Join-Path $testHome $Relative
         [void](New-Item -ItemType Directory -Path $dir -Force)
         & git init -b main $dir | Out-Null
         if($LASTEXITCODE -ne 0){throw 'Unable to initialize isolated Git checkout.'}
@@ -18,12 +18,12 @@ try{
     function New-Session([string]$Name,[string]$Prompt) {
         $file=Join-Path $fixture ($Name+'.jsonl')
         $intro=@{type='session_meta';payload=@{
-            id='00000000-0000-0000-0000-000000000001';source='cli';cwd=$home
+            id='00000000-0000-0000-0000-000000000001';source='cli';cwd=$testHome
         }} | ConvertTo-Json -Depth 7 -Compress
         $user=@{type='event_msg';payload=@{type='user_message';message=$Prompt}} |
             ConvertTo-Json -Depth 7 -Compress
         @($intro,$user) | Set-Content -LiteralPath $file -Encoding utf8
-        return [pscustomobject]@{Id='00000000-0000-0000-0000-000000000001';Cwd=$home;File=$file}
+        return [pscustomobject]@{Id='00000000-0000-0000-0000-000000000001';Cwd=$testHome;File=$file}
     }
 
     $aiv=New-TestRepo 'source\AIVault'
