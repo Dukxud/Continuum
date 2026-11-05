@@ -18,7 +18,7 @@ extension _DashboardMicro on _SchedulerHomeState {
       ? 'NEXT · ${countdown(dateField(next.first, 'When'))}'
       : 'NO RUNS IN FLIGHT';
     return DeckAtmosphere(child: Padding(
-      padding: const EdgeInsets.fromLTRB(13, 9, 13, 8),
+      padding: const EdgeInsets.fromLTRB(13, 5, 13, 4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(children: [
@@ -47,21 +47,21 @@ extension _DashboardMicro on _SchedulerHomeState {
             moreMenu(),
             const SizedBox(width: 13),
           ]),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           DeckSurface(
             top: const Color(0xff172d38),
             bottom: const Color(0xff24213d),
             radius: 12, accent: DeckColor.aqua,
-            padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+            padding: const EdgeInsets.fromLTRB(10, 4, 10, 4),
             child: Column(children: [
               _microCapacity('5-HOUR', windows.isNotEmpty ? windows[0] : null,
                 'quota', DeckColor.mint, state),
-              const SizedBox(height: 10),
+              const SizedBox(height: 4),
               _microCapacity('WEEKLY', windows.length > 1 ? windows[1] : null,
                 'weekly', DeckColor.iris, state),
             ]),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 5),
           Row(children: [
             DeckBeacon(color: running.isNotEmpty
               ? DeckColor.gold : DeckColor.aqua),
@@ -123,7 +123,7 @@ extension _DashboardMicro on _SchedulerHomeState {
           style: const TextStyle(color: DeckColor.text,
             fontSize: 11, fontWeight: FontWeight.w800))),
       ]),
-      const SizedBox(height: 3),
+      const SizedBox(height: 1),
       Padding(padding: const EdgeInsets.only(left: 63),
         child: Text(resetTime, key: Key('micro-reset-time-$kind'),
           maxLines: 1, overflow: TextOverflow.ellipsis,
