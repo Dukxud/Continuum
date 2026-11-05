@@ -418,12 +418,12 @@ void main() {
     tester.view.physicalSize = const Size(540, 685);
     await tester.pump();
     expect(find.text('On watch.'), findsOneWidget);
-    expect(find.text('Full view'), findsOneWidget);
+    expect(find.byKey(const Key('monitor-full')), findsOneWidget);
     expect(find.text('Set the moment.'), findsNothing);
     final first = tester.getTopLeft(find.text('5-HOUR'));
     final second = tester.getTopLeft(find.text('WEEKLY'));
     expect(second.dy, greaterThan(first.dy + 120));
-    await tester.tap(find.text('Full view'));
+    await tester.tap(find.byKey(const Key('monitor-full')));
     await tester.pump(const Duration(milliseconds: 150));
     expect(find.text('Continuum.'), findsOneWidget);
     expect(find.text('Schedule once'), findsOneWidget);
