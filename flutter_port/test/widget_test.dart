@@ -482,7 +482,10 @@ void main() {
     expect(find.text('Command finished (exit 0)'), findsWidgets,
       reason: 'Completion must not erase the last observed activity.');
     await tester.tap(find.byKey(const Key('close-live-activity')));
-    await tester.pump(const Duration(milliseconds: 450));
+    // Pump the first route-transition frame before advancing past its
+    // reverse animation; a single long pump starts the animation too late.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     expect(find.byKey(const Key('live-activity-dialog')), findsNothing);
     expect(tester.takeException(), isNull);
   });
