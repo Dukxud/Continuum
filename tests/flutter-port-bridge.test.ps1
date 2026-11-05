@@ -152,9 +152,16 @@ readline.createInterface({input:process.stdin}).on("line",line=>{
  const send=answer=>process.stdout.write(JSON.stringify(answer)+"\n");
  if(message.method==="initialize")send({id:message.id,result:{}});
  if(message.method==="thread/read") {
-   const id=message.params.threadId;
-   const name=id==="__TITLE_ID__"?"Official shared-EC2 architecture review":null;
-   send({id:message.id,result:{thread:{id,name,preview:"Original generic instruction",cwd:"C:\\QA"}}});
+   send({id:message.id,result:{thread:{
+     id:message.params.threadId,name:null,preview:"# AIVault — Independent Adversarial Architecture Review"
+   }}});
+ }
+ if(message.method==="thread/list") {
+   if(message.params.sourceKinds?.join(",")!=="cli,exec")
+     return send({id:message.id,error:{message:"Expected CLI/exec only"}});
+   send({id:message.id,result:{data:[
+     {id:"__TITLE_ID__",name:"AIV",preview:"# AIVault — Independent Adversarial Architecture Review",cwd:"C:\\QA"}
+   ],nextCursor:null}});
  }
 });
 '@
@@ -167,10 +174,10 @@ readline.createInterface({input:process.stdin}).on("line",line=>{
         if($namedBody.ok -ne $true){throw "Canonical title bridge error: $($namedBody.error)"}
         $namedSession=@($namedBody.result.sessions | Where-Object Id -eq $sessionId)
         if($namedSession.Count -ne 1 -or
-           -not $namedSession[0].Display.StartsWith('Official shared-EC2 architecture review | Git: qa-repository | ')){
-            throw 'Bridge ignored Codex-owned thread.name and used a guessed rollout title.'
+           -not $namedSession[0].Display.StartsWith('AIV | Git: qa-repository | ')){
+            throw 'Bridge ignored the resume picker thread/list name and used stale thread/read or rollout text.'
         }
-        Write-Host 'Codex-owned conversation title wins over rollout excerpts PASS.' -ForegroundColor Green
+        Write-Host 'Codex resume picker title wins over stale thread/read and rollout text PASS.' -ForegroundColor Green
     }finally{$env:PATH=$savedPath}
     Write-Host 'Essential session loading is isolated from optional activity excerpts PASS.' -ForegroundColor Green
     Write-Host 'Flutter conversation labels clearly distinguish Git-backed and outside-Git sessions PASS.' -ForegroundColor Green
