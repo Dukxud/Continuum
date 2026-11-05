@@ -283,6 +283,35 @@ void main() {
       isNull, reason: 'A reset already passed must not activate Reset +1');
   });
 
+  test('Micro and Always on Top are opt-in, persisted and independently reversible',
+      () async {
+    final fake = FakeScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    expect(controller.micro, isFalse);
+    expect(controller.alwaysOnTop, isFalse);
+    controller.edit(microMode: true, pinOnTop: true);
+    expect(controller.micro, isTrue);
+    expect(controller.compact, isTrue);
+    expect(controller.alwaysOnTop, isTrue);
+    await controller.flushPreferences();
+    expect(fake.saves.last['microMode'], isTrue);
+    expect(fake.saves.last['alwaysOnTop'], isTrue);
+    expect(fake.saves.last['compactMode'], isTrue);
+    controller.edit(microMode: false, compactMode: true);
+    expect(controller.micro, isFalse);
+    expect(controller.compact, isTrue);
+    expect(controller.alwaysOnTop, isTrue);
+    controller.edit(compactMode: false, pinOnTop: false);
+    expect(controller.compact, isFalse);
+    expect(controller.micro, isFalse);
+    expect(controller.alwaysOnTop, isFalse);
+    await controller.flushPreferences();
+    expect(fake.saves.last['microMode'], isFalse);
+    expect(fake.saves.last['alwaysOnTop'], isFalse);
+    controller.dispose();
+  });
+
   test('quota continuation is opt-in, persisted and forwarded only when enabled', () async {
     final fake = FakeScheduler();
     final controller = SchedulerController(fake);
