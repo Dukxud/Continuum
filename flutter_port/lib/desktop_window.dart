@@ -16,8 +16,9 @@ class WindowActionQueue {
 
 /// Window dimensions are derived from actual content, never an old dragged
 /// full-mode size. The native frame accounts for the Windows title bar.
-Size schedulerWindowSize({required bool compact, required int upcomingRunCount,
-  required int quotaWindowCount}) {
+Size schedulerWindowSize({required bool compact, bool micro = false,
+  required int upcomingRunCount, required int quotaWindowCount}) {
+  if (micro) return const Size(392, 212);
   if (compact) {
     // An independent live monitor; never a squeezed full workbench.
     return Size(540, upcomingRunCount > 0 ? 685 : 535);
@@ -26,8 +27,9 @@ Size schedulerWindowSize({required bool compact, required int upcomingRunCount,
 }
 
 abstract class SchedulerWindowHost {
-  Future<void> setMode({required bool compact, required int upcomingRunCount,
-    required int quotaWindowCount});
+  Future<void> setMode({required bool compact, bool micro = false,
+    required int upcomingRunCount, required int quotaWindowCount});
+  Future<void> setAlwaysOnTop(bool enabled);
   Future<void> showDialogWindow({required bool history});
 
   // X/Alt+F4 hides the native window before any pending persistence I/O.
@@ -60,19 +62,25 @@ class DesktopWindowHost implements SchedulerWindowHost {
   }
 
   @override
-  Future<void> setMode({required bool compact, required int upcomingRunCount,
-    required int quotaWindowCount}) => _actions.enqueue(() async {
+  Future<void> setMode({required bool compact, bool micro = false,
+    required int upcomingRunCount, required int quotaWindowCount}) => _actions.enqueue(() async {
     if (await windowManager.isMaximized()) {
       await windowManager.unmaximize();
     }
-    final size = schedulerWindowSize(compact: compact,
+    final size = schedulerWindowSize(compact: compact, micro: micro,
       upcomingRunCount: upcomingRunCount,
       quotaWindowCount: quotaWindowCount);
-    await windowManager.setMinimumSize(compact
+    await windowManager.setMinimumSize(micro
+      ? const Size(360, 190) : compact
       ? const Size(520, 490) : const Size(1100, 750));
     await windowManager.setSize(size);
     _lastCompact = compact;
   });
+
+  // Native Windows topmost style; independent of PowerToys or focus order.
+  @override
+  Future<void> setAlwaysOnTop(bool enabled) =>
+    _actions.enqueue(() => windowManager.setAlwaysOnTop(enabled));
 
   @override
   Future<void> showDialogWindow({required bool history}) =>
