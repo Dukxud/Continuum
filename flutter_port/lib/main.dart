@@ -18,6 +18,7 @@ part 'dashboard_frame.dart';
 part 'dashboard_workbench.dart';
 part 'dashboard_monitor.dart';
 part 'dashboard_micro.dart';
+part 'live_activity_dialog.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -327,6 +328,38 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
       toast(e.toString());
     } catch (e) {
       toast('Scheduling failed: $e');
+    }
+  }
+
+  Future<void> openRunActivity(String name) async {
+    final state = controller;
+    if (state == null || _dialogOpen || !mounted) return;
+    Map<String, dynamic>? running;
+    for (final row in state.upcoming) {
+      if (stringField(row, 'Name') == name &&
+          stringField(row, 'Status') == 'Running') {
+        running = Map<String, dynamic>.of(row);
+        break;
+      }
+    }
+    if (running == null) return;
+    _dialogOpen = true;
+    try {
+      // Monitor and Micro share the native window with their dialogs.
+      // Expand it temporarily to make the timeline readable.
+      await widget.windowHost?.showDialogWindow(history: false);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => LiveActivityDialog(
+          controller: state, run: running!),
+      );
+    } catch (error) {
+      if (mounted) toast('Unable to show live activity: $error');
+    } finally {
+      _dialogOpen = false;
+      _lastWindowKey = '';
+      updateWindowSize();
     }
   }
 

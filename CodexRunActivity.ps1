@@ -9,7 +9,7 @@ function Get-CodexRunActivity {
     $result=[ordered]@{
         Available=$false; Summary='Waiting for Codex events'
         Recent=@(); CompletedCommands=0; FileChanges=0
-        LatestResponse=''; UpdatedAt=$null
+        LatestResponse=''; UpdatedAt=$null; StartedAt=$null; Timeline=@()
     }
     if($Name -cnotmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[0-9a-fA-F]{8}$'){
         return [pscustomobject]$result
@@ -21,9 +21,12 @@ function Get-CodexRunActivity {
     $reader=$null
     $stream=$null
     $recent=[Collections.Generic.List[string]]::new()
+    $timeline=[Collections.Generic.List[object]]::new()
     try {
         # Live Codex sessions may still be writing. Read only the bounded tail,
         # with file-sharing compatible with an active Windows writer.
+        $result.StartedAt=[DateTimeOffset]::new(
+            ([IO.File]::GetCreationTimeUtc($eventFile))).ToUnixTimeSeconds()
         $stream=[IO.FileStream]::new($eventFile,[IO.FileMode]::Open,
             [IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
         $offset=[Math]::Max(0L,($stream.Length - 262144L))
@@ -83,15 +86,35 @@ function Get-CodexRunActivity {
                 $result.Summary=$label
                 $recent.Add($label)
                 if($recent.Count -gt 3){$recent.RemoveAt(0)}
+                # A timeline is a bounded list of milestones, not the noisy
+                # command/reasoning starts. Never include command/output text.
+                if($kind -cne 'item.started'){
+                    $at=$null
+                    if($entry.timestamp){
+                        try{
+                            $at=[DateTimeOffset]::Parse(
+                                [string]$entry.timestamp,
+                                [Globalization.CultureInfo]::InvariantCulture,
+                                [Globalization.DateTimeStyles]::AssumeUniversal
+                            ).ToUnixTimeSeconds()
+                        }catch{}
+                    }
+                    $timeline.Add([pscustomobject]@{
+                        Label=$label; Kind=$kind; At=$at
+                    })
+                    if($timeline.Count -gt 32){$timeline.RemoveAt(0)}
+                }
             }
         }
         $result.Recent=@($recent.ToArray())
+        $result.Timeline=@($timeline.ToArray())
         $result.UpdatedAt=[DateTimeOffset]::new(
             ([IO.File]::GetLastWriteTimeUtc($eventFile))).ToUnixTimeSeconds()
     } catch {
         $result.Available=$false
         $result.Summary='Activity stream temporarily unavailable'
         $result.Recent=@()
+        $result.Timeline=@()
     } finally {
         if($reader){$reader.Dispose()}
         elseif($stream){$stream.Dispose()}

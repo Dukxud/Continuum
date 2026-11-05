@@ -147,10 +147,6 @@ extension _DashboardFrame on _SchedulerHomeState {
             padding: const EdgeInsets.all(10),
             child: _runTile(runs.first),
           ),
-          if (stringField(runs.first, 'Status') == 'Running') ...[
-            const SizedBox(height: 8),
-            _liveActivityPanel(state, stringField(runs.first, 'Name')),
-          ],
         ],
         if (state.error != null &&
             !state.error!.startsWith('Usage unavailable:')) ...[

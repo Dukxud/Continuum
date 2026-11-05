@@ -130,6 +130,15 @@ class LiveMonitoringAdapter extends StubAdapter {
     'Available': true,
     'Summary': summary,
     'Recent': [summary],
+    'StartedAt': DateTime.now().subtract(const Duration(minutes: 3))
+      .millisecondsSinceEpoch ~/ 1000,
+    'UpdatedAt': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    'Timeline': [
+      {'Label': 'Codex session started'},
+      {'Label': 'A command finished'},
+      {'Label': 'A tool returned'},
+      {'Label': summary},
+    ],
     'CompletedCommands': commands,
     'FileChanges': 0,
     'LatestResponse': 'Checked repository and verified tests.',
@@ -144,7 +153,9 @@ class LiveMonitoringAdapter extends StubAdapter {
     }
     if (action == 'pending') {
       polls++;
-      if (polls > 1) return {'pending': [], 'history': [], 'activities': {}};
+      if (polls > 1) return {'pending': [], 'history': [
+        {'Name': job, 'Status': 'completed'},
+      ], 'activities': {}};
       final data = await super.call('load');
       return {
         'pending': data['pending'], 'history': [],
@@ -437,7 +448,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('running Codex event feed updates and clears in both monitor modes',
+  testWidgets('running card opens live dialog and retains timeline after completion',
       (tester) async {
     tester.view.physicalSize = const Size(1240, 850);
     tester.view.devicePixelRatio = 1;
@@ -448,19 +459,69 @@ void main() {
     final adapter = LiveMonitoringAdapter();
     await tester.pumpWidget(MaterialApp(home: SchedulerHome(adapter: adapter)));
     await tester.pump(const Duration(milliseconds: 150));
-    expect(find.byKey(const Key('live-codex-activity')), findsOneWidget);
+    expect(find.byKey(const Key('live-codex-activity')), findsNothing);
+    await tester.tap(find.text('RUNNING').first);
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.byKey(const Key('live-activity-dialog')), findsOneWidget);
     expect(find.text('Running command'), findsOneWidget);
-    await selectView(tester, 'Monitor');
-    tester.view.physicalSize = const Size(540, 685);
+    expect(find.text('Codex session started'), findsNothing);
+    await tester.tap(find.byKey(const Key('toggle-live-timeline')));
     await tester.pump();
-    expect(find.byKey(const Key('live-codex-activity')), findsOneWidget);
+    expect(find.text('Codex session started'), findsOneWidget);
     await tester.pump(const Duration(seconds: 2));
     await tester.pump(const Duration(milliseconds: 150));
-    expect(find.text('Command finished (exit 0)'), findsOneWidget);
+    expect(find.text('Command finished (exit 0)'), findsWidgets);
     expect(find.textContaining('1 commands'), findsOneWidget);
     await tester.pump(const Duration(seconds: 2));
     await tester.pump(const Duration(milliseconds: 150));
-    expect(find.byKey(const Key('live-codex-activity')), findsNothing);
+    expect(find.text('COMPLETED'), findsOneWidget);
+    expect(find.text('Command finished (exit 0)'), findsWidgets,
+      reason: 'Completion must not erase the last observed activity.');
+    await tester.tap(find.byKey(const Key('close-live-activity')));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byKey(const Key('live-activity-dialog')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Monitor running card opens shared activity dialog',
+      (tester) async {
+    tester.view.physicalSize = const Size(1240, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: LiveMonitoringAdapter())));
+    await tester.pump(const Duration(milliseconds: 150));
+    await selectView(tester, 'Monitor');
+    tester.view.physicalSize = const Size(540, 685);
+    await tester.pump();
+    await tester.tap(find.text('RUNNING').first);
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.byKey(const Key('live-activity-dialog')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Micro running status opens the same live activity dialog',
+      (tester) async {
+    tester.view.physicalSize = const Size(1240, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: LiveMonitoringAdapter())));
+    await tester.pump(const Duration(milliseconds: 150));
+    await selectView(tester, 'Micro');
+    tester.view.physicalSize = const Size(392, 212);
+    await tester.pump();
+    expect(find.byKey(const Key('micro-live-open')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('micro-live-open')));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.byKey(const Key('live-activity-dialog')), findsOneWidget);
+    expect(find.text('Running command'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

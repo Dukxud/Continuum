@@ -62,17 +62,29 @@ extension _DashboardMicro on _SchedulerHomeState {
             ]),
           ),
           const SizedBox(height: 5),
-          Row(children: [
-            DeckBeacon(color: running.isNotEmpty
-              ? DeckColor.gold : DeckColor.aqua),
-            const SizedBox(width: 8),
-            Expanded(child: Text(status,
-              key: const Key('micro-run-status'),
-              maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: DeckColor.text, fontSize: 10.5,
-                fontWeight: FontWeight.w700))),
-          ]),
+          Tooltip(
+            message: running.isNotEmpty ? 'Open live activity'
+              : 'No running Codex job',
+            child: InkWell(
+              key: const Key('micro-live-open'),
+              onTap: running.isEmpty ? null : () => unawaited(
+                openRunActivity(stringField(running.first, 'Name'))),
+              child: Row(children: [
+                DeckBeacon(color: running.isNotEmpty
+                  ? DeckColor.gold : DeckColor.aqua),
+                const SizedBox(width: 8),
+                Expanded(child: Text(status,
+                  key: const Key('micro-run-status'),
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: DeckColor.text, fontSize: 10.5,
+                    fontWeight: FontWeight.w700))),
+                if (running.isNotEmpty)
+                  const Icon(Icons.open_in_new_rounded,
+                    color: DeckColor.gold, size: 12),
+              ]),
+            ),
+          ),
         ],
       ),
     ));

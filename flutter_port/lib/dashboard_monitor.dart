@@ -89,12 +89,8 @@ extension _DashboardMonitor on _SchedulerHomeState {
 
   Widget _queueCard(SchedulerController state) {
     final runs = state.upcoming;
-    final running = runs.where((run) =>
-        stringField(run, 'Status') == 'Running').toList();
-    final liveName = running.isEmpty ? null :
-      stringField(running.any((run) => stringField(run, 'Name') == selectedRun)
-        ? running.firstWhere((run) => stringField(run, 'Name') == selectedRun)
-        : running.first, 'Name');
+    final running = runs.any((run) =>
+        stringField(run, 'Status') == 'Running');
     final canCancel = !state.busy && runs.any((run) =>
       stringField(run, 'Name') == selectedRun &&
       stringField(run, 'Status') == 'Scheduled');
@@ -124,14 +120,12 @@ extension _DashboardMonitor on _SchedulerHomeState {
               separatorBuilder: (_, __) => const SizedBox(height: 7),
               itemBuilder: (context, index) => _runTile(runs[index]),
             )),
-        if (liveName != null) ...[
-          const SizedBox(height: 9),
-          _liveActivityPanel(state, liveName),
-        ],
         const SizedBox(height: 10),
         Row(children: [
           Expanded(child: Text(
-            runs.isEmpty ? 'All clear.' : 'Select a scheduled run to cancel.',
+            runs.isEmpty ? 'All clear.' : running
+              ? 'Click a running card for live activity.'
+              : 'Select a scheduled run to cancel.',
             maxLines: 1, overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: DeckColor.muted, fontSize: 10))),
@@ -140,53 +134,6 @@ extension _DashboardMonitor on _SchedulerHomeState {
             tone: DeckColor.rose,
             onTap: canCancel ? cancelSelected : null),
         ]),
-      ]),
-    );
-  }
-
-  Widget _liveActivityPanel(SchedulerController state, String name) {
-    final data = state.activities[name];
-    final available = field(data, 'Available') == true;
-    final summary = stringField(data, 'Summary');
-    final reply = stringField(data, 'LatestResponse');
-    final latest = field(data, 'Recent');
-    final recent = latest is List ? latest.whereType<String>().toList() : <String>[];
-    final commands = field(data, 'CompletedCommands');
-    final edits = field(data, 'FileChanges');
-    final countLabel = available
-      ? '${commands is num ? commands : 0} commands · '
-        '${edits is num ? edits : 0} edits (recent)'
-      : 'LIVE FEED';
-    final detail = reply.isNotEmpty ? reply :
-      recent.length > 1 ? recent.reversed.take(2).join(' · ') :
-      'Recent Codex activity will appear here.';
-    return Container(
-      key: const Key('live-codex-activity'),
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-      decoration: BoxDecoration(
-        color: const Color(0xff101c30),
-        borderRadius: BorderRadius.circular(11),
-        border: Border.all(color: DeckColor.aqua.withValues(alpha: .28)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const DeckBeacon(color: DeckColor.aqua),
-          const SizedBox(width: 7),
-          const Expanded(child: Text('CODEX ACTIVITY',
-            style: TextStyle(color: DeckColor.aqua, fontSize: 10,
-              fontWeight: FontWeight.w800, letterSpacing: 1.1))),
-          Text(countLabel, style: const TextStyle(
-            color: DeckColor.subtle, fontSize: 9.5)),
-        ]),
-        const SizedBox(height: 5),
-        Text(summary.isNotEmpty ? summary : 'Waiting for Codex events',
-          key: const Key('live-codex-status'),
-          maxLines: 1, overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: DeckColor.text,
-            fontSize: 11.5, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 3),
-        Text(detail, maxLines: 2, overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: DeckColor.muted, fontSize: 10.2)),
       ]),
     );
   }
@@ -220,7 +167,8 @@ extension _DashboardMonitor on _SchedulerHomeState {
     final percent = running ? null :
       runElapsedPercent(when, field(run, 'CreatedAt'))?.toDouble();
     return Material(color: Colors.transparent, child: InkWell(
-      onTap: () => selectRun(name),
+      onTap: running ? () => unawaited(openRunActivity(name))
+        : () => selectRun(name),
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
@@ -247,6 +195,11 @@ extension _DashboardMonitor on _SchedulerHomeState {
               waitingForQuota ? 'WAITING FOR QUOTA' : countdown(when),
               style: TextStyle(color: tone, fontSize: 11,
                 fontWeight: FontWeight.w800)),
+            if (running) ...[
+              const SizedBox(width: 5),
+              const Icon(Icons.open_in_new_rounded,
+                size: 13, color: DeckColor.gold),
+            ],
           ]),
           const SizedBox(height: 5),
           Text(stringField(run, 'Description'),
