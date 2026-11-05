@@ -2,12 +2,22 @@
 # A conversation may use GitHub tools while its CLI working directory is
 # outside Git. Look for a uniquely matching, verified local checkout only.
 function Find-ReferencedSessionRepository {
-    param([Parameter(Mandatory)]$Session,[string]$HomeDirectory=$HOME)
+    param([Parameter(Mandatory)]$Session,[string]$HomeDirectory=$HOME,
+          [string]$CodexPreview=$null)
     if(-not (Test-Path -LiteralPath ([string]$Session.File) -PathType Leaf)){return $null}
     $names=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $remotes=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $paths=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $remotePattern='(?i)(?:https?://github[.]com/|git@github[.]com:)(?<owner>[a-z0-9_.-]+)/(?<repo>[a-z0-9_.-]+)(?=[/?#\s"''\)]|$)'
+    # The Codex App Server's thread/list preview comes from the selected
+    # conversation, even when an on-disk rollout omits that user message.
+    # Only a leading, explicit project heading may identify a remote alias.
+    # Never interpret arbitrary prose or the abbreviated thread name as a repo.
+    if($CodexPreview){
+        $heading=[regex]::Match($CodexPreview,
+            '(?m)^\s*#{1,3}\s+(?<name>[A-Za-z][A-Za-z0-9_.-]{2,79})(?=\s|$)')
+        if($heading.Success){[void]$names.Add($heading.Groups['name'].Value)}
+    }
     $reader=$null
     try {
         # Keep active Codex rollouts readable while the CLI writes to them.
