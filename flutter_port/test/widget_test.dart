@@ -275,7 +275,7 @@ void main() {
     final date = find.descendant(of: field, matching: find.byType(Text)).first;
     expect((tester.getCenter(date).dy - tester.getCenter(clock).dy).abs(), lessThan(8));
     final value = tester.widget<Text>(clock).data!;
-    expect(value, matches(RegExp(r'^\\d{1,2}:\\d{2}:\\d{2} (AM|PM)\\$')));
+    expect(value, matches(RegExp(r'^\d{1,2}:\d{2}:\d{2} (AM|PM)$')));
     expect(tester.takeException(), isNull);
   });
 
