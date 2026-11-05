@@ -170,7 +170,67 @@ function readThreadDirectory(cliJs, threadId, timeoutMs=10000) {
     return Promise.reject(new Error('Invalid Codex conversation ID.'));
   return readCodexState(cliJs,{threadId,timeoutMs,catalog:false});
 }
-()=>add+marker
+// One App Server process for the chooser, never one per conversation.
+// Requests are independent and bounded; an inaccessible thread cannot block
+// the titles of other sessions or the essential load path.
+function readThreadSummaries(cliJs, threadIds, timeoutMs=12000) {
+  const valid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+  if (!Array.isArray(threadIds) || threadIds.length > 30 ||
+      threadIds.some(id => typeof id !== 'string' || !valid.test(id)))
+    return Promise.reject(new Error('Invalid thread summary request.'));
+  const ids = [...new Set(threadIds)];
+  if (!ids.length) return Promise.resolve({ok:true,threads:{}});
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath,
+      [cliJs,'app-server','--listen','stdio://'],
+      {stdio:['pipe','pipe','pipe'],windowsHide:true});
+    const lines = readline.createInterface({input:child.stdout});
+    const threads = {};
+    const pending = new Map();
+    let settled=false, initialized=false, stderr='';
+    const timer=setTimeout(()=>finish(null,{ok:true,threads,partial:true}),timeoutMs);
+    function finish(error,value) {
+      if(settled)return;
+      settled=true;clearTimeout(timer);lines.close();
+      child.stdin.on('error',()=>{});
+      child.stdin.end();child.kill();
+      if(error)reject(error);else resolve(value);
+    }
+    function send(message) {if(!settled)child.stdin.write(JSON.stringify(message)+'\n');}
+    child.on('error',error=>finish(error));
+    child.stdin.on('error',error=>finish(error));
+    child.on('exit',code=>{
+      if(!settled)finish(new Error('Codex App Server exited ('+code+'). '+stderr.slice(-120)));
+    });
+    child.stderr.on('data',chunk=>{stderr=(stderr+chunk.toString()).slice(-300);});
+    lines.on('line',line=>{
+      let msg;try{msg=JSON.parse(line);}catch{return;}
+      if(!initialized) {
+        if(msg.id!==1)return;
+        if(msg.error)return finish(new Error(msg.error.message||'Initialization failed.'));
+        initialized=true;send({method:'initialized',params:{}});
+        ids.forEach((id,index)=>{
+          const requestId=index+2;
+          pending.set(requestId,id);
+          send({id:requestId,method:'thread/read',params:{threadId:id,includeTurns:false}});
+        });
+        return;
+      }
+      const id=pending.get(msg.id);
+      if(!id)return;
+      pending.delete(msg.id);
+      if(!msg.error) {
+        try{threads[id]=normalizeThreadRead(msg.result,id);}catch{/* stale thread */}
+      }
+      if(!pending.size)finish(null,{ok:true,threads});
+    });
+    send({id:1,method:'initialize',params:{
+      clientInfo:{name:'codex_resume_scheduler',title:'Codex Resume Scheduler',version:'1.16.0'},
+      capabilities:{experimentalApi:true}
+    }});
+  });
+}
+async function main() {
   const flag=process.argv.indexOf('--cli-js'); const cliJs=flag>=0?process.argv[flag+1]:null;
   if(!cliJs||!fs.existsSync(cliJs)||path.extname(cliJs).toLowerCase()!=='.js')throw new Error('Codex npm CLI entry not found.');
   const modelFlag=process.argv.indexOf('--model'); const model=modelFlag>=0?process.argv[modelFlag+1]:null;
