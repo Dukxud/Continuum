@@ -311,6 +311,9 @@ try {
             $access=[string]$draft.access
             if($access -cnotin @('workspace-write','read-only','yolo')){throw 'Invalid access mode.'}
             if($null -ne $draft.autoResumeOnLimit -and $draft.autoResumeOnLimit -isnot [bool]){throw 'Invalid saved quota continuation option.'}
+            foreach($flag in @('microMode','alwaysOnTop')){
+                if($null -ne $request.$flag -and $request.$flag -isnot [bool]){throw "Invalid window preference: $flag"}
+            }
             $previous=Read-CodexUiSettings $appDir
             $safeDraft=[pscustomobject]@{
                 sessionId=[string]$draft.sessionId;repo=[string]$draft.repo
@@ -338,7 +341,9 @@ try {
             }
             $settings=[pscustomobject]@{
                 version=1;lastAccess=$access
-                compactMode=($request.compactMode -eq $true)
+                compactMode=($request.compactMode -eq $true -or $request.microMode -eq $true)
+                microMode=($request.microMode -eq $true)
+                alwaysOnTop=($request.alwaysOnTop -eq $true)
                 barAppearance=$appearance
                 draft=$safeDraft
             }
