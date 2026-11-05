@@ -77,11 +77,11 @@ try {
                     if($detail -and $detail.name){
                         $activity=Format-CodexSessionTitle ([string]$detail.name)
                     }
-                    if(-not $activity){
-                        $activity=Get-CodexSessionActivity -SessionFile ([string]$session.File)
-                    }
                     if(-not $activity -and $detail -and $detail.preview){
                         $activity=Format-CodexSessionTitle ([string]$detail.preview)
+                    }
+                    if(-not $activity){
+                        $activity=Get-CodexSessionActivity -SessionFile ([string]$session.File)
                     }
                 }
                 $identity=('{0} | {1} | {2}' -f $title,$date,$id.Substring($id.Length-8))
