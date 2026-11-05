@@ -272,6 +272,14 @@ void main() {
     expect(plus, findsOneWidget);
     expect(tester.getCenter(minus).dx, lessThan(tester.getTopLeft(field).dx));
     expect(tester.getCenter(plus).dx, greaterThan(tester.getTopRight(field).dx));
+    final minusButton = find.ancestor(of: minus,
+      matching: find.byType(DeckAction)).first;
+    final plusButton = find.ancestor(of: plus,
+      matching: find.byType(DeckAction)).first;
+    final dateHeight = tester.getSize(field).height;
+    expect(dateHeight, greaterThanOrEqualTo(38));
+    expect(dateHeight, tester.getSize(minusButton).height);
+    expect(dateHeight, tester.getSize(plusButton).height);
     final date = find.descendant(of: field, matching: find.byType(Text)).first;
     expect((tester.getCenter(date).dy - tester.getCenter(clock).dy).abs(), lessThan(8));
     final value = tester.widget<Text>(clock).data!;
