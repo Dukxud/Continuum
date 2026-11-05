@@ -118,7 +118,8 @@ function Get-ReportedThreadDirectory {
 
 function Find-SessionRepository {
     param($Session, [string]$ReportedCwd = $null,
-          [Parameter(Mandatory)][string]$AppDirectory)
+          [Parameter(Mandatory)][string]$AppDirectory,
+          [string]$CheckoutHome = $HOME)
     if (-not $Session) { return $null }
     $candidates = [System.Collections.Generic.List[string]]::new()
     $reportedRoot = Get-RepositoryRoot $ReportedCwd
@@ -176,7 +177,7 @@ function Find-SessionRepository {
     }
     if ($roots.Count -eq 1) { return [pscustomobject]@{ Root = $roots[0]; Source = 'saved conversation fallback'; Candidates = $roots; AlternativeRoots = @() } }
     if ($roots.Count -gt 1) { return [pscustomobject]@{ Root = $null; Source = 'conflicting fallback worktrees'; Candidates = $roots; AlternativeRoots = $roots } }
-    return Find-ReferencedSessionRepository -Session $Session
+    return Find-ReferencedSessionRepository -Session $Session -HomeDirectory $CheckoutHome
 }
 
 
