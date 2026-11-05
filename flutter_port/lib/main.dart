@@ -228,24 +228,36 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
 
   String countdown(DateTime? due) => countdownText(due);
 
-  Future<void> pickTime() async {
+  Future<void> pickDate() async {
     final state = controller!;
     final now = DateTime.now();
-    // British English places Monday first and uses day–month ordering;
-    // keep the surrounding application in the user's 12-hour display.
+    // Keep the Monday-first calendar and day–month ordering.
     final day = await showDatePicker(context: context,
       locale: const Locale('en', 'GB'),
       initialDate: state.runAt.isBefore(now) ? now : state.runAt,
       firstDate: DateTime(now.year, now.month, now.day),
       lastDate: DateTime(now.year + 3, 12, 31));
     if (day == null || !mounted) return;
-    final time = await showTimePicker(context: context,
-      initialTime: TimeOfDay.fromDateTime(state.runAt));
+    final selected = state.runAt;
+    state.edit(time: DateTime(day.year, day.month, day.day,
+      selected.hour, selected.minute, selected.second));
+  }
+
+  Future<void> pickTime() async {
+    final state = controller!;
+    // The clock portion opens directly in keyboard entry, rather than
+    // requiring a calendar and then hiding text input behind a dial.
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(state.runAt),
+      initialEntryMode: TimePickerEntryMode.input,
+      helpText: 'Enter run time',
+    );
     if (time == null || !mounted) return;
-    // The native picker edits hours and minutes only. Preserve the exact
-    // visible second rather than silently resetting it to :00.
-    state.edit(time: DateTime(day.year, day.month, day.day, time.hour,
-      time.minute, state.runAt.second));
+    final selected = state.runAt;
+    // Only hours/minutes are editable, per the agreed precision scope.
+    state.edit(time: DateTime(selected.year, selected.month, selected.day,
+      time.hour, time.minute, selected.second));
   }
 
   Future<void> schedule() async {
