@@ -178,51 +178,67 @@ function readThreadSummaries(cliJs, threadIds, timeoutMs=12000) {
   if (!Array.isArray(threadIds) || threadIds.length > 30 ||
       threadIds.some(id => typeof id !== 'string' || !valid.test(id)))
     return Promise.reject(new Error('Invalid thread summary request.'));
-  const ids = [...new Set(threadIds)];
-  if (!ids.length) return Promise.resolve({ok:true,threads:{}});
+  const wanted = new Set(threadIds);
+  if (!wanted.size) return Promise.resolve({ok:true,threads:{}});
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath,
       [cliJs,'app-server','--listen','stdio://'],
       {stdio:['pipe','pipe','pipe'],windowsHide:true});
     const lines = readline.createInterface({input:child.stdout});
     const threads = {};
-    const pending = new Map();
-    let settled=false, initialized=false, stderr='';
-    const timer=setTimeout(()=>finish(null,{ok:true,threads,partial:true}),timeoutMs);
-    function finish(error,value) {
-      if(settled)return;
-      settled=true;clearTimeout(timer);lines.close();
-      child.stdin.on('error',()=>{});
-      child.stdin.end();child.kill();
-      if(error)reject(error);else resolve(value);
+    const seenCursors = new Set();
+    let settled = false, initialized = false, stderr = '', requestId = 1, pages = 0;
+    const timer = setTimeout(() => finish(null,{ok:true,threads,partial:true}),timeoutMs);
+    function finish(error, value) {
+      if (settled) return;
+      settled = true;clearTimeout(timer);lines.close();
+      child.stdin.on('error',()=>{});child.stdin.end();child.kill();
+      if (error) reject(error);else resolve(value);
     }
-    function send(message) {if(!settled)child.stdin.write(JSON.stringify(message)+'\n');}
+    function send(message) {
+      if (!settled) child.stdin.write(JSON.stringify(message)+'\n');
+    }
+    function requestPage(cursor = null) {
+      pages++;requestId++;
+      const params = {limit:100,sourceKinds:['cli','exec'],archived:false};
+      if (cursor) params.cursor = cursor;
+      send({id:requestId,method:'thread/list',params});
+    }
     child.on('error',error=>finish(error));
     child.stdin.on('error',error=>finish(error));
     child.on('exit',code=>{
-      if(!settled)finish(new Error('Codex App Server exited ('+code+'). '+stderr.slice(-120)));
+      if (!settled) finish(new Error('Codex App Server exited ('+code+'). '+stderr.slice(-120)));
     });
     child.stderr.on('data',chunk=>{stderr=(stderr+chunk.toString()).slice(-300);});
     lines.on('line',line=>{
       let msg;try{msg=JSON.parse(line);}catch{return;}
-      if(!initialized) {
-        if(msg.id!==1)return;
-        if(msg.error)return finish(new Error(msg.error.message||'Initialization failed.'));
-        initialized=true;send({method:'initialized',params:{}});
-        ids.forEach((id,index)=>{
-          const requestId=index+2;
-          pending.set(requestId,id);
-          send({id:requestId,method:'thread/read',params:{threadId:id,includeTurns:false}});
-        });
+      if (!initialized) {
+        if (msg.id !== 1) return;
+        if (msg.error) return finish(new Error(msg.error.message||'Initialization failed.'));
+        initialized = true;send({method:'initialized',params:{}});requestPage();
         return;
       }
-      const id=pending.get(msg.id);
-      if(!id)return;
-      pending.delete(msg.id);
-      if(!msg.error) {
-        try{threads[id]=normalizeThreadRead(msg.result,id);}catch{/* stale thread */}
+      if (msg.id !== requestId) return;
+      if (msg.error) return pages === 1
+        ? finish(new Error(msg.error.message||'Codex thread listing failed.'))
+        : finish(null,{ok:true,threads,partial:true});
+      const result = msg.result || {};
+      for (const thread of Array.isArray(result.data) ? result.data : []) {
+        if (!thread || !wanted.has(thread.id)) continue;
+        const value = key => typeof thread[key] === 'string' && thread[key].trim()
+          ? thread[key].trim() : null;
+        threads[thread.id] = {
+          ok:true,threadId:thread.id,
+          cwd:value('cwd'),name:value('name'),preview:value('preview')
+        };
+        wanted.delete(thread.id);
       }
-      if(!pending.size)finish(null,{ok:true,threads});
+      const cursor = result.nextCursor;
+      if (!wanted.size || !cursor) return finish(null,{ok:true,threads,partial:false});
+      if (typeof cursor !== 'string' || seenCursors.has(cursor) || pages >= 6)
+        return finish(null,{ok:true,threads,partial:true});
+      seenCursors.add(cursor);
+      requestPage(cursor);
     });
     send({id:1,method:'initialize',params:{
       clientInfo:{name:'codex_resume_scheduler',title:'Codex Resume Scheduler',version:'1.16.0'},
