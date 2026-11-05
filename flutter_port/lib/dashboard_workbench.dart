@@ -162,7 +162,9 @@ extension _DashboardWorkbench on _SchedulerHomeState {
               fontWeight: FontWeight.w800, color: DeckColor.text,
               letterSpacing: -.6)),
           const SizedBox(height: 10),
-          SizedBox(height: 61, child: Row(children: [
+          SizedBox(height: 61, child: Center(child: SizedBox(
+            height: 40,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             SizedBox(width: 38, child: DeckAction(
               label: '−', tone: DeckColor.gold, compact: true,
               onTap: () => state.edit(time: stepRunAt(state.runAt, -1)))),
@@ -204,7 +206,8 @@ extension _DashboardWorkbench on _SchedulerHomeState {
               tone: DeckColor.coral, compact: true,
               onTap: () => state.edit(
                 time: resetAt ?? suggestedRunAt()))),
-          ])),
+            ]),
+          ))),
           const SizedBox(height: 12),
           _deckFieldLabel('INSTRUCTION FOR CODEX'),
           const SizedBox(height: 5),
