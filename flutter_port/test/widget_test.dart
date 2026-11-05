@@ -463,6 +463,7 @@ void main() {
     await tester.tap(find.text('RUNNING').first);
     await tester.pump(const Duration(milliseconds: 150));
     expect(find.byKey(const Key('live-activity-dialog')), findsOneWidget);
+    expect(find.text('ACTIVE FOR'), findsOneWidget);
     expect(tester.widget<Text>(find.byKey(const Key('live-dialog-status'))).data,
       'Running command');
     expect(find.text('Codex session started'), findsNothing);
@@ -476,6 +477,8 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pump(const Duration(milliseconds: 150));
     expect(find.text('COMPLETED'), findsOneWidget);
+    expect(find.text('OBSERVED FOR'), findsOneWidget);
+    expect(find.text('ACTIVE FOR'), findsNothing);
     expect(find.text('Command finished (exit 0)'), findsWidgets,
       reason: 'Completion must not erase the last observed activity.');
     await tester.tap(find.byKey(const Key('close-live-activity')));
