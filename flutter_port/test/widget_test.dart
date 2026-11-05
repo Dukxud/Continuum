@@ -8,13 +8,15 @@ import 'package:codex_resume_flutter/bridge.dart';
 class StubAdapter implements SchedulerAdapter {
   StubAdapter({this.includePending = false, this.pendingCount = 0,
     this.verifiedSession = false, this.exhaustedQuota = false,
-    this.failUsage = false, this.pendingStatus = 'Scheduled',
+    this.failUsage = false, this.failLoad = false,
+    this.pendingStatus = 'Scheduled',
     this.pendingSchedule, this.pendingLabels});
   final bool includePending;
   final int pendingCount;
   final bool verifiedSession;
   final bool exhaustedQuota;
   final bool failUsage;
+  final bool failLoad;
   final String pendingStatus;
   final Completer<Map<String, dynamic>>? pendingSchedule;
   final Completer<Map<String, dynamic>>? pendingLabels;
@@ -32,6 +34,7 @@ class StubAdapter implements SchedulerAdapter {
       return {'status': 'Cancelled', 'warning': ''};
     }
     if (action == 'load') {
+      if (failLoad) throw SchedulerException('Test startup bridge failure');
       return {'sessions': verifiedSession ? [
         {'Id': '11111111-1111-1111-1111-111111111111',
          'Display': 'QA project | verified CLI session'}
@@ -148,6 +151,22 @@ void main() {
     final roundedCard = find.ancestor(of: handoffStack, matching: find.byType(ClipRRect)).first;
     expect(tester.widget<ClipRRect>(roundedCard).clipBehavior, isNot(Clip.none),
       reason: 'Glow remains constrained by the outer rounded card.');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('startup failure is visible in the header', (tester) async {
+    tester.view.physicalSize = const Size(1240, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: StubAdapter(failLoad: true))));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.text('LOAD FAILED'), findsOneWidget);
+    expect(find.text('CONNECTING'), findsNothing);
+    expect(find.textContaining('Refresh failed:'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
