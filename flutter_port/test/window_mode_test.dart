@@ -64,7 +64,81 @@ class WindowAdapter implements SchedulerAdapter {
   }
 }
 
+class ShutdownWindowAdapter extends WindowAdapter {
+  ShutdownWindowAdapter() : super(startCompact: false);
+  final Completer<void> saveGate = Completer<void>();
+  final List<Map<String, dynamic>> snapshots = [];
+  bool waitForSave = false;
+  bool rejectSave = false;
+
+  @override
+  Future<Map<String, dynamic>> call(String action,
+      [Map<String, dynamic> payload = const {}]) async {
+    if (action != 'save') return super.call(action, payload);
+    snapshots.add(Map<String, dynamic>.from(payload));
+    if (waitForSave) await saveGate.future;
+    if (rejectSave) throw SchedulerException('Disk write denied');
+    return {'saved': true};
+  }
+}
+
 void main() {
+  testWidgets('unchanged close hides and exits without spawning a save',
+      (tester) async {
+    final host = SpyWindowHost();
+    final adapter = ShutdownWindowAdapter();
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: adapter, windowHost: host)));
+    await tester.pump(const Duration(milliseconds: 160));
+    final home = tester.state(find.byType(SchedulerHome));
+    (home as dynamic).onWindowClose();
+    await tester.pump(const Duration(milliseconds: 160));
+    expect(host.shutdownCalls, ['hide', 'finish']);
+    expect(adapter.snapshots, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('dirty close hides before a slow save and exits only afterward',
+      (tester) async {
+    final host = SpyWindowHost();
+    final adapter = ShutdownWindowAdapter()..waitForSave = true;
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: adapter, windowHost: host)));
+    await tester.pump(const Duration(milliseconds: 160));
+    final home = tester.state(find.byType(SchedulerHome));
+    (home as dynamic).controller.edit(instruction: 'Latest edit');
+    (home as dynamic).onWindowClose();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(host.shutdownCalls, ['hide']);
+    expect(adapter.snapshots, hasLength(1));
+    expect((adapter.snapshots.single['draft'] as Map)['message'], 'Latest edit');
+    adapter.saveGate.complete();
+    await tester.pump(const Duration(milliseconds: 160));
+    expect(host.shutdownCalls, ['hide', 'finish']);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('save failure restores hidden window; a later close may succeed',
+      (tester) async {
+    final host = SpyWindowHost();
+    final adapter = ShutdownWindowAdapter()..rejectSave = true;
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: adapter, windowHost: host)));
+    await tester.pump(const Duration(milliseconds: 160));
+    final home = tester.state(find.byType(SchedulerHome));
+    (home as dynamic).controller.edit(instruction: 'Keep this draft');
+    (home as dynamic).onWindowClose();
+    await tester.pump(const Duration(milliseconds: 160));
+    expect(host.shutdownCalls, ['hide', 'restore']);
+    expect(find.textContaining('Unable to close safely:'), findsOneWidget);
+    adapter.rejectSave = false;
+    (home as dynamic).onWindowClose();
+    await tester.pump(const Duration(milliseconds: 160));
+    expect(host.shutdownCalls, ['hide', 'restore', 'hide', 'finish']);
+    expect(adapter.snapshots, hasLength(2));
+    expect(tester.takeException(), isNull);
+  });
+
   test('full and compact modes always fit content, regardless of prior size', () {
     expect(schedulerWindowSize(compact: false,
       upcomingRunCount: 0, quotaWindowCount: 2), const Size(1240, 850));
