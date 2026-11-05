@@ -32,6 +32,8 @@ class SchedulerController extends ChangeNotifier {
   String access = 'workspace-write';
   bool autoResumeOnLimit = false;
   bool compact = false;
+  bool micro = false;
+  bool alwaysOnTop = false;
   bool ready = false;
   bool busy = false;
   bool readingUsage = false;
@@ -159,7 +161,9 @@ class SchedulerController extends ChangeNotifier {
         access = const ['workspace-write', 'read-only', 'yolo'].contains(preferredAccess)
           ? preferredAccess : 'workspace-write';
         autoResumeOnLimit = field(draft, 'autoResumeOnLimit') == true;
-        compact = field(settings, 'compactMode') == true;
+        micro = field(settings, 'microMode') == true;
+        compact = micro || field(settings, 'compactMode') == true;
+        alwaysOnTop = field(settings, 'alwaysOnTop') == true;
         final savedTime = DateTime.tryParse(stringField(draft, 'runAt'));
         if (savedTime != null && savedTime.isAfter(earliestRunAt())) {
           runAt = savedTime; editedTime = true;
@@ -337,7 +341,8 @@ class SchedulerController extends ChangeNotifier {
 
   void edit({
     String? repository, String? instruction, String? accessMode,
-    String? reasoning, bool? compactMode, bool? autoResumeOnLimit, DateTime? time,
+    String? reasoning, bool? compactMode, bool? microMode,
+    bool? pinOnTop, bool? autoResumeOnLimit, DateTime? time,
   }) {
     if (repository != null) {
       ++_repositoryEditEpoch;
@@ -349,8 +354,19 @@ class SchedulerController extends ChangeNotifier {
     if (accessMode != null) access = accessMode;
     if (reasoning != null) effort = reasoning;
     if (autoResumeOnLimit != null) this.autoResumeOnLimit = autoResumeOnLimit;
+    var modeChanged = false;
+    if (microMode != null && micro != microMode) {
+      micro = microMode;
+      if (micro) compact = true;
+      modeChanged = true;
+    }
     if (compactMode != null && compact != compactMode) {
       compact = compactMode;
+      if (!compact) micro = false;
+      modeChanged = true;
+    }
+    if (pinOnTop != null) alwaysOnTop = pinOnTop;
+    if (modeChanged) {
       quota = null; quotaAt = null; quotaModel = '';
       unawaited(readUsage());
     }
@@ -479,6 +495,8 @@ class SchedulerController extends ChangeNotifier {
 
   Map<String, dynamic> _settingsSnapshot() => {
     'compactMode': compact,
+    'microMode': micro,
+    'alwaysOnTop': alwaysOnTop,
     'barAppearance': appearance.toJson(),
     'draft': {
       'sessionId': sessionId ?? '', 'repo': repo, 'model': model ?? '',
