@@ -91,25 +91,21 @@ and native BLACK-PUDDLE visual review.
 The original WinForms conversation reader identifies a session by its **starting
 folder**, timestamp and full UUID, so unrelated sessions that start in a
 user-home directory appear to have the same name. The Flutter-only Windows
-bridge now leads with a bounded excerpt of the **latest explicit Codex user
-request or thread goal** from that session's own rollout. Generic "Resume"
-instructions, agent output, tool calls, and malformed records cannot supply
-the label. If no meaningful activity is available, it falls back to the
-original location label. It still shows **Git: project name** when the starting
-directory is a verified Git checkout, otherwise **Outside Git: folder**, plus
-the last-activity timestamp and final eight characters of the UUID. This is
-an activity excerpt, not an invented conversation title. The full session ID
-and authoritative repository discovery remain unchanged. A session started
-outside Git may still work in a later checkout; its label never authorizes
-substituting a repository.
+bridge now uses the **same authoritative `thread/list` metadata as the
+Codex CLI resume picker**, joined to verified local session UUIDs. It prefers
+the Codex-owned thread name, then the server preview, then bounded local
+user-activity excerpts. Never present a conversation's opening prompt as its
+renamed title. The app preserves the `Git: project` or `Outside Git: folder`,
+timestamp, and shortened UUID for disambiguation. It still discovers only
+locally verified CLI and exec sessions; IDE/subagent sessions appearing in
+the Codex TUI are not thereby authorized for scheduled CLI execution.
+A display label cannot authorize or substitute a repository.
 
-**Startup isolation:** Loading sessions, task history and preferences uses
-only stable metadata. Activity excerpts are fetched separately after the
-live account/quota query and merged by the unchanged full session ID.
-Slow or malformed active rollout files cannot block the initial dashboard,
-and cosmetic errors leave the stable folder-and-ID labels available.
-Label attempts are bounded to once every three minutes.
-
+**Startup isolation:** Essential session discovery, history, account, and
+quota data never await names. A single bounded read-only App Server listing
+supplies optional labels on a separate timer. Failed or slow name lookup
+preserves the stable identity label without blocking scheduling. Results
+join by the full UUID, never list position.
 The full-mode form now places **Model / Reasoning / Access** immediately after
 **Repository root**. **Run at / Instruction / Schedule once** share one visually
 unified panel. Existing coordinates below that group, full/compact sizing,
