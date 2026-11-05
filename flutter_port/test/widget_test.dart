@@ -273,9 +273,9 @@ void main() {
     expect(tester.getCenter(minus).dx, lessThan(tester.getTopLeft(field).dx));
     expect(tester.getCenter(plus).dx, greaterThan(tester.getTopRight(field).dx));
     final minusButton = find.ancestor(of: minus,
-      matching: find.byType(DeckAction)).first;
+      matching: find.byType(InkWell)).first;
     final plusButton = find.ancestor(of: plus,
-      matching: find.byType(DeckAction)).first;
+      matching: find.byType(InkWell)).first;
     final dateHeight = tester.getSize(field).height;
     expect(dateHeight, greaterThanOrEqualTo(38));
     expect(dateHeight, tester.getSize(minusButton).height);
