@@ -231,3 +231,45 @@ if($invalidExit -eq 0 -or $invalidAnswer.error -cne 'Invalid automatic-continuat
 }
 
 Write-Host 'Flutter strict local-time JSON schedule preflight PASS (no task mutation).' -ForegroundColor Green
+
+# Saving preferences must preserve the opt-in flag. Use an isolated settings
+# location so this test cannot mutate the operator's real preferences.
+$oldLocalAppData=$env:LOCALAPPDATA
+$settingsFixture=Join-Path ([IO.Path]::GetTempPath()) ('flutter-save-fixture-'+[guid]::NewGuid().ToString('N'))
+try {
+    $env:LOCALAPPDATA=$settingsFixture
+    $draft=@{
+        sessionId='11111111-1111-1111-1111-111111111111'
+        repo='C:\fixture\repo';model='gpt-test';effort='medium'
+        access='read-only';message='Resume.';runAt=$future
+        autoResumeOnLimit=$true
+    }
+    $body=@{draft=$draft;compactMode=$true} | ConvertTo-Json -Compress -Depth 6
+    $payload=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($body))
+    $output=@(& pwsh -NoProfile -NonInteractive -STA -File $bridge -Action save -Payload $payload)
+    $status=$LASTEXITCODE
+    if($status -ne 0 -or -not $output){throw 'Flutter isolated preferences save failed.'}
+    $reply=($output | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+    if($reply.ok -ne $true){throw "Preferences save rejected: $($reply.error)"}
+    $saved=Get-Content -LiteralPath (Join-Path $settingsFixture 'CodexResumeScheduler\settings.json') -Raw | ConvertFrom-Json
+    if($saved.draft.autoResumeOnLimit -ne $true -or $saved.draft.repo -cne 'C:\fixture\repo'){
+        throw 'Persisted preferences lost the auto-resume opt-in or repository.'
+    }
+    $draft.autoResumeOnLimit='true'
+    $bad=@{draft=$draft;compactMode=$false} | ConvertTo-Json -Compress -Depth 6
+    $badPayload=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($bad))
+    $badOutput=@(& pwsh -NoProfile -NonInteractive -STA -File $bridge -Action save -Payload $badPayload)
+    $badExit=$LASTEXITCODE
+    $badReply=($badOutput | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+    if($badExit -eq 0 -or $badReply.error -cne 'Invalid saved quota continuation option.'){
+        throw 'Untrusted automatic-continuation setting was accepted.'
+    }
+    Write-Host 'Flutter isolated preferences round-trip and strict opt-in validation PASS.' -ForegroundColor Green
+}finally{
+    if($null -eq $oldLocalAppData){Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue}
+    else{$env:LOCALAPPDATA=$oldLocalAppData}
+    if(Test-Path -LiteralPath $settingsFixture){
+        Remove-Item -LiteralPath $settingsFixture -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
