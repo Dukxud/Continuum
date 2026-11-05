@@ -363,7 +363,7 @@ void main() {
     final home = tester.state(find.byType(SchedulerHome)) as dynamic;
     final before = home.controller.runAt as DateTime;
     await tester.tap(find.byKey(const Key('scheduled-time-picker')));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 350));
     expect(find.byType(DatePickerDialog), findsNothing,
       reason: 'Editing the time must not open the date picker first.');
     final dialog = find.byType(TimePickerDialog);
@@ -377,7 +377,7 @@ void main() {
     await tester.enterText(fields.at(0), '10');
     await tester.enterText(fields.at(1), '46');
     await tester.tap(find.text('OK').last);
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 350));
     final after = home.controller.runAt as DateTime;
     expect(after.hour, before.hour >= 12 ? 22 : 10);
     expect(after.minute, 46);
