@@ -37,12 +37,15 @@ class SpyWindowHost implements SchedulerWindowHost {
 class WindowAdapter implements SchedulerAdapter {
   WindowAdapter({required this.startCompact, this.hasRun = false,
     this.quotaWindowCount = 0, this.startMicro = false,
-    this.startPinned = false});
+    this.startPinned = false, this.emptyFiveHour = false,
+    this.knownReset = false});
   final bool startCompact;
   final bool hasRun;
   final int quotaWindowCount;
   final bool startMicro;
   final bool startPinned;
+  final bool emptyFiveHour;
+  final bool knownReset;
   int usageRequests = 0;
   @override
   Future<Map<String, dynamic>> call(String action,
@@ -67,7 +70,10 @@ class WindowAdapter implements SchedulerAdapter {
           {'id': 'gpt-run', 'efforts': ['medium']}],
         'windows': List.generate(quotaWindowCount, (i) => {
           'label': i == 0 ? '5-hour' : 'Weekly',
-          'remainingPercent': 70.0,
+          'remainingPercent': emptyFiveHour && i == 0 ? 0.0 : 70.0,
+          if (knownReset) 'resetsAt': DateTime.now()
+            .add(const Duration(hours: 2))
+            .millisecondsSinceEpoch ~/ 1000,
         }), 'ordinaryUsageAllowed': true,
         'accountId': 'workspace-sha256:' + 'a' * 64};
     }
