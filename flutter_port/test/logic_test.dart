@@ -507,6 +507,47 @@ void main() {
       allowWorkingDirectory: false), throwsA(isA<SchedulerException>()));
   });
 
+  test('unchanged, reverted, and repeated preferences skip redundant writes', () async {
+    final fake = FakeScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    expect(await controller.flushPreferences(), isTrue);
+    expect(fake.saves, isEmpty);
+    controller.edit(instruction: 'Temporary');
+    controller.edit(instruction: 'Resume.');
+    expect(await controller.flushPreferences(), isTrue);
+    expect(fake.saves, isEmpty);
+    controller.edit(instruction: 'Persist once');
+    expect(await controller.flushPreferences(), isTrue);
+    expect(fake.saves, hasLength(1));
+    expect(await controller.flushPreferences(), isTrue);
+    expect(fake.saves, hasLength(1));
+    controller.dispose();
+  });
+
+  test('queued saves coalesce intermediate edits without losing the newest', () async {
+    final fake = DeferredSaveScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    controller.edit(instruction: 'First');
+    final first = controller.save();
+    await fake.firstSaveEntered.future;
+    controller.edit(instruction: 'Intermediate A');
+    final oldA = controller.save();
+    controller.edit(instruction: 'Intermediate B');
+    final oldB = controller.save();
+    controller.edit(instruction: 'Final');
+    final latest = controller.save();
+    fake.releaseFirstSave.complete();
+    await Future.wait([first, oldA, oldB, latest]);
+    expect(fake.maxSimultaneous, 1);
+    expect(fake.saves, hasLength(2));
+    expect((fake.saves.last['draft'] as Map)['message'], 'Final');
+    expect(await controller.flushPreferences(), isTrue);
+    expect(fake.saves, hasLength(2));
+    controller.dispose();
+  });
+
   test('concurrent saves cannot overwrite a later draft with earlier data', () async {
     final fake = DeferredSaveScheduler();
     final controller = SchedulerController(fake);
