@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'bridge.dart';
 import 'aero_appearance.dart';
@@ -53,6 +54,8 @@ class SchedulerController extends ChangeNotifier {
   bool _loading = false;
   bool _disposed = false;
   bool _saveFailed = false;
+  bool _hasUnsavedChanges = false;
+  String? _lastPersistedSettings;
   DateTime? _lastFullRefresh;
 
   List<Map<String, dynamic>> get quotaWindows => recordList(field(quota, 'windows'));
@@ -164,6 +167,9 @@ class SchedulerController extends ChangeNotifier {
         appearance = AeroAppearance.fromJson(field(settings, 'barAppearance'));
         ++_selectionEpoch;
         ready = true;
+        // The normalized restored preferences are our no-edit baseline.
+        // A close without changes must not launch another PowerShell process.
+        _lastPersistedSettings = jsonEncode(_settingsSnapshot());
       } else if (sessionId == null ||
           !sessions.any((s) => stringField(s, 'Id') == sessionId)) {
         ++_selectionEpoch;
@@ -450,44 +456,64 @@ class SchedulerController extends ChangeNotifier {
     _queueSave();
   }
 
-  /// Closing the window must not discard edits made during the debounce.
-  /// Return false if storage rejected the write so the window can remain open.
+  /// Only actual edits require a write. An in-flight write is still awaited
+  /// before shutdown, even if the debounce timer has already fired.
   Future<bool> flushPreferences() async {
     _saveTimer?.cancel();
-    await save();
-    return !_saveFailed;
+    // A single late repository lookup can update the draft while an earlier
+    // write is in flight. Drain only the latest state; never loop forever.
+    for (var attempt = 0; attempt < 3; attempt++) {
+      await save();
+      if (_saveFailed) return false;
+      if (!_hasUnsavedChanges) return true;
+    }
+    return false;
   }
 
   void _queueSave() {
-    if (!ready) return;
+    if (!ready || _disposed) return;
+    _hasUnsavedChanges = true;
     _saveTimer?.cancel();
     _saveTimer = Timer(const Duration(milliseconds: 650), () => save());
   }
 
-  /// Serialize writes: a slow, earlier save must never overwrite a newer
-  /// draft or accepted appearance after the newer write has completed.
+  Map<String, dynamic> _settingsSnapshot() => {
+    'compactMode': compact,
+    'barAppearance': appearance.toJson(),
+    'draft': {
+      'sessionId': sessionId ?? '', 'repo': repo, 'model': model ?? '',
+      'effort': effort ?? '', 'access': access, 'message': message,
+      'autoResumeOnLimit': autoResumeOnLimit,
+      'runAt': localIsoSecond(runAt),
+    },
+  };
+
+  /// Coalesce queued writes into the current state at execution time. This
+  /// preserves ordering while eliminating redundant PowerShell launches.
   Future<void> save() {
     if (!ready || _disposed) return Future<void>.value();
-    final snapshot = <String, dynamic>{
-      'compactMode': compact,
-      'barAppearance': appearance.toJson(),
-      'draft': {
-        'sessionId': sessionId ?? '', 'repo': repo, 'model': model ?? '',
-        'effort': effort ?? '', 'access': access, 'message': message,
-        'autoResumeOnLimit': autoResumeOnLimit,
-        'runAt': localIsoSecond(runAt),
-      },
-    };
     _saveTail = _saveTail.then((_) async {
-      if (_disposed) return;
+      if (_disposed || !_hasUnsavedChanges) return;
+      final snapshot = _settingsSnapshot();
+      final fingerprint = jsonEncode(snapshot);
+      if (fingerprint == _lastPersistedSettings) {
+        _hasUnsavedChanges = false;
+        _saveFailed = false;
+        return;
+      }
+      // Edits arriving during the await re-mark this flag. A future save
+      // writes that newer state; it cannot be overwritten by an older draft.
+      _hasUnsavedChanges = false;
       try {
         await adapter.call('save', snapshot);
+        _lastPersistedSettings = fingerprint;
         _saveFailed = false;
         if (error?.startsWith('Preferences save could not be confirmed:') == true) {
           error = null;
           _changed();
         }
       } catch (e) {
+        _hasUnsavedChanges = true;
         _saveFailed = true;
         error = 'Preferences save could not be confirmed: $e';
         _changed();
