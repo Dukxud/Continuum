@@ -6,6 +6,9 @@ $temp=Join-Path ([IO.Path]::GetTempPath()) ('codex-session-activity-'+[guid]::Ne
 [void](New-Item -ItemType Directory -Path $temp -Force)
 try {
     $file=Join-Path $temp 'rollout-example.jsonl'
+    Require ((Format-CodexSessionTitle -Title 'AIV' -AllowShort) -ceq 'AIV') 'Short Codex-owned title AIV was rejected.'
+    Require ($null -eq (Format-CodexSessionTitle -Title 'AIV')) 'Inferred short activity bypassed fallback filter.'
+
     function AppendEvent([string]$type,$payload) {
         @{type=$type;payload=$payload} | ConvertTo-Json -Depth 10 -Compress | Add-Content -LiteralPath $file -Encoding utf8
     }
