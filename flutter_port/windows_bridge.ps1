@@ -75,10 +75,10 @@ try {
                 if($IncludeActivity){
                     $detail=if($threads.Contains($id)){$threads[$id]}else{$null}
                     if($detail -and $detail.name){
-                        $activity=Format-CodexSessionTitle ([string]$detail.name)
+                        $activity=Format-CodexSessionTitle -Title ([string]$detail.name) -AllowShort
                     }
                     if(-not $activity -and $detail -and $detail.preview){
-                        $activity=Format-CodexSessionTitle ([string]$detail.preview)
+                        $activity=Format-CodexSessionTitle -Title ([string]$detail.preview) -AllowShort
                     }
                     if(-not $activity){
                         $activity=Get-CodexSessionActivity -SessionFile ([string]$session.File)
