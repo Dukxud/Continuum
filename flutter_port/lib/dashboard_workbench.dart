@@ -172,28 +172,50 @@ extension _DashboardWorkbench on _SchedulerHomeState {
             Expanded(child: Material(
               color: const Color(0xff221c36).withValues(alpha: .95),
               borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                key: const Key('scheduled-date-picker'),
-                onTap: pickTime, borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(children: [
-                    const Icon(Icons.calendar_month_rounded,
-                      size: 19, color: DeckColor.gold),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(formatDayMonth(date, year: true),
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: DeckColor.text, fontSize: 17,
-                        fontWeight: FontWeight.w800))),
-                    const SizedBox(width: 10),
-                    Text(formatLocalClock(date, seconds: true),
-                      key: const Key('selected-run-time-label'),
-                      maxLines: 1,
-                      style: const TextStyle(color: DeckColor.gold,
-                        fontSize: 15.5, fontWeight: FontWeight.w700)),
-                  ]),
-                ),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: Tooltip(
+                    message: 'Choose date',
+                    child: InkWell(
+                      key: const Key('scheduled-date-picker'),
+                      onTap: pickDate,
+                      borderRadius: const BorderRadius.horizontal(
+                        left: Radius.circular(12)),
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 12, right: 6),
+                        child: Row(children: [
+                          const Icon(Icons.calendar_month_rounded,
+                            size: 19, color: DeckColor.gold),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(formatDayMonth(date, year: true),
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: DeckColor.text, fontSize: 17,
+                              fontWeight: FontWeight.w800))),
+                        ]),
+                      ),
+                    ),
+                  )),
+                  Tooltip(
+                    message: 'Type time',
+                    child: InkWell(
+                      key: const Key('scheduled-time-picker'),
+                      onTap: pickTime,
+                      borderRadius: const BorderRadius.horizontal(
+                        right: Radius.circular(12)),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Center(child: Text(
+                          formatLocalClock(date, seconds: true),
+                          key: const Key('selected-run-time-label'),
+                          maxLines: 1,
+                          style: const TextStyle(color: DeckColor.gold,
+                            fontSize: 15.5, fontWeight: FontWeight.w700),
+                        )),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             )),
             const SizedBox(width: 8),
