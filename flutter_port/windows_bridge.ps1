@@ -310,11 +310,13 @@ try {
             if(-not $draft){throw 'No draft supplied.'}
             $access=[string]$draft.access
             if($access -cnotin @('workspace-write','read-only','yolo')){throw 'Invalid access mode.'}
+            if($null -ne $draft.autoResumeOnLimit -and $draft.autoResumeOnLimit -isnot [bool]){throw 'Invalid saved quota continuation option.'}
             $previous=Read-CodexUiSettings $appDir
             $safeDraft=[pscustomobject]@{
                 sessionId=[string]$draft.sessionId;repo=[string]$draft.repo
                 model=[string]$draft.model;effort=[string]$draft.effort
                 access=$access;message=[string]$draft.message;runAt=[string]$draft.runAt
+                autoResumeOnLimit=($draft.autoResumeOnLimit -eq $true)
             }
             $appearance=if($request.barAppearance){$request.barAppearance}elseif($previous){$previous.barAppearance}else{$null}
             if($appearance){
