@@ -26,7 +26,12 @@ try{
         return [pscustomobject]@{Id='00000000-0000-0000-0000-000000000001';Cwd=$testHome;File=$file}
     }
 
-    $aiv=New-TestRepo 'source\AIVault'
+    # Reproduce BLACK-PUDDLE: neither checkout folder nor remote slug is
+    # literally "AIVault", but the verified origin has that full project
+    # name as its first hyphen-delimited component.
+    $aiv=New-TestRepo 'source\aivault-phase1-firewall-free'
+    & git -C $aiv remote add origin 'https://github.com/Dukxud/aivault-opensearch-ai-dev.git'
+    if($LASTEXITCODE -ne 0){throw 'Unable to set up AIVault real-shape remote.'}
     $session=New-Session 'aiv' '# AIVault — Independent Adversarial Architecture Review'
     # The useful user instruction can be much older than the tail window.
     1..830 | ForEach-Object { '{"type":"event_msg","payload":{"type":"token_count"}}' } |
@@ -34,6 +39,13 @@ try{
     $found=Find-SessionRepository $session -AppDirectory $app -CheckoutHome $testHome
     Assert-True ((Normalize-Root $found.Root) -ieq (Normalize-Root $aiv)) 'AIVault project heading did not locate its verified local checkout.'
     Assert-True ($found.Source -eq 'session-referenced local Git checkout') 'Untrusted provenance was reported.'
+    $short=New-Session 'short' '# AIV — Independent Architecture'
+    Assert-True ($null -eq (Find-SessionRepository $short -AppDirectory $app -CheckoutHome $testHome)) 'Three-letter project abbreviation must not match a longer Git remote prefix.'
+    $unrelatedSimilar=New-TestRepo 'source\aivaultish-other'
+    & git -C $unrelatedSimilar remote add origin 'https://github.com/Dukxud/aivaultish-other.git'
+    if($LASTEXITCODE -ne 0){throw 'Unable to configure similarly named unrelated remote.'}
+    $unique=Find-SessionRepository $session -AppDirectory $app -CheckoutHome $testHome
+    Assert-True ((Normalize-Root $unique.Root) -ieq (Normalize-Root $aiv)) 'Substring-only repo name incorrectly matched AIVault project.'
 
     $different=New-TestRepo 'source\Unrelated'
     $wrong=New-Session 'unrelated' 'Investigate an unrelated repository.'
