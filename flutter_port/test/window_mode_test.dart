@@ -7,10 +7,14 @@ import 'package:codex_resume_flutter/main.dart';
 
 class SpyWindowHost implements SchedulerWindowHost {
   final List<String> modes = [];
+  final List<bool> topmostCalls = [];
   @override
-  Future<void> setMode({required bool compact, required int upcomingRunCount,
+  Future<void> setAlwaysOnTop(bool enabled) async { topmostCalls.add(enabled); }
+  @override
+  Future<void> setMode({required bool compact, bool micro = false,
+      required int upcomingRunCount,
       required int quotaWindowCount}) async {
-    modes.add((compact ? 'compact' : 'standard') +
+    modes.add((micro ? 'micro' : compact ? 'compact' : 'standard') +
       (upcomingRunCount > 0 ? ':run' : ':empty') +
       ':quota:$quotaWindowCount');
   }
@@ -28,10 +32,13 @@ class SpyWindowHost implements SchedulerWindowHost {
 
 class WindowAdapter implements SchedulerAdapter {
   WindowAdapter({required this.startCompact, this.hasRun = false,
-    this.quotaWindowCount = 0});
+    this.quotaWindowCount = 0, this.startMicro = false,
+    this.startPinned = false});
   final bool startCompact;
   final bool hasRun;
   final int quotaWindowCount;
+  final bool startMicro;
+  final bool startPinned;
   @override
   Future<Map<String, dynamic>> call(String action,
       [Map<String, dynamic> payload = const {}]) async {
@@ -44,7 +51,8 @@ class WindowAdapter implements SchedulerAdapter {
            'Status': 'Scheduled', 'Model': 'gpt-run',
            'Repo': r'C:\projects\test', 'Session': '-'}
         ] : [],
-        'settings': {'compactMode': startCompact, 'draft': {}},
+        'settings': {'compactMode': startCompact, 'microMode': startMicro,
+          'alwaysOnTop': startPinned, 'draft': {}},
       };
     }
     if (action == 'usage') {
