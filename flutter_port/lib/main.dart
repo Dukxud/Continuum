@@ -163,17 +163,36 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
   }
 
   Future<void> _closeAfterSave() async {
+    final host = widget.windowHost;
+    var hidden = false;
     try {
+      // Do the visible part of closing first. No disk or PowerShell wait
+      // occurs while the operator is still looking at the window.
+      if (host != null) {
+        await host.hideForShutdown();
+        hidden = true;
+      }
       final saved = await controller?.flushPreferences() ?? true;
       if (!saved) {
-        toast('Preferences could not be saved. Window remains open.');
-        _closing = false;
-        return;
+        throw StateError('Preferences could not be saved.');
       }
-      await windowManager.destroy();
+      if (host != null) {
+        await host.finishShutdown();
+      } else {
+        await windowManager.destroy();
+      }
     } catch (error) {
+      // Failure must remain recoverable. Never exit with unsaved changes.
+      var recoveryError = '';
+      if (hidden && host != null) {
+        try {
+          await host.restoreAfterFailedShutdown();
+        } catch (e) {
+          recoveryError = ' Window restoration failed: $e';
+        }
+      }
       _closing = false;
-      toast('Unable to close safely: $error');
+      toast('Unable to close safely: $error$recoveryError');
     }
   }
 
