@@ -109,12 +109,25 @@ function Find-ReferencedSessionRepository {
                             if($LASTEXITCODE -eq 0 -and $urls.Count){$origin=[string]$urls[0]}
                         }catch{}
                         $remoteMatch=$false
+                        $projectAliasMatch=$false
                         foreach($hit in [regex]::Matches($origin,$remotePattern)){
                             $remote=('{0}/{1}' -f $hit.Groups['owner'].Value,
                                 ($hit.Groups['repo'].Value -replace '[.]git$',''))
                             if($remotes.Contains($remote)){$remoteMatch=$true}
+                            # The checkout and GitHub repository can have different
+                            # names. A user-authored project heading such as
+                            # "AIVault" may identify "aivault-opensearch-ai-dev".
+                            # Match whole leading components only, never loose
+                            # substrings or short acronyms (e.g. AIV).
+                            foreach($project in $names){
+                                if($project.Length -lt 5){continue}
+                                if($remote.Split('/')[-1] -match
+                                    ('(?i)^'+[regex]::Escape($project)+'(?:[-_.]|$)')){
+                                    $projectAliasMatch=$true
+                                }
+                            }
                         }
-                        if($remoteMatch -or $names.Contains($identity)){
+                        if($remoteMatch -or $names.Contains($identity) -or $projectAliasMatch){
                             [void]$matchedRoots.Add($root)
                         }
                     }elseif($level -lt ($depth-1)){
