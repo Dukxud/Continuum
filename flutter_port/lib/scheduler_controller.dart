@@ -15,6 +15,7 @@ class SchedulerController extends ChangeNotifier {
   DateTime? _lastSessionLabelsAttempt;
   List<Map<String, dynamic>> runs = [];
   List<Map<String, dynamic>> history = [];
+  Map<String, Map<String, dynamic>> activities = {};
   List<Map<String, dynamic>> models = [];
   Map<String, dynamic>? quota;
   AeroAppearance appearance = AeroAppearance.defaults;
@@ -133,6 +134,7 @@ class SchedulerController extends ChangeNotifier {
       }
       runs = recordList(field(data, 'pending'));
       history = recordList(field(data, 'history'));
+      _acceptActivities(field(data, 'activities'));
       logDirectory = stringField(data, 'logDirectory');
       // WinForms picks the most recent session when its saved choice is gone
       // and immediately looks up the selected conversation's Git root.
@@ -244,6 +246,17 @@ class SchedulerController extends ChangeNotifier {
     }
   }
 
+  // Snapshot replacement prevents stale output from persisting after a job
+  // stops or disappears from Windows Task Scheduler.
+  void _acceptActivities(dynamic value) {
+    activities = {
+      if (value is Map)
+        for (final entry in value.entries)
+          if (entry.key is String && entry.value is Map)
+            entry.key as String: Map<String, dynamic>.from(entry.value as Map),
+    };
+  }
+
   Future<void> poll() async {
     if (_polling || _loading) return;
     _polling = true;
@@ -253,6 +266,7 @@ class SchedulerController extends ChangeNotifier {
       final previousTarget = usageTargetModel;
       runs = recordList(field(data, 'pending'));
       history = recordList(field(data, 'history'));
+      _acceptActivities(field(data, 'activities'));
       if (usageTargetModel != previousTarget) {
         quota = null; quotaAt = null; quotaModel = '';
         unawaited(readUsage());
