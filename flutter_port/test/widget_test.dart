@@ -111,6 +111,41 @@ class AutoRepositoryAdapter extends StubAdapter {
   }
 }
 
+class LiveMonitoringAdapter extends StubAdapter {
+  LiveMonitoringAdapter() : super(pendingCount: 1, pendingStatus: 'Running');
+
+  static const job = 'CodexResume-20261103-1900-00000001';
+  int polls = 0;
+
+  Map<String, dynamic> activity(String summary, {int commands = 0}) => {
+    'Available': true,
+    'Summary': summary,
+    'Recent': [summary],
+    'CompletedCommands': commands,
+    'FileChanges': 0,
+    'LatestResponse': 'Checked repository and verified tests.',
+  };
+
+  @override
+  Future<Map<String, dynamic>> call(String action,
+      [Map<String, dynamic> payload = const {}]) async {
+    if (action == 'load') {
+      final data = await super.call(action, payload);
+      return {...data, 'activities': {job: activity('Running command')}};
+    }
+    if (action == 'pending') {
+      polls++;
+      if (polls > 1) return {'pending': [], 'history': [], 'activities': {}};
+      final data = await super.call('load');
+      return {
+        'pending': data['pending'], 'history': [],
+        'activities': {job: activity('Command finished (exit 0)', commands: 1)},
+      };
+    }
+    return super.call(action, payload);
+  }
+}
+
 void main() {
   testWidgets('new workbench has distinct visual hierarchy', (tester) async {
     tester.view.physicalSize = const Size(1240, 850);
@@ -219,6 +254,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('minus is left of date and time stays beside date',
+      (tester) async {
+    tester.view.physicalSize = const Size(1240, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(adapter: StubAdapter())));
+    await tester.pump(const Duration(milliseconds: 150));
+    final minus = find.text('−');
+    final plus = find.text('+');
+    final field = find.byKey(const Key('scheduled-date-picker'));
+    final clock = find.byKey(const Key('selected-run-time-label'));
+    expect(minus, findsOneWidget);
+    expect(plus, findsOneWidget);
+    expect(tester.getCenter(minus).dx, lessThan(tester.getTopLeft(field).dx));
+    expect(tester.getCenter(plus).dx, greaterThan(tester.getTopRight(field).dx));
+    final date = find.descendant(of: field, matching: find.byType(Text)).first;
+    expect((tester.getCenter(date).dy - tester.getCenter(clock).dy).abs(), lessThan(8));
+    final value = tester.widget<Text>(clock).data!;
+    expect(value, matches(RegExp(r'^\\d{1,2}:\\d{2}:\\d{2} (AM|PM)\\$')));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('adaptive +1 shortcut preserves recommended seconds',
       (tester) async {
     tester.view.physicalSize = const Size(1240, 850);
@@ -319,6 +379,34 @@ void main() {
     await tester.pump(const Duration(milliseconds: 150));
     expect(find.text('Continuum.'), findsOneWidget);
     expect(find.text('Schedule once'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('running Codex event feed updates and clears in both monitor modes',
+      (tester) async {
+    tester.view.physicalSize = const Size(1240, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final adapter = LiveMonitoringAdapter();
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(adapter: adapter)));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.byKey(const Key('live-codex-activity')), findsOneWidget);
+    expect(find.text('Running command'), findsOneWidget);
+    await tester.tap(find.text('Monitor'));
+    await tester.pump(const Duration(milliseconds: 150));
+    tester.view.physicalSize = const Size(540, 685);
+    await tester.pump();
+    expect(find.byKey(const Key('live-codex-activity')), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.text('Command finished (exit 0)'), findsOneWidget);
+    expect(find.textContaining('1 commands'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.byKey(const Key('live-codex-activity')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
