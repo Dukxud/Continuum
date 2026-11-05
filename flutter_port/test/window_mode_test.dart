@@ -272,6 +272,27 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('View stays at the same right-edge offset across modes',
+      (tester) async {
+    tester.view.physicalSize = const Size(1240, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: WindowAdapter(startCompact: false))));
+    await tester.pump(const Duration(milliseconds: 180));
+    double rightOffset() => tester.view.physicalSize.width -
+      tester.getRect(find.byKey(const Key('view-menu'))).right;
+    final fullOffset = rightOffset();
+    await chooseView(tester, 'Monitor', nextSize: const Size(540, 535));
+    expect(rightOffset(), closeTo(fullOffset, 1));
+    await chooseView(tester, 'Micro', nextSize: const Size(392, 212));
+    expect(rightOffset(), closeTo(fullOffset, 1));
+    expect(tester.takeException(), isNull);
+  });
+
   test('upper-right pivot survives mode and dialog roundtrips', () {
     const starting = Rect.fromLTWH(920, 50, 392, 212);
     final monitor = anchoredTopRightBounds(starting, const Size(540, 535));
