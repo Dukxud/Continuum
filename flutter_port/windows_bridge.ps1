@@ -26,8 +26,33 @@ try {
     # full stable IDs, while making the Flutter chooser distinguish projects.
     function Get-FlutterSessionChoices {
         param([switch]$IncludeActivity)
+        $choices=@(Get-RecentCliSessions)
+        $threads=@{}
+        if($IncludeActivity -and $choices.Count){
+            # Use one metadata-only Codex App Server for all session titles.
+            # This is optional presentation work, never a scheduling authority.
+            try {
+                $shim=(Get-Command codex.cmd -ErrorAction Stop).Source
+                $cli=Join-Path (Split-Path -Parent $shim) 'node_modules\@openai\codex\bin\codex.js'
+                $helper=Join-Path $source 'CodexUsage.js'
+                if((Test-Path -LiteralPath $cli -PathType Leaf) -and
+                   (Test-Path -LiteralPath $helper -PathType Leaf)){
+                    $ids=@($choices | ForEach-Object { [string]$_.Id })
+                    $lines=@(& node.exe $helper --cli-js $cli --thread-ids ($ids -join ','))
+                    if($LASTEXITCODE -eq 0 -and $lines.Count){
+                        $reply=($lines | Select-Object -Last 1) |
+                            ConvertFrom-Json -AsHashtable -ErrorAction Stop
+                        if($reply.ok -eq $true -and $reply.threads -is [System.Collections.IDictionary]){
+                            $threads=$reply.threads
+                        }
+                    }
+                }
+            }catch{
+                # Use local user activity or stable folder/time identity below.
+            }
+        }
         $rootCache=@{}
-        foreach($session in @(Get-RecentCliSessions)){
+        foreach($session in $choices){
             try {
                 $cwd=[string]$session.Cwd
                 $root=$null
@@ -46,7 +71,19 @@ try {
                 $date=$when.ToString('d MMM HH:mm',[Globalization.CultureInfo]::InvariantCulture)
                 # Activity excerpts are optional. Never scan large live Codex
                 # rollouts as part of the critical startup data load.
-                $activity=if($IncludeActivity){Get-CodexSessionActivity -SessionFile ([string]$session.File)}else{$null}
+                $activity=$null
+                if($IncludeActivity){
+                    $detail=if($threads.Contains($id)){$threads[$id]}else{$null}
+                    if($detail -and $detail.name){
+                        $activity=Format-CodexSessionTitle ([string]$detail.name)
+                    }
+                    if(-not $activity){
+                        $activity=Get-CodexSessionActivity -SessionFile ([string]$session.File)
+                    }
+                    if(-not $activity -and $detail -and $detail.preview){
+                        $activity=Format-CodexSessionTitle ([string]$detail.preview)
+                    }
+                }
                 $identity=('{0} | {1} | {2}' -f $title,$date,$id.Substring($id.Length-8))
                 $session.Display=if($activity){$activity+' | '+$identity}else{$identity}
             }catch{
