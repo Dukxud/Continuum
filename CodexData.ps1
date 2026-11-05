@@ -49,15 +49,26 @@ function Get-RecentCliSessions {
 # conversation title from assistant output, tool calls, or injected context.
 # Live sessions can be large, so inspect a bounded tail; fall back to the first
 # prompt when an active turn has produced more than the sampled amount of output.
+function Format-CodexSessionTitle {
+    param([AllowEmptyString()][string]$Title)
+    $first=($Title -split '\r?\n' | Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_)
+    } | Select-Object -First 1)
+    $first=[regex]::Replace([string]$first,'[\p{Cc}\p{Cf}\s]+',' ').Trim()
+    if($first.Length -lt 5 -or $first -match '^(?:<[^>]*>|[^\p{L}\p{N}]+)$'){return $null}
+    if($first.Length -gt 58){return $first.Substring(0,57).TrimEnd()+'…'}
+    return $first
+}
+
 function Get-CodexSessionActivity {
     param([Parameter(Mandatory)][string]$SessionFile)
     if(-not (Test-Path -LiteralPath $SessionFile -PathType Leaf)){return $null}
     foreach($sample in @('recent','initial')){
         try {
             $lines=if($sample -eq 'recent'){
-                @(Get-Content -LiteralPath $SessionFile -Tail 512 -ErrorAction Stop)
+                @(Get-Content -LiteralPath $SessionFile -Tail 160 -ErrorAction Stop)
             }else{
-                @(Get-Content -LiteralPath $SessionFile -TotalCount 120 -ErrorAction Stop)
+                @(Get-Content -LiteralPath $SessionFile -TotalCount 60 -ErrorAction Stop)
             }
         }catch{return $null}
         $last=$null
@@ -73,12 +84,8 @@ function Get-CodexSessionActivity {
                 }
                 # A bare continuation instruction is not a useful subject.
                 if($raw.Trim() -match '^(?i:resume|continue|go ahead|proceed|yes|ok|okay|do it)[.!\s]*$'){continue}
-                $first=($raw -split '\r?\n' | Where-Object {
-                    -not [string]::IsNullOrWhiteSpace($_)
-                } | Select-Object -First 1)
-                $first=[regex]::Replace([string]$first,'[\p{Cc}\p{Cf}\s]+',' ').Trim()
-                if($first.Length -lt 5 -or $first -match '^(?:<[^>]*>|[^\p{L}\p{N}]+)$'){continue}
-                $last=if($first.Length -gt 58){$first.Substring(0,57).TrimEnd()+'…'}else{$first}
+                $caption=Format-CodexSessionTitle $raw
+                if($caption){$last=$caption}
             }catch{continue}
         }
         if($last){return $last}
