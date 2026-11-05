@@ -249,12 +249,15 @@ class SchedulerController extends ChangeNotifier {
   // Snapshot replacement prevents stale output from persisting after a job
   // stops or disappears from Windows Task Scheduler.
   void _acceptActivities(dynamic value) {
-    activities = {
-      if (value is Map)
-        for (final entry in value.entries)
-          if (entry.key is String && entry.value is Map)
-            entry.key as String: Map<String, dynamic>.from(entry.value as Map),
-    };
+    final next = <String, Map<String, dynamic>>{};
+    if (value is Map) {
+      for (final entry in value.entries) {
+        if (entry.key is String && entry.value is Map) {
+          next[entry.key as String] = Map<String, dynamic>.from(entry.value as Map);
+        }
+      }
+    }
+    activities = next;
   }
 
   Future<void> poll() async {
