@@ -41,7 +41,10 @@ extension _DashboardFrame on _SchedulerHomeState {
     );
   }
 
-  Widget _deckHeader(SchedulerController state) => Row(children: [
+  Widget _deckHeader(SchedulerController state) {
+    final loadFailed = !state.ready &&
+        (state.error?.startsWith('Refresh failed:') ?? false);
+    return Row(children: [
     Container(
       width: 53, height: 53,
       decoration: BoxDecoration(
@@ -69,9 +72,10 @@ extension _DashboardFrame on _SchedulerHomeState {
           fontWeight: FontWeight.w900, letterSpacing: -1.25)),
     ]),
     const Spacer(),
-    DeckInfo(state.ready ? 'CONNECTED' : 'CONNECTING',
-      color: state.ready ? DeckColor.mint : DeckColor.gold,
-      icon: state.ready ? Icons.link_rounded : Icons.sync_rounded),
+    DeckInfo(state.ready ? 'CONNECTED' : loadFailed ? 'LOAD FAILED' : 'CONNECTING',
+      color: state.ready ? DeckColor.mint : loadFailed ? DeckColor.rose : DeckColor.gold,
+      icon: state.ready ? Icons.link_rounded :
+        loadFailed ? Icons.error_outline_rounded : Icons.sync_rounded),
     const SizedBox(width: 12),
     DeckAction(label: 'Logs', icon: Icons.folder_outlined,
       compact: true, onTap: openLogs, tone: DeckColor.aqua),
@@ -85,7 +89,8 @@ extension _DashboardFrame on _SchedulerHomeState {
     DeckAction(label: 'Monitor', icon: Icons.dashboard_customize_outlined,
       compact: true, onTap: () => state.edit(compactMode: true),
       tone: DeckColor.mint),
-  ]);
+    ]);
+  }
 
   /// Compact is a separate monitoring instrument, not a squeezed form.
   Widget _compactDeck() {
