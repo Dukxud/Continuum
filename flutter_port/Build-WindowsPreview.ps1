@@ -55,7 +55,7 @@ try{
     [void](New-Item -ItemType Directory -Path $destination -Force)
     Copy-Item -Path (Join-Path $release '*') -Destination $destination -Recurse -Force -ErrorAction Stop
     $mustCopy=@('CodexResumeScheduler.ps1','CodexRunEngine.ps1','CodexData.ps1',
-        'CodexJobStore.ps1','CodexUsage.js','CodexQuotaContinuation.ps1','CodexRunJob.vbs')
+        'CodexJobStore.ps1','CodexSessionRepository.ps1','CodexUsage.js','CodexQuotaContinuation.ps1','CodexRunJob.vbs')
     foreach($relative in $mustCopy){
         $from=Join-Path $root $relative
         if(-not (Test-Path -LiteralPath $from -PathType Leaf)){throw "Required worker file missing: $relative"}
