@@ -80,21 +80,54 @@ extension _DashboardMicro on _SchedulerHomeState {
   Widget _microCapacity(String label, Map<String, dynamic>? window,
       String kind, Color accent, SchedulerController state) {
     final value = field(window, 'remainingPercent');
-    final remaining = value is num ? value.toDouble() : null;
-    return Row(children: [
-      SizedBox(width: 56, child: Text(label, maxLines: 1,
-        style: TextStyle(color: accent, fontSize: 9.5,
-          fontWeight: FontWeight.w800, letterSpacing: .5))),
-      const SizedBox(width: 7),
-      Expanded(child: AeroLiquidBar(
-        amount: remaining, appearance: state.appearance,
-        kind: kind, height: 12)),
-      const SizedBox(width: 9),
-      SizedBox(width: 49, child: Text(
-        remaining == null ? '—' : '${remaining.toStringAsFixed(1)}%',
-        textAlign: TextAlign.end,
-        style: const TextStyle(color: DeckColor.text,
-          fontSize: 11, fontWeight: FontWeight.w800))),
+    final remaining = value is num && value.isFinite
+      ? value.toDouble() : null;
+    final resetAt = dateField(window, 'resetsAt');
+    final now = DateTime.now();
+    final due = resetAt != null && resetAt.isAfter(now);
+    final exhausted = remaining != null && remaining <= 0;
+    final resetTime = resetAt == null
+      ? 'RESET TIME UNAVAILABLE'
+      : due ? 'RESETS ${formatDayMonth(resetAt)} · ${formatLocalClock(resetAt)}'
+        : 'RESET DUE · AWAITING UPDATE';
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        SizedBox(width: 56, child: Text(label, maxLines: 1,
+          style: TextStyle(color: accent, fontSize: 9.5,
+            fontWeight: FontWeight.w800, letterSpacing: .5))),
+        const SizedBox(width: 7),
+        Expanded(child: exhausted
+          ? Container(
+              key: Key('micro-reset-$kind'), height: 19,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(7),
+                color: DeckColor.gold.withValues(alpha: .13),
+                border: Border.all(
+                  color: DeckColor.gold.withValues(alpha: .45))),
+              child: Text(due
+                ? 'RESET IN ${countdown(resetAt)}'
+                : resetAt == null ? 'RESET UNKNOWN' : 'RESET DUE',
+                maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: DeckColor.gold,
+                  fontSize: 10.5, fontWeight: FontWeight.w800)))
+          : AeroLiquidBar(
+              key: Key('micro-bar-$kind'),
+              amount: remaining, appearance: state.appearance,
+              kind: kind, height: 12)),
+        const SizedBox(width: 9),
+        SizedBox(width: 49, child: Text(
+          remaining == null ? '—' : '${remaining.toStringAsFixed(1)}%',
+          textAlign: TextAlign.end,
+          style: const TextStyle(color: DeckColor.text,
+            fontSize: 11, fontWeight: FontWeight.w800))),
+      ]),
+      const SizedBox(height: 3),
+      Padding(padding: const EdgeInsets.only(left: 63),
+        child: Text(resetTime, key: Key('micro-reset-time-$kind'),
+          maxLines: 1, overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: DeckColor.muted,
+            fontSize: 9, letterSpacing: .2))),
     ]);
   }
 
