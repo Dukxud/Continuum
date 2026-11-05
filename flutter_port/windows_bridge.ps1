@@ -22,6 +22,7 @@ try {
     }else{[pscustomobject]@{}}
     . (Join-Path $source 'CodexRunEngine.ps1')
     . (Join-Path $source 'CodexData.ps1')
+    . (Join-Path $source 'CodexRunActivity.ps1')
     # Presentation-only labels: preserve the WinForms session reader and its
     # full stable IDs, while making the Flutter chooser distinguish projects.
     function Get-FlutterSessionChoices {
@@ -128,6 +129,20 @@ try {
         }
         return @($records | Sort-Object When -Descending)
     }
+    # Only running Scheduler jobs expose their own event summaries. There
+    # are no extra processes or raw command/output disclosures in the poll.
+    function Get-FlutterRunActivities {
+        param([object[]]$Tasks=@())
+        $activities=@{}
+        foreach($task in @($Tasks | Where-Object { $_.Status -eq 'Running' } |
+                Select-Object -First 8)){
+            $name=[string]$task.Name
+            if($name -cmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[0-9a-fA-F]{8}$'){
+                $activities[$name]=Get-CodexRunActivity -Directory $appDir -Name $name
+            }
+        }
+        return $activities
+    }
     $result=$null
     switch($Action){
         'load' {
@@ -135,6 +150,7 @@ try {
             $result=@{
                 sessions=@(Get-FlutterSessionChoices)
                 pending=$tasks
+                activities=(Get-FlutterRunActivities -Tasks $tasks)
                 history=@(Get-FlutterHistory -Tasks $tasks)
                 settings=Read-CodexUiSettings $appDir
                 logDirectory=$appDir
@@ -147,6 +163,7 @@ try {
             $tasks=@(Get-UpcomingCodexTasks -AppDirectory $appDir)
             $result=@{
                 pending=$tasks
+                activities=(Get-FlutterRunActivities -Tasks $tasks)
                 history=@(Get-FlutterHistory -Tasks $tasks)
             }
         }
