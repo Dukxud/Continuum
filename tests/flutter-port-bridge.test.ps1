@@ -244,7 +244,7 @@ try {
         access='read-only';message='Resume.';runAt=$future
         autoResumeOnLimit=$true
     }
-    $body=@{draft=$draft;compactMode=$true} | ConvertTo-Json -Compress -Depth 6
+    $body=@{draft=$draft;compactMode=$true;microMode=$true;alwaysOnTop=$true} | ConvertTo-Json -Compress -Depth 6
     $payload=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($body))
     $output=@(& pwsh -NoProfile -NonInteractive -STA -File $bridge -Action save -Payload $payload)
     $status=$LASTEXITCODE
@@ -252,7 +252,8 @@ try {
     $reply=($output | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
     if($reply.ok -ne $true){throw "Preferences save rejected: $($reply.error)"}
     $saved=Get-Content -LiteralPath (Join-Path $settingsFixture 'CodexResumeScheduler\settings.json') -Raw | ConvertFrom-Json
-    if($saved.draft.autoResumeOnLimit -ne $true -or $saved.draft.repo -cne 'C:\fixture\repo'){
+    if($saved.draft.autoResumeOnLimit -ne $true -or $saved.draft.repo -cne 'C:\fixture\repo' -or
+       $saved.microMode -ne $true -or $saved.alwaysOnTop -ne $true -or $saved.compactMode -ne $true){
         throw 'Persisted preferences lost the auto-resume opt-in or repository.'
     }
     $draft.autoResumeOnLimit='true'
@@ -263,6 +264,19 @@ try {
     $badReply=($badOutput | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
     if($badExit -eq 0 -or $badReply.error -cne 'Invalid saved quota continuation option.'){
         throw 'Untrusted automatic-continuation setting was accepted.'
+    }
+    $draft.autoResumeOnLimit=$true
+    foreach($flag in @('microMode','alwaysOnTop')){
+        $request=@{draft=$draft;compactMode=$true;microMode=$true;alwaysOnTop=$true}
+        $request[$flag]='true'
+        $invalidBody=$request | ConvertTo-Json -Compress -Depth 6
+        $invalidPayload=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($invalidBody))
+        $invalidOut=@(& pwsh -NoProfile -NonInteractive -STA -File $bridge -Action save -Payload $invalidPayload)
+        $invalidExit=$LASTEXITCODE
+        $invalidReply=($invalidOut | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+        if($invalidExit -eq 0 -or $invalidReply.error -cne "Invalid window preference: $flag"){
+            throw "Invalid persisted $flag preference was accepted."
+        }
     }
     Write-Host 'Flutter isolated preferences round-trip and strict opt-in validation PASS.' -ForegroundColor Green
 }finally{
