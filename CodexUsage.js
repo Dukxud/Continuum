@@ -157,23 +157,33 @@ function normalizeThreadRead(result, expectedId) {
   if (!thread || thread.id !== expectedId) throw new Error('Codex returned unexpected thread metadata.');
   // thread/read does not resume a conversation or subscribe to turns.
   const cwd = typeof thread.cwd === 'string' && thread.cwd.trim() ? thread.cwd.trim() : null;
-  return {ok:true, threadId:expectedId, cwd};
+  // Use the Codex-owned title, not a guessed title from rollout messages.
+  // thread/read is a metadata-only operation (includeTurns is false).
+  const name = typeof thread.name === 'string' && thread.name.trim()
+    ? thread.name.trim() : null;
+  const preview = typeof thread.preview === 'string' && thread.preview.trim()
+    ? thread.preview.trim() : null;
+  return {ok:true, threadId:expectedId, cwd, name, preview};
 }
 function readThreadDirectory(cliJs, threadId, timeoutMs=10000) {
   if (typeof threadId !== 'string' || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(threadId))
     return Promise.reject(new Error('Invalid Codex conversation ID.'));
   return readCodexState(cliJs,{threadId,timeoutMs,catalog:false});
 }
-async function main() {
+()=>add+marker
   const flag=process.argv.indexOf('--cli-js'); const cliJs=flag>=0?process.argv[flag+1]:null;
   if(!cliJs||!fs.existsSync(cliJs)||path.extname(cliJs).toLowerCase()!=='.js')throw new Error('Codex npm CLI entry not found.');
   const modelFlag=process.argv.indexOf('--model'); const model=modelFlag>=0?process.argv[modelFlag+1]:null;
   const threadFlag=process.argv.indexOf('--thread-id');
   const threadId=threadFlag>=0?process.argv[threadFlag+1]:null;
-  const state=threadFlag>=0
-    ? await readThreadDirectory(path.resolve(cliJs),threadId)
-    : await readCodexState(path.resolve(cliJs),{model,catalog:!process.argv.includes('--rates-only'),modelsOnly:process.argv.includes('--models-only')});
+  const threadsFlag=process.argv.indexOf('--thread-ids');
+  const state=threadsFlag>=0
+    ? await readThreadSummaries(path.resolve(cliJs),
+      (process.argv[threadsFlag+1]||'').split(',').filter(Boolean))
+    : threadFlag>=0
+      ? await readThreadDirectory(path.resolve(cliJs),threadId)
+      : await readCodexState(path.resolve(cliJs),{model,catalog:!process.argv.includes('--rates-only'),modelsOnly:process.argv.includes('--models-only')});
   process.stdout.write(JSON.stringify(state)+'\n');
 }
 if(require.main===module) main().catch(e=>{process.stdout.write(JSON.stringify({ok:false,error:e.message})+'\n');process.exitCode=1;});
-module.exports={describeWindow,normalizeModels,selectBucket,summarizeRateLimits,readCodexState,readRateLimits,normalizeThreadRead,readThreadDirectory,identifyAccount};
+module.exports={describeWindow,normalizeModels,selectBucket,summarizeRateLimits,readCodexState,readRateLimits,normalizeThreadRead,readThreadDirectory,readThreadSummaries,identifyAccount};
