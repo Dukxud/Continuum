@@ -549,7 +549,7 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
   }
 
   Widget _menuFace(IconData glyph, Color tone, {String? label}) => Container(
-    width: label == null ? 36 : 86, height: 36,
+    width: label == null ? 36 : 96, height: 36,
     decoration: BoxDecoration(
       color: const Color(0xff27304a),
       border: Border.all(color: tone.withValues(alpha: .42)),
