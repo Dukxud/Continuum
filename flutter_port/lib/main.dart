@@ -17,6 +17,7 @@ import 'scheduler_controller.dart';
 part 'dashboard_frame.dart';
 part 'dashboard_workbench.dart';
 part 'dashboard_monitor.dart';
+part 'dashboard_micro.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -91,6 +92,8 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
 
   bool _dialogOpen = false;
   bool _closing = false;
+  bool _pinRestored = false;
+  bool _changingPin = false;
   String _lastWindowKey = '';
 
   void updateWindowSize() {
@@ -99,11 +102,11 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
     if (state == null || host == null || !state.ready || _dialogOpen) return;
     final quotaCount = math.min(2, state.quotaWindows.length);
     final runCount = state.upcoming.length;
-    final key = (state.compact ? 'compact' : 'standard') +
+    final key = (state.micro ? 'micro' : state.compact ? 'compact' : 'standard') +
       '-runs:${math.min(4, runCount)}-quota:$quotaCount';
     if (_lastWindowKey == key) return;
     _lastWindowKey = key;
-    unawaited(host.setMode(compact: state.compact,
+    unawaited(host.setMode(compact: state.compact, micro: state.micro,
       upcomingRunCount: runCount,
       quotaWindowCount: quotaCount).catchError((Object error) {
         if (mounted) toast('Unable to resize window: ' + error.toString());
@@ -141,7 +144,34 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
       );
     }
     updateWindowSize();
+    if (state.ready && !_pinRestored) {
+      _pinRestored = true;
+      final host = widget.windowHost;
+      if (host != null && state.alwaysOnTop) {
+        unawaited(host.setAlwaysOnTop(true).catchError((Object error) {
+          if (mounted) toast('Unable to restore Always on Top: $error');
+        }));
+      }
+    }
     setState(() {});
+  }
+
+  Future<void> toggleAlwaysOnTop() async {
+    final state = controller;
+    if (state == null || !state.ready || _changingPin) return;
+    final desired = !state.alwaysOnTop;
+    _changingPin = true;
+    try {
+      // A successful native operation is required before persisting its
+      // visual state. This does not depend on the PowerToys hotkey.
+      await widget.windowHost?.setAlwaysOnTop(desired);
+      if (!mounted) return;
+      state.edit(pinOnTop: desired);
+    } catch (error) {
+      if (mounted) toast('Unable to change Always on Top: $error');
+    } finally {
+      _changingPin = false;
+    }
   }
 
   @override
@@ -460,7 +490,8 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
     }
     return Scaffold(
       backgroundColor: DeckColor.voidInk,
-      body: SafeArea(child: state.compact ? _compactDeck() : _fullDeck()),
+      body: SafeArea(child: state.micro ? _microDeck() :
+        state.compact ? _compactDeck() : _fullDeck()),
     );
   }
 }
