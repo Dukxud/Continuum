@@ -69,9 +69,9 @@ class _LiveActivityDialogState extends State<LiveActivityDialog> {
     return '${seconds ~/ 86400}d ago';
   }
 
-  String _elapsed(DateTime? start) {
-    if (start == null) return 'Unavailable';
-    final seconds = DateTime.now().difference(start).inSeconds;
+  String _elapsed(DateTime? start, DateTime? through) {
+    if (start == null || through == null) return 'Unavailable';
+    final seconds = through.difference(start).inSeconds;
     if (seconds <= 0) return '0s';
     if (seconds < 60) return '${seconds}s';
     if (seconds < 3600) return '${seconds ~/ 60}m ${seconds % 60}s';
@@ -142,7 +142,10 @@ class _LiveActivityDialogState extends State<LiveActivityDialog> {
               Wrap(spacing: 9, runSpacing: 7, children: [
                 _metric('STATUS', status, active != null
                   ? DeckColor.gold : DeckColor.mint),
-                _metric('ACTIVE FOR', _elapsed(startedAt), DeckColor.aqua),
+                _metric(active != null ? 'ACTIVE FOR' : 'OBSERVED FOR',
+                  _elapsed(startedAt,
+                    active != null ? DateTime.now() : updatedAt),
+                  DeckColor.aqua),
                 _metric('LAST EVENT', _age(updatedAt), DeckColor.iris),
               ]),
               const SizedBox(height: 13),
