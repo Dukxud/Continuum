@@ -136,6 +136,42 @@ try {
        -not $outsideLabel[0].Display.StartsWith('Outside Git: outside-git | ')){
         throw 'Optional activity query lost its topic, fallback label or stable session identity.'
     }
+    # A canonical Codex-owned thread title must override the opening prompt.
+    # Fake local App Server: no account access, network, or Windows task mutation.
+    $savedPath=$env:PATH
+    try {
+        $bin=Join-Path $fixture 'mock-codex-bin'
+        $mockDir=Join-Path $bin 'node_modules\@openai\codex\bin'
+        [void](New-Item -ItemType Directory -Path $mockDir -Force)
+        '@echo off' | Set-Content -LiteralPath (Join-Path $bin 'codex.cmd') -Encoding ascii
+        $mock=@'
+"use strict";
+const readline=require("node:readline");
+readline.createInterface({input:process.stdin}).on("line",line=>{
+ let message;try{message=JSON.parse(line)}catch{return}
+ const send=answer=>process.stdout.write(JSON.stringify(answer)+"\n");
+ if(message.method==="initialize")send({id:message.id,result:{}});
+ if(message.method==="thread/read") {
+   const id=message.params.threadId;
+   const name=id==="__TITLE_ID__"?"Official shared-EC2 architecture review":null;
+   send({id:message.id,result:{thread:{id,name,preview:"Original generic instruction",cwd:"C:\\QA"}}});
+ }
+});
+'@
+        $mock=$mock.Replace('__TITLE_ID__',$sessionId)
+        Set-Content -LiteralPath (Join-Path $mockDir 'codex.js') -Value $mock -Encoding utf8
+        $env:PATH="$bin;$savedPath"
+        $namedOutput=@(& pwsh -NoLogo -NoProfile -NonInteractive -STA -File $bridge -Action labels)
+        if($LASTEXITCODE -ne 0 -or -not $namedOutput){throw 'Canonical title bridge query failed.'}
+        $namedBody=($namedOutput | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+        if($namedBody.ok -ne $true){throw "Canonical title bridge error: $($namedBody.error)"}
+        $namedSession=@($namedBody.result.sessions | Where-Object Id -eq $sessionId)
+        if($namedSession.Count -ne 1 -or
+           -not $namedSession[0].Display.StartsWith('Official shared-EC2 architecture review | Git: qa-repository | ')){
+            throw 'Bridge ignored Codex-owned thread.name and used a guessed rollout title.'
+        }
+        Write-Host 'Codex-owned conversation title wins over rollout excerpts PASS.' -ForegroundColor Green
+    }finally{$env:PATH=$savedPath}
     Write-Host 'Essential session loading is isolated from optional activity excerpts PASS.' -ForegroundColor Green
     Write-Host 'Flutter conversation labels clearly distinguish Git-backed and outside-Git sessions PASS.' -ForegroundColor Green
 
