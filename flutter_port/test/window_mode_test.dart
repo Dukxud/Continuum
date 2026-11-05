@@ -17,6 +17,13 @@ class SpyWindowHost implements SchedulerWindowHost {
   @override
   Future<void> showDialogWindow({required bool history}) async {}
 
+  final List<String> shutdownCalls = [];
+  @override
+  Future<void> hideForShutdown() async { shutdownCalls.add('hide'); }
+  @override
+  Future<void> restoreAfterFailedShutdown() async { shutdownCalls.add('restore'); }
+  @override
+  Future<void> finishShutdown() async { shutdownCalls.add('finish'); }
 }
 
 class WindowAdapter implements SchedulerAdapter {
