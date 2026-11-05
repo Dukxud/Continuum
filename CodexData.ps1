@@ -175,7 +175,7 @@ function Find-SessionRepository {
     }
     if ($roots.Count -eq 1) { return [pscustomobject]@{ Root = $roots[0]; Source = 'saved conversation fallback'; Candidates = $roots; AlternativeRoots = @() } }
     if ($roots.Count -gt 1) { return [pscustomobject]@{ Root = $null; Source = 'conflicting fallback worktrees'; Candidates = $roots; AlternativeRoots = $roots } }
-    return $null
+    return Find-ReferencedSessionRepository -Session $Session
 }
 
 
