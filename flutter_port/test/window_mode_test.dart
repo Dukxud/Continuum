@@ -272,6 +272,62 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  test('upper-right pivot survives mode and dialog roundtrips', () {
+    const starting = Rect.fromLTWH(920, 50, 392, 212);
+    final monitor = anchoredTopRightBounds(starting, const Size(540, 535));
+    expect(monitor.right, starting.right);
+    expect(monitor.top, starting.top);
+    final full = anchoredTopRightBounds(monitor, const Size(1240, 850));
+    expect(full.right, starting.right);
+    expect(full.top, starting.top);
+    final dialog = anchoredTopRightBounds(starting, const Size(1040, 780));
+    expect(dialog.right, starting.right);
+    expect(anchoredTopRightBounds(dialog, starting.size), starting);
+    expect(anchoredTopRightBounds(full, starting.size), starting);
+    // Secondary-monitor coordinates can be negative.
+    const secondary = Rect.fromLTWH(-1500, 75, 540, 535);
+    expect(anchoredTopRightBounds(secondary, const Size(392, 212)).right,
+      secondary.right);
+  });
+
+  testWidgets('Micro shows actual reset and countdown when exhausted',
+      (tester) async {
+    tester.view.physicalSize = const Size(392, 212);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: WindowAdapter(startCompact: true, startMicro: true,
+        quotaWindowCount: 2, emptyFiveHour: true, knownReset: true))));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byKey(const Key('micro-reset-quota')), findsOneWidget);
+    expect(find.byKey(const Key('micro-bar-quota')), findsNothing);
+    expect(find.textContaining('RESET IN'), findsOneWidget);
+    expect(find.byKey(const Key('micro-bar-weekly')), findsOneWidget);
+    expect(find.byKey(const Key('micro-reset-time-quota')), findsOneWidget);
+    expect(find.byKey(const Key('micro-reset-time-weekly')), findsOneWidget);
+    expect(find.textContaining('RESETS'), findsNWidgets(2));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Micro does not invent a reset timestamp', (tester) async {
+    tester.view.physicalSize = const Size(392, 212);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: WindowAdapter(startCompact: true, startMicro: true,
+        quotaWindowCount: 2, emptyFiveHour: true))));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('RESET UNKNOWN'), findsOneWidget);
+    expect(find.text('RESET TIME UNAVAILABLE'), findsNWidgets(2));
+    expect(tester.takeException(), isNull);
+  });
+
   test('full and compact modes always fit content, regardless of prior size', () {
     expect(schedulerWindowSize(compact: false,
       upcomingRunCount: 0, quotaWindowCount: 2), const Size(1240, 850));
