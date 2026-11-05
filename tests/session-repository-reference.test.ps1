@@ -47,6 +47,17 @@ try{
     $unique=Find-SessionRepository $session -AppDirectory $app -CheckoutHome $testHome
     Assert-True ((Normalize-Root $unique.Root) -ieq (Normalize-Root $aiv)) 'Substring-only repo name incorrectly matched AIVault project.'
 
+    # Codex thread/list retains the original project heading even when the
+    # rollout's user events do not. A 3-character renamed title is insufficient.
+    $pickerOnly=New-Session 'picker' 'Continue the work.'
+    Assert-True ($null -eq (Find-SessionRepository $pickerOnly -AppDirectory $app -CheckoutHome $testHome)) 'Missing preview must remain unresolved.'
+    $pickerFound=Find-SessionRepository $pickerOnly -AppDirectory $app -CheckoutHome $testHome -CodexPreview '# AIVault — Independent Adversarial Architecture Review'
+    Assert-True ((Normalize-Root $pickerFound.Root) -ieq (Normalize-Root $aiv)) 'Codex picker preview did not match verified AIVault remote.'
+    $pickerShort=Find-SessionRepository $pickerOnly -AppDirectory $app -CheckoutHome $testHome -CodexPreview '# AIV — Architecture Review'
+    Assert-True ($null -eq $pickerShort) 'Short renamed title falsely resolved repository.'
+    $pickerProse=Find-SessionRepository $pickerOnly -AppDirectory $app -CheckoutHome $testHome -CodexPreview 'AIVault discussions continue.'
+    Assert-True ($null -eq $pickerProse) 'Unstructured description must not choose a repository.'
+
     $different=New-TestRepo 'source\Unrelated'
     $wrong=New-Session 'unrelated' 'Investigate an unrelated repository.'
     Assert-True ($null -eq (Find-SessionRepository $wrong -AppDirectory $app -CheckoutHome $testHome)) 'Unrelated session borrowed a random local checkout.'
