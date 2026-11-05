@@ -147,9 +147,81 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Micro restores saved topmost and shows live quota without scheduling',
+      (tester) async {
+    tester.view.physicalSize = const Size(392, 212);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final host = SpyWindowHost();
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: WindowAdapter(startCompact: true,
+        startMicro: true, startPinned: true),
+      windowHost: host)));
+    await tester.pump(const Duration(milliseconds: 180));
+    expect(host.modes, contains('micro:empty:quota:0'));
+    expect(host.topmostCalls, [true]);
+    expect(find.text('Micro monitor'), findsOneWidget);
+    expect(find.text('5-HOUR'), findsOneWidget);
+    expect(find.text('WEEKLY'), findsOneWidget);
+    expect(find.text('NO RUNS IN FLIGHT'), findsOneWidget);
+    expect(find.text('Schedule once'), findsNothing);
+    expect(find.text('Cancel selected'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('micro-pin')));
+    await tester.pump();
+    expect(host.topmostCalls, [true, false]);
+    tester.view.physicalSize = const Size(540, 535);
+    await tester.tap(find.byKey(const Key('micro-monitor')));
+    await tester.pump(const Duration(milliseconds: 180));
+    expect(host.modes, contains('compact:empty:quota:0'));
+    expect(find.text('On watch.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('native pin toggles independently of Micro and returns to Full',
+      (tester) async {
+    tester.view.physicalSize = const Size(1240, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final host = SpyWindowHost();
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: WindowAdapter(startCompact: false),
+      windowHost: host)));
+    await tester.pump(const Duration(milliseconds: 180));
+    expect(host.topmostCalls, isEmpty);
+    await tester.tap(find.text('Pin'));
+    await tester.pump();
+    expect(host.topmostCalls, [true]);
+    expect(find.text('Unpin'), findsOneWidget);
+    await tester.tap(find.text('Micro'));
+    tester.view.physicalSize = const Size(392, 212);
+    await tester.pump(const Duration(milliseconds: 180));
+    expect(host.modes, contains('micro:empty:quota:0'));
+    expect(find.byKey(const Key('micro-pin')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('micro-full')));
+    tester.view.physicalSize = const Size(1240, 850);
+    await tester.pump(const Duration(milliseconds: 180));
+    expect(find.text('Continuum.'), findsOneWidget);
+    expect(find.text('Unpin'), findsOneWidget);
+    expect(host.modes, contains('standard:empty:quota:0'));
+    await tester.tap(find.text('Unpin'));
+    await tester.pump();
+    expect(host.topmostCalls, [true, false]);
+    expect(tester.takeException(), isNull);
+  });
+
   test('full and compact modes always fit content, regardless of prior size', () {
     expect(schedulerWindowSize(compact: false,
       upcomingRunCount: 0, quotaWindowCount: 2), const Size(1240, 850));
+    expect(schedulerWindowSize(compact: true, micro: true,
+      upcomingRunCount: 1, quotaWindowCount: 2), const Size(392, 212));
     expect(schedulerWindowSize(compact: false,
       upcomingRunCount: 1, quotaWindowCount: 2), const Size(1240, 850));
     expect(schedulerWindowSize(compact: true,
