@@ -8,8 +8,12 @@ import 'package:codex_resume_flutter/main.dart';
 class SpyWindowHost implements SchedulerWindowHost {
   final List<String> modes = [];
   final List<bool> topmostCalls = [];
+  bool rejectPin = false;
   @override
-  Future<void> setAlwaysOnTop(bool enabled) async { topmostCalls.add(enabled); }
+  Future<void> setAlwaysOnTop(bool enabled) async {
+    topmostCalls.add(enabled);
+    if (rejectPin) throw SchedulerException('Native pin failed');
+  }
   @override
   Future<void> setMode({required bool compact, bool micro = false,
       required int upcomingRunCount,
@@ -39,6 +43,7 @@ class WindowAdapter implements SchedulerAdapter {
   final int quotaWindowCount;
   final bool startMicro;
   final bool startPinned;
+  int usageRequests = 0;
   @override
   Future<Map<String, dynamic>> call(String action,
       [Map<String, dynamic> payload = const {}]) async {
@@ -56,6 +61,7 @@ class WindowAdapter implements SchedulerAdapter {
       };
     }
     if (action == 'usage') {
+      usageRequests++;
       return {'ok': true, 'model': payload['model'] ?? 'gpt-test',
         'models': [{'id': 'gpt-test', 'efforts': ['medium']},
           {'id': 'gpt-run', 'efforts': ['medium']}],
@@ -88,6 +94,16 @@ class ShutdownWindowAdapter extends WindowAdapter {
     if (rejectSave) throw SchedulerException('Disk write denied');
     return {'saved': true};
   }
+}
+
+Future<void> chooseView(WidgetTester tester, String label, {Size? nextSize}) async {
+  await tester.tap(find.byKey(const Key('view-menu')));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 350));
+  await tester.tap(find.text(label).last);
+  if (nextSize != null) tester.view.physicalSize = nextSize;
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 350));
 }
 
 void main() {
@@ -170,12 +186,10 @@ void main() {
     expect(find.text('Schedule once'), findsNothing);
     expect(find.text('Cancel selected'), findsNothing);
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byKey(const Key('micro-pin')));
+    await tester.tap(find.byKey(const Key('pin-window')));
     await tester.pump();
     expect(host.topmostCalls, [true, false]);
-    tester.view.physicalSize = const Size(540, 535);
-    await tester.tap(find.byKey(const Key('micro-monitor')));
-    await tester.pump(const Duration(milliseconds: 180));
+    await chooseView(tester, 'Monitor', nextSize: const Size(540, 535));
     expect(host.modes, contains('compact:empty:quota:0'));
     expect(find.text('On watch.'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -195,25 +209,60 @@ void main() {
       windowHost: host)));
     await tester.pump(const Duration(milliseconds: 180));
     expect(host.topmostCalls, isEmpty);
-    await tester.tap(find.byKey(const Key('full-pin')));
+    await tester.tap(find.byKey(const Key('pin-window')));
     await tester.pump();
     expect(host.topmostCalls, [true]);
-    expect(find.byKey(const Key('full-pin')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('full-micro')));
-    tester.view.physicalSize = const Size(392, 212);
-    await tester.pump(const Duration(milliseconds: 180));
+    expect(find.byKey(const Key('pin-window')), findsOneWidget);
+    await chooseView(tester, 'Micro', nextSize: const Size(392, 212));
     expect(host.modes, contains('micro:empty:quota:0'));
-    expect(find.byKey(const Key('micro-pin')), findsOneWidget);
+    expect(find.byKey(const Key('pin-window')), findsOneWidget);
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byKey(const Key('micro-full')));
-    tester.view.physicalSize = const Size(1240, 850);
-    await tester.pump(const Duration(milliseconds: 180));
+    await chooseView(tester, 'Full', nextSize: const Size(1240, 850));
     expect(find.text('Continuum.'), findsOneWidget);
-    expect(find.byKey(const Key('full-pin')), findsOneWidget);
+    expect(find.byKey(const Key('pin-window')), findsOneWidget);
     expect(host.modes, contains('standard:empty:quota:0'));
-    await tester.tap(find.byKey(const Key('full-pin')));
+    await tester.tap(find.byKey(const Key('pin-window')));
     await tester.pump();
     expect(host.topmostCalls, [true, false]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('failed native restore clears displayed pin', (tester) async {
+    tester.view.physicalSize = const Size(392, 212);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final host = SpyWindowHost()..rejectPin = true;
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: WindowAdapter(startCompact: true, startMicro: true,
+        startPinned: true), windowHost: host)));
+    await tester.pump(const Duration(milliseconds: 180));
+    expect(host.topmostCalls, [true]);
+    final home = tester.state(find.byType(SchedulerHome));
+    expect((home as dynamic).controller.alwaysOnTop, isFalse);
+    expect(find.byTooltip('Always on Top'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('failed manual pin never claims topmost', (tester) async {
+    tester.view.physicalSize = const Size(392, 212);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final host = SpyWindowHost()..rejectPin = true;
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: WindowAdapter(startCompact: true, startMicro: true),
+      windowHost: host)));
+    await tester.pump(const Duration(milliseconds: 180));
+    await tester.tap(find.byKey(const Key('pin-window')));
+    await tester.pump();
+    final home = tester.state(find.byType(SchedulerHome));
+    expect((home as dynamic).controller.alwaysOnTop, isFalse);
+    expect(host.topmostCalls, [true]);
     expect(tester.takeException(), isNull);
   });
 
@@ -253,6 +302,28 @@ void main() {
     expect(calls, ['first-start', 'first-end', 'second', 'final-mode']);
   });
 
+  testWidgets('view switching preserves same-model quota without new reads',
+      (tester) async {
+    tester.view.physicalSize = const Size(1240, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final host = SpyWindowHost();
+    final adapter = WindowAdapter(startCompact: false, quotaWindowCount: 2);
+    await tester.pumpWidget(MaterialApp(home: SchedulerHome(
+      adapter: adapter, windowHost: host)));
+    await tester.pump(const Duration(milliseconds: 180));
+    final reads = adapter.usageRequests;
+    expect(reads, greaterThan(0));
+    await chooseView(tester, 'Monitor', nextSize: const Size(540, 535));
+    await chooseView(tester, 'Micro', nextSize: const Size(392, 212));
+    await chooseView(tester, 'Full', nextSize: const Size(1240, 850));
+    expect(adapter.usageRequests, reads);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('compact mode changes the host window size, not only controls', (tester) async {
     // The native workbench is wide; render it at the actual desktop size.
     tester.view.physicalSize = const Size(1240, 850);
@@ -264,8 +335,7 @@ void main() {
       windowHost: host)));
     await tester.pump(const Duration(milliseconds: 160));
     expect(host.modes, contains('standard:empty:quota:0'));
-    await tester.tap(find.text('Monitor'));
-    await tester.pump(const Duration(milliseconds: 160));
+    await chooseView(tester, 'Monitor', nextSize: const Size(540, 535));
     expect(host.modes, contains('compact:empty:quota:0'));
     expect(find.text('Schedule once'), findsNothing);
     expect(find.text('On watch.'), findsOneWidget);

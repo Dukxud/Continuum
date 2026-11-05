@@ -354,6 +354,7 @@ class SchedulerController extends ChangeNotifier {
     if (accessMode != null) access = accessMode;
     if (reasoning != null) effort = reasoning;
     if (autoResumeOnLimit != null) this.autoResumeOnLimit = autoResumeOnLimit;
+    final previousUsageTarget = usageTargetModel;
     var modeChanged = false;
     if (microMode != null && micro != microMode) {
       micro = microMode;
@@ -366,7 +367,8 @@ class SchedulerController extends ChangeNotifier {
       modeChanged = true;
     }
     if (pinOnTop != null) alwaysOnTop = pinOnTop;
-    if (modeChanged) {
+    // Switching views is presentation-only unless the monitored model changes.
+    if (modeChanged && usageTargetModel != previousUsageTarget) {
       quota = null; quotaAt = null; quotaModel = '';
       unawaited(readUsage());
     }

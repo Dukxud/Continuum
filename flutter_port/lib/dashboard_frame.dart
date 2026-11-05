@@ -77,27 +77,11 @@ extension _DashboardFrame on _SchedulerHomeState {
       icon: state.ready ? Icons.link_rounded :
         loadFailed ? Icons.error_outline_rounded : Icons.sync_rounded),
     const SizedBox(width: 12),
-    DeckAction(label: 'Logs', icon: Icons.folder_outlined,
-      compact: true, onTap: openLogs, tone: DeckColor.aqua),
-    const SizedBox(width: 9),
-    DeckAction(label: 'History', icon: Icons.history_rounded,
-      compact: true, onTap: historyDialog, tone: DeckColor.iris),
-    const SizedBox(width: 9),
-    _headerIcon(const Key('full-appearance'), Icons.palette_outlined,
-      'Appearance', DeckColor.rose, appearanceDialog),
+    viewMenu(),
     const SizedBox(width: 8),
-    _headerIcon(const Key('full-pin'),
-      state.alwaysOnTop ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-      state.alwaysOnTop ? 'Unpin window' : 'Always on Top',
-      state.alwaysOnTop ? DeckColor.gold : DeckColor.aqua,
-      toggleAlwaysOnTop),
+    pinButton(),
     const SizedBox(width: 8),
-    _headerIcon(const Key('full-micro'), Icons.picture_in_picture_alt_rounded,
-      'Micro view', DeckColor.gold, () => state.edit(microMode: true)),
-    const SizedBox(width: 9),
-    DeckAction(label: 'Monitor', icon: Icons.dashboard_customize_outlined,
-      compact: true, onTap: () => state.edit(compactMode: true),
-      tone: DeckColor.mint),
+    moreMenu(),
     ]);
   }
 
@@ -123,19 +107,11 @@ extension _DashboardFrame on _SchedulerHomeState {
                   fontSize: 26, fontWeight: FontWeight.w900)),
             ],
           )),
-          _headerIcon(const Key('monitor-pin'),
-            state.alwaysOnTop ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-            state.alwaysOnTop ? 'Unpin window' : 'Always on Top',
-            state.alwaysOnTop ? DeckColor.gold : DeckColor.aqua,
-            toggleAlwaysOnTop),
+          viewMenu(tight: true),
           const SizedBox(width: 6),
-          _headerIcon(const Key('monitor-micro'),
-            Icons.picture_in_picture_alt_rounded,
-            'Micro view', DeckColor.gold, () => state.edit(microMode: true)),
+          pinButton(),
           const SizedBox(width: 6),
-          _headerIcon(const Key('monitor-full'), Icons.open_in_full_rounded,
-            'Full view', DeckColor.mint,
-            () => state.edit(compactMode: false)),
+          moreMenu(),
         ]),
         const SizedBox(height: 17),
         Row(children: [
@@ -175,20 +151,6 @@ extension _DashboardFrame on _SchedulerHomeState {
             _liveActivityPanel(state, stringField(runs.first, 'Name')),
           ],
         ],
-        const SizedBox(height: 15),
-        Row(children: [
-          Expanded(child: DeckAction(label: 'History',
-            compact: true, icon: Icons.history_rounded,
-            tone: DeckColor.iris, onTap: historyDialog)),
-          const SizedBox(width: 8),
-          Expanded(child: DeckAction(label: 'Appearance',
-            compact: true, icon: Icons.palette_outlined,
-            tone: DeckColor.rose, onTap: appearanceDialog)),
-          const SizedBox(width: 8),
-          DeckAction(label: 'Logs', compact: true,
-            icon: Icons.folder_outlined,
-            tone: DeckColor.aqua, onTap: openLogs),
-        ]),
         if (state.error != null &&
             !state.error!.startsWith('Usage unavailable:')) ...[
           const SizedBox(height: 12),
@@ -197,23 +159,6 @@ extension _DashboardFrame on _SchedulerHomeState {
       ]),
     ));
   }
-
-  /// Icon-only secondary actions keep the native frame's approved width.
-  Widget _headerIcon(Key key, IconData glyph, String hint,
-      Color tone, VoidCallback action) => SizedBox(
-    width: 36, height: 36,
-    child: IconButton(
-      key: key, tooltip: hint, onPressed: action,
-      style: IconButton.styleFrom(
-        backgroundColor: const Color(0xff27304a),
-        side: BorderSide(color: tone.withValues(alpha: .42)),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(11))),
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-      icon: Icon(glyph, color: tone, size: 19),
-    ),
-  );
 
   Widget _dashboardError(String message) => DecoratedBox(
     decoration: BoxDecoration(

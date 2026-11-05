@@ -149,7 +149,10 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
       final host = widget.windowHost;
       if (host != null && state.alwaysOnTop) {
         unawaited(host.setAlwaysOnTop(true).catchError((Object error) {
-          if (mounted) toast('Unable to restore Always on Top: $error');
+          if (!mounted) return;
+          // Windows rejected the pin: correct the UI and saved preference.
+          if (state.alwaysOnTop) state.edit(pinOnTop: false);
+          toast('Unable to restore Always on Top: $error');
         }));
       }
     }
@@ -160,11 +163,16 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
     final state = controller;
     if (state == null || !state.ready || _changingPin) return;
     final desired = !state.alwaysOnTop;
+    final host = widget.windowHost;
+    if (host == null) {
+      toast('Always on Top requires a desktop window.');
+      return;
+    }
     _changingPin = true;
     try {
       // A successful native operation is required before persisting its
       // visual state. This does not depend on the PowerToys hotkey.
-      await widget.windowHost?.setAlwaysOnTop(desired);
+      await host.setAlwaysOnTop(desired);
       if (!mounted) return;
       state.edit(pinOnTop: desired);
     } catch (error) {
@@ -481,6 +489,81 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
         mode: ProcessStartMode.detached);
     } catch (e) { toast('Cannot open logs: $e'); }
   }
+
+  /// Shared controls keep Full, Monitor and Micro navigation consistent.
+  Widget viewMenu({bool tight = false}) {
+    final state = controller!;
+    final selected = state.micro ? 'micro' : state.compact ? 'monitor' : 'full';
+    return PopupMenuButton<String>(
+      key: const Key('view-menu'), tooltip: 'View',
+      initialValue: selected,
+      onSelected: (mode) => state.edit(
+        microMode: mode == 'micro', compactMode: mode != 'full'),
+      itemBuilder: (_) => [
+        CheckedPopupMenuItem<String>(value: 'full',
+          checked: selected == 'full', child: const Text('Full')),
+        CheckedPopupMenuItem<String>(value: 'monitor',
+          checked: selected == 'monitor', child: const Text('Monitor')),
+        CheckedPopupMenuItem<String>(value: 'micro',
+          checked: selected == 'micro', child: const Text('Micro')),
+      ],
+      child: _menuFace(Icons.layers_outlined, DeckColor.aqua,
+        label: tight ? null : 'View'),
+    );
+  }
+
+  Widget moreMenu() => PopupMenuButton<String>(
+    key: const Key('more-menu'), tooltip: 'More',
+    onSelected: (action) {
+      if (action == 'history') unawaited(historyDialog());
+      if (action == 'logs') unawaited(openLogs());
+      if (action == 'appearance') unawaited(appearanceDialog());
+    },
+    itemBuilder: (_) => const [
+      PopupMenuItem<String>(value: 'history', child: Text('History')),
+      PopupMenuItem<String>(value: 'logs', child: Text('Logs')),
+      PopupMenuItem<String>(value: 'appearance', child: Text('Appearance')),
+    ],
+    child: _menuFace(Icons.more_horiz_rounded, DeckColor.iris),
+  );
+
+  Widget pinButton() {
+    final state = controller!;
+    return SizedBox(width: 36, height: 36, child: IconButton(
+      key: const Key('pin-window'),
+      tooltip: state.alwaysOnTop ? 'Unpin window' : 'Always on Top',
+      onPressed: state.ready ? toggleAlwaysOnTop : null,
+      style: IconButton.styleFrom(
+        backgroundColor: const Color(0xff27304a),
+        side: BorderSide(color:
+          (state.alwaysOnTop ? DeckColor.gold : DeckColor.aqua)
+            .withValues(alpha: .42)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(11))),
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+      icon: Icon(state.alwaysOnTop
+        ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+        size: 19, color: state.alwaysOnTop ? DeckColor.gold : DeckColor.aqua),
+    ));
+  }
+
+  Widget _menuFace(IconData glyph, Color tone, {String? label}) => Container(
+    width: label == null ? 36 : 86, height: 36,
+    decoration: BoxDecoration(
+      color: const Color(0xff27304a),
+      border: Border.all(color: tone.withValues(alpha: .42)),
+      borderRadius: BorderRadius.circular(11)),
+    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(glyph, color: tone, size: 19),
+      if (label != null) ...[
+        const SizedBox(width: 5),
+        Text(label, style: const TextStyle(
+          color: DeckColor.text, fontSize: 12, fontWeight: FontWeight.w700)),
+        const Icon(Icons.arrow_drop_down, color: DeckColor.muted, size: 15),
+      ],
+    ]),
+  );
 
   @override
   Widget build(BuildContext context) {

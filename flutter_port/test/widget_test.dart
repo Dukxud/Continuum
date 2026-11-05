@@ -5,6 +5,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:codex_resume_flutter/main.dart';
 import 'package:codex_resume_flutter/bridge.dart';
 
+Future<void> selectView(WidgetTester tester, String label) async {
+  await tester.tap(find.byKey(const Key('view-menu')));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 350));
+  await tester.tap(find.text(label).last);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 350));
+}
+
 class StubAdapter implements SchedulerAdapter {
   StubAdapter({this.includePending = false, this.pendingCount = 0,
     this.verifiedSession = false, this.exhaustedQuota = false,
@@ -413,18 +422,16 @@ void main() {
     addTearDown(() {tester.view.resetPhysicalSize();tester.view.resetDevicePixelRatio();});
     await tester.pumpWidget(MaterialApp(home: SchedulerHome(adapter: StubAdapter())));
     await tester.pump(const Duration(milliseconds: 150));
-    await tester.tap(find.text('Monitor'));
-    await tester.pump(const Duration(milliseconds: 150));
+    await selectView(tester, 'Monitor');
     tester.view.physicalSize = const Size(540, 685);
     await tester.pump();
     expect(find.text('On watch.'), findsOneWidget);
-    expect(find.byKey(const Key('monitor-full')), findsOneWidget);
+    expect(find.byKey(const Key('view-menu')), findsOneWidget);
     expect(find.text('Set the moment.'), findsNothing);
     final first = tester.getTopLeft(find.text('5-HOUR'));
     final second = tester.getTopLeft(find.text('WEEKLY'));
     expect(second.dy, greaterThan(first.dy + 120));
-    await tester.tap(find.byKey(const Key('monitor-full')));
-    await tester.pump(const Duration(milliseconds: 150));
+    await selectView(tester, 'Full');
     expect(find.text('Continuum.'), findsOneWidget);
     expect(find.text('Schedule once'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -443,8 +450,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 150));
     expect(find.byKey(const Key('live-codex-activity')), findsOneWidget);
     expect(find.text('Running command'), findsOneWidget);
-    await tester.tap(find.text('Monitor'));
-    await tester.pump(const Duration(milliseconds: 150));
+    await selectView(tester, 'Monitor');
     tester.view.physicalSize = const Size(540, 685);
     await tester.pump();
     expect(find.byKey(const Key('live-codex-activity')), findsOneWidget);
@@ -551,8 +557,7 @@ void main() {
     final cancelButton = find.ancestor(
       of: find.text('Cancel selected'), matching: find.byType(InkWell)).first;
     expect(tester.widget<InkWell>(cancelButton).onTap, isNull);
-    await tester.tap(find.text('Monitor'));
-    await tester.pump(const Duration(milliseconds: 150));
+    await selectView(tester, 'Monitor');
     expect(find.text('RUNNING'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
@@ -595,9 +600,10 @@ void main() {
       expect(find.text('Schedule once'), findsOneWidget);
       expect(find.text('CAPACITY / LIVE'), findsOneWidget);
       expect(find.text('1 ACTIVE'), findsOneWidget);
-      await tester.ensureVisible(find.text('History'));
+      await tester.tap(find.byKey(const Key('more-menu')));
       await tester.pump();
-      await tester.tap(find.text('History'));
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.tap(find.text('History').last);
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('Recent Codex runs'), findsOneWidget);
       expect(tester.takeException(), isNull);

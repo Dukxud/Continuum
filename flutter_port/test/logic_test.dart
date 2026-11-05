@@ -312,6 +312,25 @@ void main() {
     controller.dispose();
   });
 
+  test('same-model view changes retain quota and readiness', () async {
+    final fake = FakeScheduler();
+    final controller = SchedulerController(fake);
+    await controller.start();
+    final previousQuota = controller.quota;
+    final previousTime = controller.quotaAt;
+    final reads = fake.actions.where((action) => action == 'usage').length;
+    expect(controller.canSchedule, isTrue);
+    controller.edit(compactMode: true);
+    controller.edit(microMode: true);
+    controller.edit(microMode: false);
+    controller.edit(compactMode: false);
+    expect(identical(controller.quota, previousQuota), isTrue);
+    expect(controller.quotaAt, previousTime);
+    expect(fake.actions.where((action) => action == 'usage').length, reads);
+    expect(controller.canSchedule, isTrue);
+    controller.dispose();
+  });
+
   test('quota continuation is opt-in, persisted and forwarded only when enabled', () async {
     final fake = FakeScheduler();
     final controller = SchedulerController(fake);

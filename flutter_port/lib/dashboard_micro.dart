@@ -40,23 +40,11 @@ extension _DashboardMicro on _SchedulerHomeState {
                   color: DeckColor.text, fontSize: 16,
                   fontWeight: FontWeight.w800)),
               ])),
-            _microAction(
-              key: const Key('micro-pin'),
-              icon: state.alwaysOnTop
-                ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-              tooltip: state.alwaysOnTop ? 'Unpin window' : 'Always on Top',
-              color: state.alwaysOnTop ? DeckColor.gold : DeckColor.muted,
-              onTap: state.ready ? toggleAlwaysOnTop : null),
-            _microAction(
-              key: const Key('micro-monitor'),
-              icon: Icons.dashboard_outlined, tooltip: 'Monitor view',
-              color: DeckColor.aqua,
-              onTap: () => state.edit(microMode: false, compactMode: true)),
-            _microAction(
-              key: const Key('micro-full'),
-              icon: Icons.open_in_full_rounded, tooltip: 'Full view',
-              color: DeckColor.mint,
-              onTap: () => state.edit(microMode: false, compactMode: false)),
+            viewMenu(tight: true),
+            const SizedBox(width: 4),
+            pinButton(),
+            const SizedBox(width: 4),
+            moreMenu(),
           ]),
           const SizedBox(height: 10),
           DeckSurface(
@@ -110,15 +98,4 @@ extension _DashboardMicro on _SchedulerHomeState {
     ]);
   }
 
-  Widget _microAction({required Key key, required IconData icon,
-      required String tooltip, required Color color,
-      required VoidCallback? onTap}) => SizedBox(
-    width: 33, height: 33,
-    child: IconButton(
-      key: key,
-      tooltip: tooltip, onPressed: onTap, padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 33, height: 33),
-      icon: Icon(icon, size: 18, color: color),
-    ),
-  );
 }
