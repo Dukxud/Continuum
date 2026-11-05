@@ -93,6 +93,23 @@ try {
             $session
         }
     }
+    function Get-CodexPickerPreview {
+        param([Parameter(Mandatory)][string]$SessionId)
+        # Non-mutating metadata. This is optional and must never bypass Git
+        # verification or a conflicting repository result.
+        try {
+            $shim=(Get-Command codex.cmd -ErrorAction Stop).Source
+            $cli=Join-Path (Split-Path -Parent $shim) 'node_modules\@openai\codex\bin\codex.js'
+            $helper=Join-Path $source 'CodexUsage.js'
+            if(-not (Test-Path -LiteralPath $cli -PathType Leaf) -or
+               -not (Test-Path -LiteralPath $helper -PathType Leaf)){return $null}
+            $lines=@(& node.exe $helper --cli-js $cli --thread-ids $SessionId)
+            if($LASTEXITCODE -ne 0 -or -not $lines.Count){return $null}
+            $data=($lines | Select-Object -Last 1) | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+            if($data.ok -ne $true -or -not $data.threads.Contains($SessionId)){return $null}
+            return [string]$data.threads[$SessionId].preview
+        }catch{return $null}
+    }
     function Get-FlutterHistory {
         param([object[]]$Tasks=@())
         $recentTasks=@($Tasks)
@@ -152,6 +169,15 @@ try {
             if(-not $session){throw 'Selected CLI conversation could not be verified.'}
             $cwd=Get-ReportedThreadDirectory -SessionId $id -SourceFolder $source
             $found=Find-SessionRepository -Session $session -ReportedCwd $cwd -AppDirectory $appDir
+            if(-not $found){
+                # The title query already knows which CLI session is selected;
+                # the picker preview may retain its explicit project heading
+                # when the rollout format lacks event_msg/user_message records.
+                $preview=Get-CodexPickerPreview -SessionId $id
+                if($preview){
+                    $found=Find-SessionRepository -Session $session -ReportedCwd $cwd -AppDirectory $appDir -CodexPreview $preview
+                }
+            }
             $result=@{sessionId=$id;model=Read-SessionModel $session;found=$found}
         }
         'schedule' {
