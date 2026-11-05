@@ -50,12 +50,13 @@ function Get-RecentCliSessions {
 # Live sessions can be large, so inspect a bounded tail; fall back to the first
 # prompt when an active turn has produced more than the sampled amount of output.
 function Format-CodexSessionTitle {
-    param([AllowEmptyString()][string]$Title)
+    param([AllowEmptyString()][string]$Title,[switch]$AllowShort)
     $first=($Title -split '\r?\n' | Where-Object {
         -not [string]::IsNullOrWhiteSpace($_)
     } | Select-Object -First 1)
     $first=[regex]::Replace([string]$first,'[\p{Cc}\p{Cf}\s]+',' ').Trim()
-    if($first.Length -lt 5 -or $first -match '^(?:<[^>]*>|[^\p{L}\p{N}]+)$'){return $null}
+    if(((-not $AllowShort) -and $first.Length -lt 5) -or
+       $first -match '^(?:<[^>]*>|[^\p{L}\p{N}]+)$'){return $null}
     if($first.Length -gt 58){return $first.Substring(0,57).TrimEnd()+'…'}
     return $first
 }
