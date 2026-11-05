@@ -195,11 +195,11 @@ void main() {
       windowHost: host)));
     await tester.pump(const Duration(milliseconds: 180));
     expect(host.topmostCalls, isEmpty);
-    await tester.tap(find.text('Pin'));
+    await tester.tap(find.byKey(const Key('full-pin')));
     await tester.pump();
     expect(host.topmostCalls, [true]);
-    expect(find.text('Unpin'), findsOneWidget);
-    await tester.tap(find.text('Micro'));
+    expect(find.byKey(const Key('full-pin')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('full-micro')));
     tester.view.physicalSize = const Size(392, 212);
     await tester.pump(const Duration(milliseconds: 180));
     expect(host.modes, contains('micro:empty:quota:0'));
@@ -209,9 +209,9 @@ void main() {
     tester.view.physicalSize = const Size(1240, 850);
     await tester.pump(const Duration(milliseconds: 180));
     expect(find.text('Continuum.'), findsOneWidget);
-    expect(find.text('Unpin'), findsOneWidget);
+    expect(find.byKey(const Key('full-pin')), findsOneWidget);
     expect(host.modes, contains('standard:empty:quota:0'));
-    await tester.tap(find.text('Unpin'));
+    await tester.tap(find.byKey(const Key('full-pin')));
     await tester.pump();
     expect(host.topmostCalls, [true, false]);
     expect(tester.takeException(), isNull);
