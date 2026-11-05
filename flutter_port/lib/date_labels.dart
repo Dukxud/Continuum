@@ -10,14 +10,16 @@ String formatDayMonth(DateTime value, {bool year = false}) {
   return year ? '$date ${value.year}' : date;
 }
 
+String formatLocalClock(DateTime value, {bool seconds = false}) {
+  String two(int value) => value.toString().padLeft(2, '0');
+  final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
+  return '$hour:${two(value.minute)}'
+      '${seconds ? ':${two(value.second)}' : ''}'
+      '${value.hour >= 12 ? ' PM' : ' AM'}';
+}
+
 String formatLocalDateTime(DateTime value, {
   bool year = false,
   bool seconds = false,
-}) {
-  String two(int value) => value.toString().padLeft(2, '0');
-  final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
-  final clock = '$hour:${two(value.minute)}'
-      '${seconds ? ':${two(value.second)}' : ''}'
-      '${value.hour >= 12 ? ' PM' : ' AM'}';
-  return '${formatDayMonth(value, year: year)} · $clock';
-}
+}) => '${formatDayMonth(value, year: year)} · '
+    '${formatLocalClock(value, seconds: seconds)}';
