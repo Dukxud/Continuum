@@ -26,6 +26,11 @@ Size schedulerWindowSize({required bool compact, bool micro = false,
   return const Size(1240, 850);
 }
 
+/// Keeps the current top-right corner fixed across view transitions.
+Rect anchoredTopRightBounds(Rect current, Size next) =>
+  Rect.fromLTWH(current.right - next.width, current.top,
+    next.width, next.height);
+
 abstract class SchedulerWindowHost {
   Future<void> setMode({required bool compact, bool micro = false,
     required int upcomingRunCount, required int quotaWindowCount});
@@ -42,6 +47,22 @@ abstract class SchedulerWindowHost {
 class DesktopWindowHost implements SchedulerWindowHost {
   final WindowActionQueue _actions = WindowActionQueue();
   bool _lastCompact = false;
+  Size _minimumSize = const Size(1100, 750);
+
+  Future<void> _resizeFromTopRight(Size size, Size minimum) async {
+    final original = await windowManager.getBounds();
+    final target = anchoredTopRightBounds(original, size);
+    // Decrease the minimum before shrinking; increase it after growing.
+    if (size.width < _minimumSize.width ||
+        size.height < _minimumSize.height) {
+      await windowManager.setMinimumSize(minimum);
+      await windowManager.setBounds(target);
+    } else {
+      await windowManager.setBounds(target);
+      await windowManager.setMinimumSize(minimum);
+    }
+    _minimumSize = minimum;
+  }
 
   Future<void> initialize() async {
     await windowManager.ensureInitialized();
@@ -70,10 +91,9 @@ class DesktopWindowHost implements SchedulerWindowHost {
     final size = schedulerWindowSize(compact: compact, micro: micro,
       upcomingRunCount: upcomingRunCount,
       quotaWindowCount: quotaWindowCount);
-    await windowManager.setMinimumSize(micro
+    await _resizeFromTopRight(size, micro
       ? const Size(360, 190) : compact
       ? const Size(520, 490) : const Size(1100, 750));
-    await windowManager.setSize(size);
     _lastCompact = compact;
   });
 
@@ -88,10 +108,9 @@ class DesktopWindowHost implements SchedulerWindowHost {
       if (!_lastCompact) return;
       // Dialogs share the main native window. Expand temporarily, then
       // restore the exact content size through setMode after closing.
-      await windowManager.setMinimumSize(const Size(520, 490));
-      await windowManager.setSize(history
-        ? const Size(1040, 780)
-        : const Size(750, 820));
+      await _resizeFromTopRight(history
+        ? const Size(1040, 780) : const Size(750, 820),
+        const Size(520, 490));
     });
 
   // Do not queue hiding behind a slow resize; close should look immediate.
