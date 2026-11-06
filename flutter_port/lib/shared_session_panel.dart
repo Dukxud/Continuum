@@ -70,18 +70,47 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
     final params = field(request,'params');
     if (method == 'item/commandExecution/requestApproval' ||
         method == 'item/fileChange/requestApproval') {
+      final isFileChange = method == 'item/fileChange/requestApproval';
+      final changes = recordList(field(params, 'proposedChanges'));
+      final command = stringField(params, 'command');
+      final network = field(params, 'networkApprovalContext');
+      final reviewable = isFileChange ? changes.isNotEmpty
+        : command.isNotEmpty || network is Map;
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('APPROVAL REQUESTED',style: TextStyle(color: DeckColor.gold,
-          fontWeight: FontWeight.w800)),
-        Text(stringField(params,'reason'),style: const TextStyle(color: DeckColor.text)),
-        SelectableText(stringField(params,'command'),style:
-          const TextStyle(color: DeckColor.text,fontFamily:'Consolas')),
-        Wrap(spacing: 8,children: [
+        Text(isFileChange ? 'FILE CHANGE APPROVAL' : 'COMMAND APPROVAL',
+          style: const TextStyle(
+            color: DeckColor.gold, fontWeight: FontWeight.w800)),
+        if (stringField(params, 'reason').isNotEmpty)
+          Text(stringField(params, 'reason'),
+            style: const TextStyle(color: DeckColor.text)),
+        if (command.isNotEmpty)
+          SelectableText(command, style: const TextStyle(
+            color: DeckColor.text, fontFamily:'Consolas')),
+        if (network is Map)
+          Text('Network: ' + stringField(network, 'host') +
+            ' (' + stringField(network, 'protocol') + ')',
+            style: const TextStyle(color: DeckColor.text)),
+        if (stringField(params, 'grantRoot').isNotEmpty)
+          Text('Access root: ' + stringField(params,'grantRoot'),
+            style: const TextStyle(color: DeckColor.gold)),
+        for (final change in changes) ...[
+          const SizedBox(height: 7),
+          Text(stringField(change,'kind') + ': ' + stringField(change,'path'),
+            style: const TextStyle(color: DeckColor.text,
+              fontWeight: FontWeight.w700)),
+          SelectableText(stringField(change, 'diff'), style: const TextStyle(
+            color: DeckColor.text, fontFamily:'Consolas',fontSize:11)),
+        ],
+        if (!reviewable)
+          const Text('Approval is disabled until Codex provides reviewable details.',
+            style: TextStyle(color: DeckColor.gold)),
+        Wrap(spacing: 8, children: [
           OutlinedButton(key: Key('shared-decline-' + id),
             onPressed: sending ? null : () => _answer(id,{'decision':'decline'}),
             child: const Text('Decline')),
           FilledButton(key: Key('shared-approve-' + id),
-            onPressed: sending ? null : () => _answer(id,{'decision':'accept'}),
+            onPressed: sending || !reviewable ? null
+              : () => _answer(id, {'decision':'accept'}),
             child: const Text('Approve once')),
         ]),
       ]);
