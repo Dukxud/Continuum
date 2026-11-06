@@ -230,6 +230,26 @@ if($invalidExit -eq 0 -or $invalidAnswer.error -cne 'Invalid automatic-continuat
     throw 'A non-boolean continuation flag was not rejected before task creation.'
 }
 
+# Execution-mode validation must happen before looking up a real
+# conversation, verifying quota or registering a Windows task.
+function Assert-ModeRejected {
+    param([hashtable]$Flags,[string]$Expected)
+    $payload=@{
+        sessionId='00000000-0000-0000-0000-000000000000'
+        runAt=$future
+        repo=''
+    }
+    foreach($entry in $Flags.GetEnumerator()){$payload[$entry.Key]=$entry.Value}
+    $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($payload | ConvertTo-Json -Compress)))
+    $output=@(& pwsh -NoProfile -NonInteractive -STA -File $bridge -Action schedule -Payload $encoded)
+    $exitCode=$LASTEXITCODE
+    $reply=($output | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+    if($exitCode -eq 0 -or $reply.error -cne $Expected){
+        throw "Invalid execution-mode request was not rejected before scheduling: $($reply.error)"
+    }
+}
+Assert-ModeRejected -Flags @{executionMode='terminal;Write-Host hacked'} -Expected 'Invalid execution mode.'
+Assert-ModeRejected -Flags @{executionMode='terminal';autoResumeOnLimit=$true} -Expected 'Automatic quota continuation requires Background execution.'
 Write-Host 'Flutter strict local-time JSON schedule preflight PASS (no task mutation).' -ForegroundColor Green
 
 # Saving preferences must preserve the opt-in flag. Use an isolated settings

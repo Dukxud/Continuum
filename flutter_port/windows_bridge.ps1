@@ -210,6 +210,11 @@ try {
         }
         'schedule' {
             if($null -ne $request.autoResumeOnLimit -and $request.autoResumeOnLimit -isnot [bool]){throw 'Invalid automatic-continuation option.'}
+            $executionMode=if($request.executionMode){[string]$request.executionMode}else{'background'}
+            if($executionMode -cnotin @('terminal','background')){throw 'Invalid execution mode.'}
+            if($executionMode -eq 'terminal' -and $request.autoResumeOnLimit -eq $true){
+                throw 'Automatic quota continuation requires Background execution.'
+            }
             $sessionId=[string]$request.sessionId
             if($sessionId -notmatch '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$'){throw 'Invalid session ID.'}
             # Validate the actual Flutter wall-clock value before any lookup or
@@ -274,12 +279,13 @@ try {
             [pscustomobject]@{
                 sessionId=$sessionId;repo=$root;branch=$branchName;model=$model
                 effort=$effort;access=$access;message=$message
+                executionMode=$executionMode
                 continuationPolicy=$policy;retryAttempt=0
                 createdAt=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
                 accountId=[string]$usage.accountId;runtimeFingerprint=$runtime.Fingerprint;log=$log
             } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $jobFilePath -Encoding utf8
             $runner=Join-Path $runtime.Directory 'CodexRunJob.vbs'
-            $arguments=Get-CodexTaskArguments -Runner $runner -JobFile $jobFilePath
+            $arguments=Get-CodexTaskArguments -Runner $runner -JobFile $jobFilePath -ExecutionMode $executionMode
             try {
                 [void](Register-OneTimeTask -Name $name -At $when -Executable (Join-Path $env:WINDIR 'System32\wscript.exe') -Arguments $arguments -WorkingDirectory $root -Description "Codex session $sessionId ($branchName)")
             }catch{
@@ -322,6 +328,11 @@ try {
             $access=[string]$draft.access
             if($access -cnotin @('workspace-write','read-only','yolo')){throw 'Invalid access mode.'}
             if($null -ne $draft.autoResumeOnLimit -and $draft.autoResumeOnLimit -isnot [bool]){throw 'Invalid saved quota continuation option.'}
+            $executionMode=if($draft.executionMode){[string]$draft.executionMode}else{'background'}
+            if($executionMode -cnotin @('background','terminal')){throw 'Invalid saved execution mode.'}
+            if($executionMode -eq 'terminal' -and $draft.autoResumeOnLimit -eq $true){
+                throw 'Automatic quota continuation requires Background execution.'
+            }
             foreach($flag in @('microMode','alwaysOnTop')){
                 if($null -ne $request.$flag -and $request.$flag -isnot [bool]){throw "Invalid window preference: $flag"}
             }
@@ -330,6 +341,7 @@ try {
                 sessionId=[string]$draft.sessionId;repo=[string]$draft.repo
                 model=[string]$draft.model;effort=[string]$draft.effort
                 access=$access;message=[string]$draft.message;runAt=[string]$draft.runAt
+                executionMode=$executionMode
                 autoResumeOnLimit=($draft.autoResumeOnLimit -eq $true)
             }
             $appearance=if($request.barAppearance){$request.barAppearance}elseif($previous){$previous.barAppearance}else{$null}
