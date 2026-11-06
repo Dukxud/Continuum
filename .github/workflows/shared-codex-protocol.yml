@@ -15,7 +15,7 @@ concurrency:
 jobs:
   windows-protocol:
     runs-on: windows-2022
-    timeout-minutes: 5
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,3 +26,33 @@ jobs:
         run: |
           node --test ./tests/shared-codex-session.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Shared interactive protocol failed.' }
+      - name: Inspect worker/bridge source and immutable runtime safety
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File ./tests/flutter-port-source.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Worker source safety check failed.' }
+          pwsh -NoProfile -STA -File ./tests/flutter-port-bridge.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Windows bridge regression failed.' }
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+
+      - name: Generate Windows Flutter runner
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter create --platforms=windows --project-name codex_resume_flutter .
+
+      - name: Verify Flutter interactions and compile
+        shell: pwsh
+        working-directory: flutter_port
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter static analysis failed.' }
+          flutter test --exclude-tags visual-capture
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter widget tests failed.' }
+          flutter build windows --debug
+          if ($LASTEXITCODE -ne 0) { throw 'Windows Flutter compile failed.' }
