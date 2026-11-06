@@ -73,6 +73,12 @@ jobs:
           flutter build windows --release
           if ($LASTEXITCODE -ne 0) { throw 'Windows release compilation failed.' }
 
+      - name: Verify compiled Continuum EXE icon, not just source asset
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File ./tests/flutter-window-icon.test.ps1 -Executable ./flutter_port/build/windows/x64/runner/Release/codex_resume_flutter.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Compiled Windows executable has incorrect branding icon.' }
+
       - name: Package and independently verify review ZIP
         shell: pwsh
         run: |
