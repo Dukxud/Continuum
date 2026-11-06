@@ -74,8 +74,11 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
       final changes = recordList(field(params, 'proposedChanges'));
       final command = stringField(params, 'command');
       final network = field(params, 'networkApprovalContext');
-      final reviewable = isFileChange ? changes.isNotEmpty
-        : command.isNotEmpty || network is Map<String, dynamic>;
+      final reviewable = isFileChange
+        ? changes.isNotEmpty && field(params, 'previewComplete') == true
+        : command.isNotEmpty || (network is Map<String, dynamic> &&
+          stringField(network, 'host').isNotEmpty &&
+          stringField(network, 'protocol').isNotEmpty);
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(isFileChange ? 'FILE CHANGE APPROVAL' : 'COMMAND APPROVAL',
           style: const TextStyle(
@@ -88,7 +91,9 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
             color: DeckColor.text, fontFamily:'Consolas')),
         if (network is Map<String, dynamic>)
           Text('Network: ' + stringField(network, 'host') +
-            ' (' + stringField(network, 'protocol') + ')',
+            ' (' + stringField(network, 'protocol') +
+              (field(network, 'port') == null ? '' :
+                ':' + field(network, 'port').toString()) + ')',
             style: const TextStyle(color: DeckColor.text)),
         if (stringField(params, 'grantRoot').isNotEmpty)
           Text('Access root: ' + stringField(params,'grantRoot'),
