@@ -45,10 +45,12 @@ test('one App Server process, two viewers, command approval and user question', 
   first.end(); second.end();
 });
 test('file edits and unknown network requests never receive blind approval', () => {
-  const file = { method:'item/fileChange/requestApproval', params: { proposedChanges:[] } };
+  const file = { method:'item/fileChange/requestApproval', params: { proposedChanges:[], previewComplete:false } };
   assert.throws(() => validateUserResponse(file, { decision:'accept' }));
   assert.deepEqual(validateUserResponse(file, { decision:'decline' }), { decision:'decline' });
   file.params.proposedChanges = [{ path:'src/test.dart', kind:'update', diff:'@@ -1 +1 @@' }];
+  assert.throws(() => validateUserResponse(file, { decision:'accept' }), 'Incomplete diff must not be approved');
+  file.params.previewComplete = true;
   assert.deepEqual(validateUserResponse(file, { decision:'accept' }), { decision:'accept' });
   const command = { method:'item/commandExecution/requestApproval', params: {} };
   assert.throws(() => validateUserResponse(command, { decision:'accept' }));
