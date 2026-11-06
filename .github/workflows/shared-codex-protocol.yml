@@ -56,3 +56,24 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Flutter widget tests failed.' }
           flutter build windows --debug
           if ($LASTEXITCODE -ne 0) { throw 'Windows Flutter compile failed.' }
+
+      - name: Compile unsigned release review package
+        shell: pwsh
+        working-directory: flutter_port
+        run: |
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'Windows release compilation failed.' }
+
+      - name: Package and independently verify review ZIP
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -STA -File ./flutter_port/Build-WindowsPreview.ps1 -PackageVerifiedBuild -OutputDirectory ./flutter_port/build/review-out
+          if ($LASTEXITCODE -ne 0) { throw 'Preview package verification failed.' }
+
+      - name: Attach private Windows shared-session preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-codex-windows-preview
+          path: flutter_port/build/review-out/*.zip
+          retention-days: 7
+          if-no-files-found: error
