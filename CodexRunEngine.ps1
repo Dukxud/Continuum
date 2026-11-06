@@ -73,6 +73,11 @@ function Get-CodexRuntimeFiles {
         'CodexResumeScheduler.ps1','CodexRunEngine.ps1',
         'CodexUsage.js','CodexRunJob.vbs','CodexQuotaContinuation.ps1',
         'CodexTerminalRun.ps1',
+        'components/SharedCodexSession/protocol.mjs',
+        'components/SharedCodexSession/host.mjs',
+        'components/SharedCodexSession/remote.mjs',
+        'components/SharedCodexSession/client.mjs',
+        'components/SharedCodexSession/main.mjs',
         'components/RuntimeBundle/RuntimeBundle.psm1',
         'components/OneTimeTasks/OneTimeTasks.psm1',
         'components/GitRepository/GitRepository.psm1',
@@ -82,7 +87,7 @@ function Get-CodexRuntimeFiles {
 }
 function Get-CodexTaskArguments {
     param([string]$Runner,[string]$JobFile,
-          [ValidateSet('background','terminal')][string]$ExecutionMode='background')
+          [ValidateSet('background','terminal','shared')][string]$ExecutionMode='background')
     if ($Runner.Contains('"') -or $JobFile.Contains('"')) { throw 'Unsafe quote in task path.' }
     # A terminal run deliberately gets a console; existing tasks keep their
     # original one-argument, hidden launch contract.
@@ -168,8 +173,8 @@ function Invoke-CodexScheduledJob {
         if ($job.model -and $job.model -notmatch '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}$') { throw 'Invalid model identifier.' }
         if ($job.access -notin @('read-only','workspace-write','yolo')) { throw 'Invalid saved access setting.' }
         $executionMode=if($job.executionMode){[string]$job.executionMode}else{'background'}
-        if($executionMode -cnotin @('background','terminal')){throw 'Invalid saved execution mode.'}
-        if($executionMode -eq 'terminal' -and (Test-CodexContinuationPolicy $job)){
+        if($executionMode -cnotin @('background','terminal','shared')){throw 'Invalid saved execution mode.'}
+        if($executionMode -in @('terminal','shared') -and (Test-CodexContinuationPolicy $job)){
             throw 'Interactive terminal runs cannot use automatic quota continuation.'
         }
         if (-not (Test-Path -LiteralPath $job.repo -PathType Container)) { throw 'Repository no longer exists.' }
@@ -250,6 +255,22 @@ function Invoke-CodexScheduledJob {
         $codex = (Get-Command codex.cmd -ErrorAction Stop).Source
         [void](New-Item -Path $AppDirectory -ItemType Directory -Force -ErrorAction Stop)
         $PSNativeCommandUseErrorActionPreference = $false
+        if($executionMode -eq 'shared'){
+            # One App Server owns the original conversation. Native TUI windows
+            # are authenticated clients; they never start a second turn owner.
+            # The scheduled worker holds its session mutex until this turn
+            # has truly finished, not until a launcher exits.
+            $hostFile=Join-Path $RuntimeDirectory 'components/SharedCodexSession/main.mjs'
+            $node=(Get-Command node.exe -ErrorAction Stop).Source
+            & $node $hostFile host $JobFile (Get-CodexCliJs)
+            $result=$LASTEXITCODE
+            if([int]$result -eq 0){
+                Set-CodexRunOutcome -JobFile $JobFile -Status 'completed' -ExitCode 0 -Attempt ([int]$job.retryAttempt)
+                return 0
+            }
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -ExitCode ([int]$result) -Attempt ([int]$job.retryAttempt) -Message 'Shared Codex session failed; inspect the host log. No second writer was launched.'
+            return [int]$result
+        }
         if($executionMode -eq 'terminal'){
             # The interactive TUI MUST inherit real stdin/stdout/stderr:
             # piping through Tee-Object would prevent prompts and approvals.

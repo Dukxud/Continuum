@@ -86,6 +86,7 @@ class _LiveActivityDialogState extends State<LiveActivityDialog> {
       stringField(current, 'Status') == 'Running' ? current : null;
     final status = _stateLabel(current, history);
     final nativeTerminal = stringField(widget.run, 'ExecutionMode') == 'terminal';
+    final sharedMode = stringField(widget.run, 'ExecutionMode') == 'shared';
     final activity = _lastActivity;
     final recent = field(activity, 'Recent');
     final structured = recordList(field(activity, 'Timeline'));
@@ -136,7 +137,9 @@ class _LiveActivityDialogState extends State<LiveActivityDialog> {
                 icon: const Icon(Icons.close_rounded, color: DeckColor.muted)),
             ])),
           const Divider(height: 1, color: DeckColor.line),
-          Expanded(child: ListView(
+          Expanded(child: sharedMode
+            ? SharedSessionPanel(controller: widget.controller, name: _name)
+            : ListView(
             key: const Key('live-activity-scroll'),
             padding: const EdgeInsets.fromLTRB(17, 12, 17, 14),
             children: [

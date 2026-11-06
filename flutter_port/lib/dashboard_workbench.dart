@@ -247,7 +247,7 @@ extension _DashboardWorkbench on _SchedulerHomeState {
                 key: const Key('auto-resume-on-limit'),
                 value: state.autoResumeOnLimit,
                 activeTrackColor: DeckColor.mint,
-                onChanged: state.executionMode == 'terminal'
+                onChanged: state.executionMode != 'background'
                   ? null : (value) => state.edit(autoResumeOnLimit: value),
               ),
             ),
@@ -270,14 +270,16 @@ extension _DashboardWorkbench on _SchedulerHomeState {
                 color: DeckColor.muted, fontWeight: FontWeight.w700)),
               const SizedBox(width: 9),
               Expanded(child: SizedBox(height: 42, child: Tooltip(
-                message: 'Native terminal displays Codex questions and approvals. '
-                  'Background runs unattended and supports quota continuation.',
+                message: 'Shared session displays questions in Continuum without a second Codex process. '
+                  'Native terminal opens the CLI; Background runs unattended.',
                 child: DeckSelect<String>(
                   name: 'execution-mode',
                   value: state.executionMode,
                   items: const [
                     DropdownMenuItem(value: 'terminal',
                       child: Text('Native terminal')),
+                    DropdownMenuItem(value: 'shared',
+                      child: Text('Shared session')),
                     DropdownMenuItem(value: 'background',
                       child: Text('Background')),
                   ],

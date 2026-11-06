@@ -2,7 +2,7 @@
 # The existing verified worker owns all execution and account safety checks.
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('load','labels','pending','usage','select','schedule','cancel','evidence','hide','save','browse')][string]$Action,
+    [Parameter(Mandatory)][ValidateSet('load','labels','pending','usage','select','schedule','cancel','evidence','hide','save','browse','shared-status','shared-answer','shared-open')][string]$Action,
     [string]$Payload = ''
 )
 $ErrorActionPreference='Stop'
@@ -211,8 +211,8 @@ try {
         'schedule' {
             if($null -ne $request.autoResumeOnLimit -and $request.autoResumeOnLimit -isnot [bool]){throw 'Invalid automatic-continuation option.'}
             $executionMode=if($request.executionMode){[string]$request.executionMode}else{'background'}
-            if($executionMode -cnotin @('terminal','background')){throw 'Invalid execution mode.'}
-            if($executionMode -eq 'terminal' -and $request.autoResumeOnLimit -eq $true){
+            if($executionMode -cnotin @('terminal','background','shared')){throw 'Invalid execution mode.'}
+            if($executionMode -in @('terminal','shared') -and $request.autoResumeOnLimit -eq $true){
                 throw 'Automatic quota continuation requires Background execution.'
             }
             $sessionId=[string]$request.sessionId
@@ -296,6 +296,78 @@ try {
             }
             $result=@{name=$name;status='Scheduled'}
         }
+        'shared-status' {
+            $name=[string]$request.name
+            if($name -cnotmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[0-9a-fA-F]{8}$'){throw 'Invalid shared-session name.'}
+            $job=Join-Path $appDir ($name+'.json')
+            if(-not (Test-Path -LiteralPath $job -PathType Leaf)){throw 'Shared job not found.'}
+            $saved=Get-Content -LiteralPath $job -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            if([string]$saved.executionMode -cne 'shared'){throw 'Job does not use shared execution.'}
+            $script=Join-Path $source 'components/SharedCodexSession/main.mjs'
+            $online=$false
+            try {
+                $lines=@(& node.exe $script status $job 2>$null)
+                if($LASTEXITCODE -eq 0 -and $lines.Count -gt 0){
+                    $result=($lines | Select-Object -Last 1) | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+                    $online=$true
+                }
+            }catch { $online=$false }
+            if(-not $online){
+                # Completed jobs lose their transient pipe/descriptor; the
+                # persisted result is authoritative. Never leave a stale
+                # 'running' snapshot onscreen after a successful exit.
+                $resultPath=[IO.Path]::ChangeExtension($job,'.result.json')
+                $outcome=Read-JobOutcome -Path $resultPath
+                if(-not $outcome){throw 'Shared session unavailable; no recorded outcome yet.'}
+                $result=@{
+                    action='snapshot'; status=[string]$outcome.status; offline=$true
+                    pending=@(); events=@(); message=[string]$outcome.message
+                    finishedAt=[string]$outcome.at; nativeViewers=0
+                }
+            }
+        }
+        'shared-open' {
+            $name=[string]$request.name
+            if($name -cnotmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[0-9a-fA-F]{8}$'){throw 'Invalid shared-session name.'}
+            $job=Join-Path $appDir ($name+'.json')
+            if(-not (Test-Path -LiteralPath $job -PathType Leaf)){throw 'Shared job not found.'}
+            $saved=Get-Content -LiteralPath $job -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            if([string]$saved.executionMode -cne 'shared'){throw 'Job does not use shared execution.'}
+            $script=Join-Path $source 'components/SharedCodexSession/main.mjs'
+            $node=(Get-Command node.exe -ErrorAction Stop).Source
+            # The terminal is a client of the authenticated running owner.
+            # This action never starts an App Server or creates a fork.
+            $lines=@(& $node $script status $job)
+            if($LASTEXITCODE -ne 0 -or $lines.Count -eq 0){throw 'Shared session owner is not reachable.'}
+            $program=Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
+            if(-not (Test-Path -LiteralPath $program -PathType Leaf)){throw 'PowerShell 7 is missing.'}
+            $cli=Get-CodexCliJs
+            $cmd="& '$($node.Replace("'","''"))' '$($script.Replace("'","''"))' native '$($job.Replace("'","''"))' '$($cli.Replace("'","''"))'"
+            $encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))
+            $wt=Get-Command wt.exe -ErrorAction SilentlyContinue
+            if($wt){
+                $args='-w new new-tab --title "Continuum viewer" "'+$program+'" -NoLogo -NoExit -EncodedCommand '+$encoded
+                [void](Start-Process -FilePath $wt.Source -ArgumentList $args -PassThru -ErrorAction Stop)
+            }else{
+                [void](Start-Process -FilePath $program -ArgumentList @('-NoLogo','-NoExit','-EncodedCommand',$encoded) -PassThru -ErrorAction Stop)
+            }
+            $result=@{opened=$true;nativeTui=$true}
+        }
+        'shared-answer' {
+            $name=[string]$request.name
+            if($name -cnotmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[0-9a-fA-F]{8}$'){throw 'Invalid shared-session name.'}
+            $job=Join-Path $appDir ($name+'.json')
+            if(-not (Test-Path -LiteralPath $job -PathType Leaf)){throw 'Shared job not found.'}
+            $saved=Get-Content -LiteralPath $job -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            if([string]$saved.executionMode -cne 'shared'){throw 'Job does not use shared execution.'}
+            $body=[pscustomobject]@{action='answer';id=[string]$request.requestId;result=$request.result}
+            $script=Join-Path $source 'components/SharedCodexSession/main.mjs'
+            $wire=$body | ConvertTo-Json -Depth 16 -Compress
+            $lines=@($wire | node.exe $script answer $job)
+            if($LASTEXITCODE -ne 0 -or $lines.Count -eq 0){throw 'Shared request refused or expired.'}
+            $result=($lines | Select-Object -Last 1) | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+            if($result.action -ne 'ack'){throw 'Shared request was not acknowledged.'}
+        }
         'cancel' {
             $name=[string]$request.name
             if($name -cnotmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[0-9a-fA-F]{8}$'){throw 'Invalid Scheduler task name.'}
@@ -329,8 +401,8 @@ try {
             if($access -cnotin @('workspace-write','read-only','yolo')){throw 'Invalid access mode.'}
             if($null -ne $draft.autoResumeOnLimit -and $draft.autoResumeOnLimit -isnot [bool]){throw 'Invalid saved quota continuation option.'}
             $executionMode=if($draft.executionMode){[string]$draft.executionMode}else{'background'}
-            if($executionMode -cnotin @('background','terminal')){throw 'Invalid saved execution mode.'}
-            if($executionMode -eq 'terminal' -and $draft.autoResumeOnLimit -eq $true){
+            if($executionMode -cnotin @('background','terminal','shared')){throw 'Invalid saved execution mode.'}
+            if($executionMode -in @('terminal','shared') -and $draft.autoResumeOnLimit -eq $true){
                 throw 'Automatic quota continuation requires Background execution.'
             }
             foreach($flag in @('microMode','alwaysOnTop')){
