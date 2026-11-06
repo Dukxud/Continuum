@@ -259,8 +259,17 @@ function Invoke-CodexScheduledJob {
             }
             $argsList+=@([string]$job.sessionId,[string]$job.message)
             Write-Host 'Starting interactive Codex in this terminal. Questions and approvals appear here.' -ForegroundColor Cyan
-            & $codex @argsList
-            $result=$LASTEXITCODE
+            # A nonzero native exit is a result, not a PowerShell
+            # terminating error. Preserve it even with strict wrapper
+            # ErrorActionPreference and report the original exit code.
+            $oldErrorActionPreference=$ErrorActionPreference
+            try {
+                $ErrorActionPreference='Continue'
+                & $codex @argsList
+                $result=$LASTEXITCODE
+            } finally {
+                $ErrorActionPreference=$oldErrorActionPreference
+            }
             Write-Host "Codex terminal exit code: $result" -ForegroundColor $(if($result -eq 0){'Green'}else{'Yellow'})
             if([int]$result -eq 0){
                 # A TUI can exit voluntarily before the user-requested work

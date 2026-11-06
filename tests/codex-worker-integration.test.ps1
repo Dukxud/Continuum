@@ -142,7 +142,8 @@ exit /b %errorlevel%
     $outcome=Read-JobOutcome -Path $outcomePath
     Require ($outcome.status -eq 'finished' -and $outcome.exitCode -eq 0) 'Interactive exit must not be misreported as task completion.'
     $interactiveFailed=Run-CodexStub 17 $false 'acct-1' $false $false $expectedAccountIdentity $false 'terminal'
-    Require ($interactiveFailed.Exit -eq 17 -and (Read-JobOutcome -Path $outcomePath).status -eq 'failed') 'Interactive Codex failure was not preserved.'
+    $failedStatus=Read-JobOutcome -Path $outcomePath
+    Require ($interactiveFailed.Exit -eq 17 -and $failedStatus.status -eq 'failed') "Interactive Codex failure was not preserved. Exit=$($interactiveFailed.Exit), status=$($failedStatus.status), output=$($interactiveFailed.Output), errors=$($interactiveFailed.Errors)"
     $terminalWrongAccount=Run-CodexStub 0 $false 'wrong-workspace' $false $false $expectedAccountIdentity $false 'terminal'
     Require ($terminalWrongAccount.Exit -ne 0 -and -not $terminalWrongAccount.Executed) 'Terminal mode bypassed the workspace identity check.'
     $terminalArgs=Get-CodexTaskArguments -Runner (Join-Path $temp 'CodexRunJob.vbs') -JobFile $jobPath -ExecutionMode 'terminal'
