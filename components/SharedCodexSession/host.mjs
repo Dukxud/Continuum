@@ -47,6 +47,7 @@ export class SharedSessionHost extends EventEmitter {
     this.secret = randomBytes(32).toString('hex');
     this.sockets = new Set();
     this.pending = new Map();
+    this.reviewableFileChanges = new Map();
     this.events = [];
     this.status = 'starting';
     this.turnId = null;
@@ -131,13 +132,28 @@ export class SharedSessionHost extends EventEmitter {
   }
   onAppMessage(message) {
     if (this.completed) return;
+    if (message.method === 'item/started' && message.params?.item?.type === 'fileChange') {
+      const item = message.params.item;
+      if (item.id && Array.isArray(item.changes)) {
+        this.reviewableFileChanges.set(item.id,
+          item.changes.slice(0, 16).map(change => ({
+            path: limitText(change.path),
+            kind: limitText(change.kind),
+            diff: limitText(change.diff).slice(0, 2500),
+          })));
+      }
+    }
     if (Object.hasOwn(message, 'id') && isServerRequest(message.method)) {
       if (message.params?.threadId !== this.job.sessionId) {
         this.fatal(new Error('Cross-thread Codex server request refused'));
         return;
       }
       const id = String(message.id);
-      this.pending.set(id, { id, method: message.method, params: message.params });
+      const params = { ...message.params };
+      if (message.method === 'item/fileChange/requestApproval') {
+        params.proposedChanges = this.reviewableFileChanges.get(params.itemId) ?? [];
+      }
+      this.pending.set(id, { id, method: message.method, params });
       this.status = 'needs-input';
       this.broadcast(this.snapshot());
       return;
