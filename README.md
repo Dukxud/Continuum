@@ -4,7 +4,7 @@
 
 **Status: open-source engineering preview, not a signed public release.** The current code lives on [main](https://github.com/Dukxud/codex-resume-scheduler/tree/main). This is an independent community project, **not an OpenAI product**.
 
-> **Download distinction:** The [latest GitHub Release](https://github.com/Dukxud/codex-resume-scheduler/releases/latest) is the **older PowerShell/WinForms application (v1.11.0)**. It is **not** the current Continuum Flutter executable. For Continuum, build from \`main\` as shown below. Prebuilt CI artifacts are unsigned, short-lived engineering previews and must not be presented as signed installers.
+> **Download distinction:** The [latest GitHub Release](https://github.com/Dukxud/codex-resume-scheduler/releases/latest) is the **older PowerShell/WinForms application (v1.11.0)**. It is **not** the current Continuum Flutter executable. For Continuum, build from `main` as shown below. Prebuilt CI artifacts are unsigned, short-lived engineering previews and must not be presented as signed installers.
 
 ## What you can do
 
@@ -37,14 +37,14 @@ The Shared owner retains the server after scheduled-turn completion while an att
 
 In PowerShell 7:
 
-\`\`\`powershell
+```powershell
 git clone --branch main --single-branch https://github.com/Dukxud/codex-resume-scheduler.git "$HOME\source\continuum"
 cd "$HOME\source\continuum"
 pwsh -NoProfile -STA -File .\flutter_port\Build-WindowsPreview.ps1 -OutputDirectory "$HOME\Downloads\Continuum-Main"
 & "$HOME\Downloads\Continuum-Main\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe"
-\`\`\`
+```
 
-**Exact executable after that build:** \`%USERPROFILE%\Downloads\Continuum-Main\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe\`. Keep the accompanying \`data\`, DLLs, worker modules, and scripts beside it. Do **not** move the EXE by itself. The build refuses to overwrite an existing review package; choose another output directory when rebuilding.
+**Exact executable after that build:** `%USERPROFILE%\Downloads\Continuum-Main\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe`. Keep the accompanying `data`, DLLs, worker modules, and scripts beside it. Do **not** move the EXE by itself. The build refuses to overwrite an existing review package; choose another output directory when rebuilding.
 
 For a one-command **source-level development review** (tests then desktop launch), see [Flutter development instructions](flutter_port/README.md). To review CI binaries, download the artifact for the **exact tested commit** from [GitHub Actions](https://github.com/Dukxud/codex-resume-scheduler/actions); artifacts expire and are **not** an official release.
 
@@ -75,14 +75,14 @@ For a one-command **source-level development review** (tests then desktop launch
 
 ## Developer verification
 
-\`\`\`powershell
+```powershell
 node --test tests/shared-codex-session.test.mjs tests/shared-codex-remote.test.mjs
 pwsh -NoProfile -File .\tests\flutter-port-source.test.ps1
 pwsh -NoProfile -STA -File .\tests\flutter-port-bridge.test.ps1
 pwsh -NoProfile -STA -File .\flutter_port\Run-WindowsReview.ps1 -TestsOnly
-\`\`\`
+```
 
-These checks verify protocol mocks, source, bridge, and Flutter tests. **They do not prove live Codex TUI attachment or target-machine acceptance.** Do not run live Codex integration tests without the operator's explicit authorization. The main branch was formed by merging [#17](https://github.com/Dukxud/codex-resume-scheduler/pull/17) and [#18](https://github.com/Dukxud/codex-resume-scheduler/pull/18) on November 6, 2026. The exact merge baseline was \`15b32f74b0ea243e1e0bfa833ff33aa073c59089\`.
+These checks verify protocol mocks, source, bridge, and Flutter tests. **They do not prove live Codex TUI attachment or target-machine acceptance.** Do not run live Codex integration tests without the operator's explicit authorization. The main branch was formed by merging [#17](https://github.com/Dukxud/codex-resume-scheduler/pull/17) and [#18](https://github.com/Dukxud/codex-resume-scheduler/pull/18) on November 6, 2026. The exact merge baseline was `15b32f74b0ea243e1e0bfa833ff33aa073c59089`.
 
 ## Public availability and feedback
 
