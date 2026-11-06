@@ -63,6 +63,7 @@ export const isServerRequest = method => [
   'item/commandExecution/requestApproval',
   'item/fileChange/requestApproval',
   'item/tool/requestUserInput',
+  'tool/requestUserInput',
   'mcpServer/elicitation/request',
   'item/permissions/requestApproval',
 ].includes(method);
@@ -73,7 +74,7 @@ export function validateUserResponse(request, result) {
   if (request.method === 'item/commandExecution/requestApproval' || request.method === 'item/fileChange/requestApproval') {
     if (!['accept', 'acceptForSession', 'decline', 'cancel'].includes(result.decision)) throw new Error('Unsupported approval decision');
     if (Object.keys(result).length !== 1) throw new Error('Unexpected approval attributes');
-  } else if (request.method === 'item/tool/requestUserInput') {
+  } else if ((request.method === 'item/tool/requestUserInput' || request.method === 'tool/requestUserInput')) {
     const questions = request.params?.questions;
     if (!Array.isArray(questions) || !result.answers || typeof result.answers !== 'object' || Array.isArray(result.answers)) throw new Error('Malformed question answers');
     const allowed = new Set(questions.map(q => q.id));
