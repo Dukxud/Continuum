@@ -89,7 +89,14 @@ export class SharedSessionHost extends EventEmitter {
     try {
       const child = this.spawnServer();
       this.child = child;
+      // The real Codex App Server can log extensively on stderr. Drain it,
+      // without copying private process output into the shared UI snapshot,
+      // so the pipe never blocks the single conversation owner.
+      child.stderr?.resume();
       this.protocol = new AppServerProtocol(child);
+      this.protocol.on('malformed', () => this.fatal(
+        new Error('Codex App Server returned an invalid JSON-RPC message')));
+
       this.protocol.on('message', message => this.onAppMessage(message));
       this.protocol.on('closed', error => { if (!this.completed) this.fatal(error); });
       const initialized = await this.protocol.request('initialize', {
@@ -145,6 +152,11 @@ export class SharedSessionHost extends EventEmitter {
       this.broadcast(this.snapshot());
     }
     if (message.method === 'turn/completed') {
+      if (message.params?.threadId !== this.job.sessionId ||
+          (this.turnId && message.params?.turn?.id !== this.turnId)) {
+        this.fatal(new Error('Unexpected thread or turn completion from Codex'));
+        return;
+      }
       const outcome = message.params?.turn?.status;
       this.status = outcome === 'completed' ? 'completed' : outcome === 'interrupted' ? 'interrupted' : 'failed';
       this.completed = true;
