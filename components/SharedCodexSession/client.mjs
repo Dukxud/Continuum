@@ -4,22 +4,51 @@ import { loadDescriptor } from './host.mjs';
 
 export async function connectToSession(descriptorPath, onMessage) {
   const { endpoint, secret } = await loadDescriptor(descriptorPath);
-  return await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const socket = connect(endpoint);
-    let input = '', ready = false;
-    const fail = error => { if (!ready) reject(error); else onMessage({ action: 'disconnected', message: error.message }); };
+    let input = '', authenticated = false, settled = false;
+    const timer = setTimeout(() => {
+      if (!authenticated) { reject(new Error('Shared owner authentication timed out')); socket.destroy(); }
+    }, 5000);
+    const fail = error => {
+      clearTimeout(timer);
+      if (!settled) { settled = true; reject(error); }
+      else onMessage({ action: 'disconnected', message: error.message });
+    };
     socket.once('error', fail);
-    socket.once('connect', () => { socket.write(JSON.stringify({ secret }) + '\n'); ready = true; resolve(socket); });
+    socket.on('close', () => {
+      if (!settled) fail(new Error('Shared owner disconnected before authentication'));
+    });
+    socket.once('connect', () => socket.write(JSON.stringify({ secret }) + '\\n'));
     socket.setEncoding('utf8');
     socket.on('data', chunk => {
       input += chunk;
-      if (Buffer.byteLength(input, 'utf8') > 256 * 1024) { socket.destroy(); return; }
+      if (Buffer.byteLength(input, 'utf8') > 256 * 1024) {
+        socket.destroy(new Error('Shared owner message exceeded size limit'));
+        return;
+      }
       for (;;) {
-        const i = input.indexOf('\n');
+        const i = input.indexOf('\\n');
         if (i < 0) return;
-        const line = input.slice(0, i); input = input.slice(i + 1);
-        try { onMessage(JSON.parse(line)); }
-        catch { socket.destroy(); return; }
+        const line = input.slice(0, i);
+        input = input.slice(i + 1);
+        let msg;
+        try { msg = JSON.parse(line); }
+        catch { socket.destroy(new Error('Invalid shared owner response')); return; }
+        if (!authenticated) {
+          if (msg.action !== 'snapshot') {
+            socket.destroy(new Error('Shared owner did not authenticate'));
+            return;
+          }
+          authenticated = true;
+          settled = true;
+          clearTimeout(timer);
+          resolve(socket);
+          // The caller must receive its socket before its first snapshot.
+          queueMicrotask(() => onMessage(msg));
+        } else {
+          onMessage(msg);
+        }
       }
     });
   });
