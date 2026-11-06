@@ -1,9 +1,11 @@
-# Release and preview policy
+# Release and preview policy (current, 6 Nov 2026)
 
-- Production release publication is disabled until explicit authorization and trusted publisher signing exist. The consolidated PR deletes the release job; the main branch workflow is manual-dispatch only, making its older push-only release job unreachable.
-- The workflow is not automatically triggered by pushes, pull requests or merges. It can be invoked manually only if the user later authorizes it.
-- Preview packaging remains available through scripts/Package-CodexScheduler.ps1, scripts/Package-AeroComponent.ps1 and scripts/Package-ReusableComponents.ps1 using their Preview switches. Preview archives must disclose that they are unsigned.
-- SHA-256 manifests verify package content; they are not publisher signatures.
-- A production release requires a trusted signing certificate in the release environment, a timestamp service, signature validation, direct Windows acceptance, antivirus checks, and explicit publication authorization. Nothing automatically creates a release.
-- Do not disable Bitdefender or broadly exclude program files to make a preview work.
-- Weight Trajectory may adopt the selective window, progress, and fallback modules. It must not adopt SettingsStore for durable measurements; that module has no revision or transaction contract and treats corrupt JSON as absent.
+- **No production Flutter release has been published.** The [latest public GitHub Release](https://github.com/Dukxud/codex-resume-scheduler/releases/latest) is earlier **v1.11.0 WinForms ZIP**. It is **not** the Flutter Continuum EXE.
+- Flutter verification CI can run on pushes; its artifacts are **short-lived, unsigned engineering previews**. **CI execution is not release publication.** Production publishing is disabled/manual until explicit approval and signing.
+- `flutter_port/Build-WindowsPreview.ps1` outputs a Windows Flutter ZIP/folder with pinned worker sources, runtime and SHA-256 manifest. The builder refuses to overwrite an existing preview. Legacy PowerShell WinForms packaging scripts remain for earlier generations.
+- SHA-256 manifests check file integrity; **they are not a publisher signature**.
+- A production release requires explicit authorization, trusted code signing, timestamping, signature validation, direct Windows acceptance (including Shared TUI retention and approvals), antivirus/SmartScreen checks, compatibility notes and rollback plan.
+- Do **not** disable antivirus, Bitdefender or SmartScreen globally or make broad exclusions to run a preview.
+- Publish **only real, privacy-reviewed screenshots** with accurate build/outcome captions. Historical defect screenshots must never be presented as current passing behavior. See [SCREENSHOTS.md](SCREENSHOTS.md).
+- [Distribution and adoption](DISTRIBUTION-READINESS.md) records why a public repository and legacy release are not equivalent to an accessible current installer.
+- Reusable-component consumers retain their own acceptance. The SettingsStore module is not suitable as a durable transactional measurements database.
