@@ -3,7 +3,7 @@ Import-Module (Join-Path $PSScriptRoot '../SettingsStore/SettingsStore.psm1') -E
 function Write-JobOutcome {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Path,
-          [Parameter(Mandatory)][ValidateSet('completed','failed','deferred','blocked','cancelled')][string]$Status,
+          [Parameter(Mandatory)][ValidateSet('completed','finished','failed','deferred','blocked','cancelled')][string]$Status,
           [int]$Attempt=0,
           [Nullable[int]]$ExitCode=$null,
           [string]$Message='',
@@ -20,7 +20,7 @@ function Read-JobOutcome {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Path)
     $data=SettingsStore\Read-JsonSettings -Path $Path
-    if(-not $data -or $data.schema -ne 1 -or [string]$data.status -notin @('completed','failed','deferred','blocked','cancelled')){return $null}
+    if(-not $data -or $data.schema -ne 1 -or [string]$data.status -notin @('completed','finished','failed','deferred','blocked','cancelled')){return $null}
     return $data
 }
 Export-ModuleMember -Function Write-JobOutcome,Read-JobOutcome

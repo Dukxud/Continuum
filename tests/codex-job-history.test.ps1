@@ -29,5 +29,15 @@ try {
     try { Hide-CodexRunRecord -Directory $temp -Name '../bad'; throw 'Unsafe ID accepted.' }
     catch { if($_.Exception.Message -eq 'Unsafe ID accepted.'){throw} }
     if(@(Get-HiddenCodexRunNames -Directory $temp).Count -ne 1){throw 'Invalid hide operation changed saved choices.'}
+    $finished=Join-Path $temp 'CodexResume-20261101-1500-00112233.result.json'
+    [void](Write-JobOutcome -Path $finished -Status 'finished' -ExitCode 0 -Message 'Interactive terminal exited; verify in Codex.')
+    $readFinished=Read-JobOutcome -Path $finished
+    if(-not $readFinished -or $readFinished.status -cne 'finished'){
+        throw 'Native terminal exit was rejected by the durable outcome reader.'
+    }
+    $finishHistory=@(Get-CodexRunHistory -Directory $temp | Where-Object Status -eq 'finished')
+    if($finishHistory.Count -ne 1 -or $finishHistory[0].Message -notmatch 'verify in Codex'){
+        throw 'Native terminal exit status disappeared from human-readable history.'
+    }
     Write-Host 'Result records, job discovery isolation, linked retries and corrupt-history visibility PASS.'
 }finally{Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue}
