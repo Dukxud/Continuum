@@ -1,3 +1,5 @@
+> **Current context:** These reusable PowerShell components remain in merged Flutter Continuum `main`. For current product behavior see the [root README](../README.md) and [current architecture](../docs/ARCHITECTURE.md); the WinForms-only descriptions below document their original consumers.
+
 # Reusable components
 
 These PowerShell modules can be imported independently. None needs Codex, the scheduler GUI, a session ID or application-specific settings. Choose only the components your next application needs.
