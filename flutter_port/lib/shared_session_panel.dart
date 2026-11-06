@@ -86,7 +86,8 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
         ]),
       ]);
     }
-    if (method == 'item/tool/requestUserInput') {
+    if (method == 'item/tool/requestUserInput' ||
+        method == 'tool/requestUserInput') {
       final questions = recordList(field(params,'questions'));
       final complete = questions.isNotEmpty && questions.every(
         (q) => (answers[stringField(q,'id')] ?? '').isNotEmpty);
