@@ -44,6 +44,17 @@ test('one App Server process, two viewers, command approval and user question', 
   assert.equal(host.completed, true);
   first.end(); second.end();
 });
+test('both Codex question method variants require exact question IDs', () => {
+  for (const method of ['item/tool/requestUserInput','tool/requestUserInput']) {
+    const req = { method, params: { questions: [{ id: 'valid' }] } };
+    assert.deepEqual(validateUserResponse(req,
+      { answers: { valid: { answers: ['Yes'] } } }),
+      { answers: { valid: { answers: ['Yes'] } } });
+    assert.throws(() => validateUserResponse(req,
+      { answers: { arbitrary: { answers: ['Yes'] } } }));
+  }
+});
+
 test('reject implicit approvals, unknown questions and permission escalation', () => {
   const req = { method: 'item/commandExecution/requestApproval' };
   assert.throws(() => validateUserResponse(req, { decision: 'accept', unsafe: true }));
