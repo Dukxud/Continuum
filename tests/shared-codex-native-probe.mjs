@@ -15,7 +15,7 @@ if (!isAbsolute(codexEntry ?? '')) {
   console.error('Usage: node tests/shared-codex-native-probe.mjs ABSOLUTE_CODEX_CLI_JS');
   process.exit(2);
 }
-const runId = 'BP200';
+const runId = 'BP201';
 const jobName = 'CodexResume-20261105-2220-a11ce999';
 const deadline = 90000;
 const seen = [];
@@ -64,13 +64,16 @@ async function waitForFile(path, maxMs = 15000) {
   throw new Error('Shared owner did not create its endpoint descriptor');
 }
 async function stop(child) {
-  if (!child || child.exitCode !== null) return;
-  child.kill();
-  await Promise.race([
-    new Promise(resolve => child.once('exit', resolve)),
-    delay(2000),
-  ]);
-  if (child.exitCode === null) child.kill('SIGKILL');
+  if (!child) return;
+  const closed = new Promise(resolve => child.once('close', resolve));
+  if (child.exitCode === null && child.signalCode === null) child.kill();
+  try {
+    await withDeadline(closed, 2000, 'App Server close timed out');
+  } catch (error) {
+    if (child.exitCode !== null || child.signalCode !== null) throw error;
+    child.kill('SIGKILL');
+    await withDeadline(closed, 2000, 'App Server did not release its process handles');
+  }
 }
 async function main() {
   const dir = await mkdtemp(join(tmpdir(), 'continuum-native-probe-'));
@@ -152,7 +155,9 @@ async function main() {
       await host.close();
     }
     await stop(initialChild);
-    await rm(dir, { recursive: true, force: true });
+    // Windows can briefly retain cwd/stdio handles after process exit.
+    // Node's bounded retry policy only retries transient filesystem errors.
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 }
 main().catch(error => {
