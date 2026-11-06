@@ -317,13 +317,14 @@ try {
             if([string]$saved.executionMode -cne 'shared'){throw 'Job does not use shared execution.'}
             $script=Join-Path $source 'components/SharedCodexSession/main.mjs'
             $node=(Get-Command node.exe -ErrorAction Stop).Source
-            # A viewer only attaches to the authenticated, already-running owner.
-            # Never launch codex resume or a new App Server from this action.
+            # The terminal is a client of the authenticated running owner.
+            # This action never starts an App Server or creates a fork.
             $lines=@(& $node $script status $job)
             if($LASTEXITCODE -ne 0 -or $lines.Count -eq 0){throw 'Shared session owner is not reachable.'}
             $program=Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
             if(-not (Test-Path -LiteralPath $program -PathType Leaf)){throw 'PowerShell 7 is missing.'}
-            $cmd="& '$($node.Replace("'","''"))' '$($script.Replace("'","''"))' watch '$($job.Replace("'","''"))'"
+            $cli=Get-CodexCliJs
+            $cmd="& '$($node.Replace("'","''"))' '$($script.Replace("'","''"))' native '$($job.Replace("'","''"))' '$($cli.Replace("'","''"))'"
             $encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))
             $wt=Get-Command wt.exe -ErrorAction SilentlyContinue
             if($wt){
@@ -332,7 +333,7 @@ try {
             }else{
                 [void](Start-Process -FilePath $program -ArgumentList @('-NoLogo','-NoExit','-EncodedCommand',$encoded) -PassThru -ErrorAction Stop)
             }
-            $result=@{opened=$true;viewerOnly=$true}
+            $result=@{opened=$true;nativeTui=$true}
         }
         'shared-answer' {
             $name=[string]$request.name

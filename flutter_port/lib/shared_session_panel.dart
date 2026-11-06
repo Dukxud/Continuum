@@ -1,6 +1,6 @@
 part of 'main.dart';
 
-/// Mirrors one App Server owner; no new conversation process is launched.
+/// Shows the shared owner's activity and opens a native TUI client on request.
 class SharedSessionPanel extends StatefulWidget {
   const SharedSessionPanel({super.key, required this.controller, required this.name});
   final SchedulerController controller;
@@ -195,7 +195,7 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
             key: const Key('shared-open-terminal'),
             icon: const Icon(Icons.terminal_rounded, size: 17),
             onPressed: openingViewer ? null : _openTerminal,
-            label: const Text('Open in Terminal'))),
+            label: const Text('Open Codex Terminal'))),
         const SizedBox(height: 12),
         for (final request in requests)
           Container(margin:const EdgeInsets.only(bottom:12),

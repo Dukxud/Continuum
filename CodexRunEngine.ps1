@@ -75,6 +75,7 @@ function Get-CodexRuntimeFiles {
         'CodexTerminalRun.ps1',
         'components/SharedCodexSession/protocol.mjs',
         'components/SharedCodexSession/host.mjs',
+        'components/SharedCodexSession/remote.mjs',
         'components/SharedCodexSession/client.mjs',
         'components/SharedCodexSession/main.mjs',
         'components/RuntimeBundle/RuntimeBundle.psm1',
@@ -255,8 +256,8 @@ function Invoke-CodexScheduledJob {
         [void](New-Item -Path $AppDirectory -ItemType Directory -Force -ErrorAction Stop)
         $PSNativeCommandUseErrorActionPreference = $false
         if($executionMode -eq 'shared'){
-            # Single App Server owns the original conversation. Named-pipe
-            # viewers attach to that owner; nobody runs a second Codex TUI.
+            # One App Server owns the original conversation. Native TUI windows
+            # are authenticated clients; they never start a second turn owner.
             # The scheduled worker holds its session mutex until this turn
             # has truly finished, not until a launcher exits.
             $hostFile=Join-Path $RuntimeDirectory 'components/SharedCodexSession/main.mjs'
