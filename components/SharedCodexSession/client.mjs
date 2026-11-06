@@ -40,15 +40,15 @@ function displayRequest(request, output) {
     if (p.command) output.write(p.command + '\n');
     if (p.networkApprovalContext) {
       const net = p.networkApprovalContext;
-      output.write('Network: ' + (net.protocol ?? '') + '://' + (net.host ?? '') + '\n');
+      output.write('Network: ' + (net.protocol ?? '') + '://' + (net.host ?? '') + (net.port == null ? '' : ':' + net.port) + '\n');
     }
     if (p.grantRoot) output.write('Access root: ' + p.grantRoot + '\n');
     for (const change of p.proposedChanges ?? []) {
       output.write('Change ' + change.kind + ': ' + change.path + '\n' + change.diff + '\n');
     }
     const safe = request.method === 'item/fileChange/requestApproval'
-      ? (p.proposedChanges?.length ?? 0) > 0
-      : !!(p.command || p.networkApprovalContext);
+      ? (p.proposedChanges?.length ?? 0) > 0 && p.previewComplete === true
+      : !!(p.command || (p.networkApprovalContext?.host && p.networkApprovalContext?.protocol));
     if (!safe) output.write('Approval disabled: no reviewable command/change details.\n');
     output.write(safe ? '[a]pprove / [d]ecline / [c]ancel: ' : '[d]ecline / [c]ancel: ');
     return;
@@ -113,8 +113,8 @@ export async function terminalWatch(descriptorPath, input = process.stdin, outpu
         if (!decision) { output.write('Use a / d / c: '); return; }
         const p = request.params ?? {};
         const mayApprove = request.method === 'item/fileChange/requestApproval'
-          ? (p.proposedChanges?.length ?? 0) > 0
-          : !!(p.command || p.networkApprovalContext);
+          ? (p.proposedChanges?.length ?? 0) > 0 && p.previewComplete === true
+          : !!(p.command || (p.networkApprovalContext?.host && p.networkApprovalContext?.protocol));
         if (decision === 'accept' && !mayApprove) {
           output.write('Cannot approve without reviewable details. Decline or cancel: ');
           return;
