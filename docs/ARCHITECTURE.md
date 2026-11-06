@@ -1,3 +1,9 @@
+# Architecture map: current Continuum and historical Windows modules
+
+**Current (6 Nov 2026):** Flutter in `flutter_port/lib/` owns the desktop UI, `flutter_port/windows_bridge.ps1` validates JSON commands and uses Windows Task Scheduler, and the pinned `CodexRunEngine.ps1` owns actual execution/results. `components/SharedCodexSession/` owns one remote App Server, authenticated native TUI viewers, and live status. `flutter_port/Build-WindowsPreview.ps1` packages the Windows preview and pinned workers. See [Flutter guide](../flutter_port/README.md), [Shared lifecycle](SHARED-NATIVE-TUI.md), [current native acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md).
+
+**Historical scope below:** v1.16 WinForms architecture and reusable PowerShell modules. They remain in the repository, but should not be mistaken for the complete Flutter GUI architecture or current release instructions.
+
 # Architecture — Codex Resume Scheduler v1.16.0
 
 ## Design boundaries
