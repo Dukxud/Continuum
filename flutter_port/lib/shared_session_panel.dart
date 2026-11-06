@@ -13,7 +13,7 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
   Map<String, dynamic>? snapshot;
   final Map<String, String> answers = {};
   Timer? timer;
-  bool reading = false, sending = false;
+  bool reading = false, sending = false, openingViewer = false;
   String? problem;
 
   @override
@@ -49,6 +49,18 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
       if (mounted) setState(() => problem = e.toString());
     } finally {
       if (mounted) setState(() => sending = false);
+    }
+  }
+
+  Future<void> _openTerminal() async {
+    if (openingViewer) return;
+    setState(() { openingViewer = true; problem = null; });
+    try {
+      await widget.controller.openSharedViewer(widget.name);
+    } catch (e) {
+      if (mounted) setState(() => problem = e.toString());
+    } finally {
+      if (mounted) setState(() => openingViewer = false);
     }
   }
 
@@ -142,6 +154,13 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
             fontSize: 14,fontWeight: FontWeight.w800)),
         if (problem != null) Text(problem!,
           style: const TextStyle(color: DeckColor.rose)),
+        const SizedBox(height: 9),
+        Align(alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            key: const Key('shared-open-terminal'),
+            icon: const Icon(Icons.terminal_rounded, size: 17),
+            onPressed: openingViewer ? null : _openTerminal,
+            label: const Text('Open in Terminal'))),
         const SizedBox(height: 12),
         for (final request in requests)
           Container(margin:const EdgeInsets.only(bottom:12),
