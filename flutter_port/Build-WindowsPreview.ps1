@@ -49,6 +49,8 @@ if($LASTEXITCODE -ne 0){throw 'Windows icon missing from generated runner.'}
 $release=Join-Path $project 'build\windows\x64\runner\Release'
 $exe=Join-Path $release 'codex_resume_flutter.exe'
 if(-not (Test-Path -LiteralPath $exe -PathType Leaf)){throw 'Flutter executable is missing.'}
+& pwsh -NoProfile -File (Join-Path $root 'tests/flutter-window-icon.test.ps1') -Executable $exe
+if($LASTEXITCODE -ne 0){throw 'Packaged executable lacks Continuum icon.'}
 foreach($required in @('flutter_windows.dll','data')){
     if(-not (Test-Path -LiteralPath (Join-Path $release $required))){
         throw "Flutter release payload incomplete: $required"
