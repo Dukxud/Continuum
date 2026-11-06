@@ -16,7 +16,9 @@ export async function unusedLoopbackPort() {
     await once(server, 'listening');
     return server.address().port;
   } finally {
-    await new Promise(resolve => server.close(resolve));
+    if (server.listening) {
+      await new Promise(resolve => server.close(resolve));
+    }
   }
 }
 
@@ -53,7 +55,8 @@ async function dial(endpoint, token, makeSocket, timeoutMs) {
     });
     return socket;
   } catch (error) {
-    socket.close();
+    // Closing a socket that never completed its handshake can itself throw.
+    try { socket.close(); } catch { /* The connection was never usable. */ }
     throw error;
   }
 }

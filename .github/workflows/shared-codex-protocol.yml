@@ -24,8 +24,8 @@ jobs:
       - name: Verify shared owner and two-client interactive protocol
         shell: pwsh
         run: |
-          node --test ./tests/shared-codex-session.test.mjs
-          if ($LASTEXITCODE -ne 0) { throw 'Shared interactive protocol failed.' }
+          node --test ./tests/shared-codex-session.test.mjs ./tests/shared-codex-remote.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Shared interactive protocol or remote mock tests failed.' }
       - name: Inspect worker/bridge source and immutable runtime safety
         shell: pwsh
         run: |

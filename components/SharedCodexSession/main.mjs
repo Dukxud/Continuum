@@ -15,6 +15,39 @@ if (!['host', 'watch', 'status', 'answer', 'native'].includes(mode) ||
 const jobName = basename(jobPath, '.json');
 const appDir = dirname(jobPath);
 const { descriptor } = locationFor(appDir, jobName);
+async function nativeCredentials(descriptorPath) {
+  let socket;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      socket?.destroy();
+      reject(new Error('Timed out requesting native terminal credentials'));
+    }, 5000);
+    const handle = message => {
+      try {
+        if (message.action === 'snapshot') {
+          socket.write(JSON.stringify({ action: 'native-attach' }) + '\n');
+        } else if (message.action === 'native-credentials') {
+          clearTimeout(timer);
+          socket.end();
+          resolve(message);
+        } else if (message.action === 'error' || message.action === 'disconnected') {
+          clearTimeout(timer);
+          socket?.destroy();
+          reject(new Error(message.message));
+        }
+      } catch (error) {
+        clearTimeout(timer);
+        socket?.destroy();
+        reject(error);
+      }
+    };
+    connectToSession(descriptorPath, handle).then(
+      connection => { socket = connection; },
+      error => { clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
 async function run() {
   if (mode === 'host') {
     const job = JSON.parse(await readFile(jobPath, 'utf8'));
@@ -32,22 +65,7 @@ async function run() {
     if (job.executionMode !== 'shared') throw new Error('Native viewer requires a shared session');
     // Clicking Open in Terminal explicitly requests the real Codex TUI.
     // No new App Server, turn/start, prompt, or fork is issued here.
-    const credentials = await new Promise(async (resolve, reject) => {
-      let socket;
-      try {
-        socket = await connectToSession(descriptor, message => {
-          if (message.action === 'snapshot') {
-            socket.write(JSON.stringify({ action: 'native-attach' }) + '\n');
-          } else if (message.action === 'native-credentials') {
-            socket.end();
-            resolve(message);
-          } else if (message.action === 'error' || message.action === 'disconnected') {
-            socket.destroy();
-            reject(new Error(message.message));
-          }
-        });
-      } catch (error) { reject(error); }
-    });
+    const credentials = await nativeCredentials(descriptor);
     if (!/^[a-f0-9]{64}$/i.test(credentials.token ?? '') ||
         credentials.threadId !== job.sessionId ||
         credentials.cwd !== job.repo) throw new Error('Invalid shared owner credentials');
