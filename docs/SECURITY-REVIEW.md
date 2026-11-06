@@ -1,3 +1,5 @@
+> **Historical WinForms security review:** current Flutter/Shared security boundaries are in [SECURITY-AND-PRIVACY.md](SECURITY-AND-PRIVACY.md). The source review below remains unchanged as dated evidence.
+
 > **Historical WinForms security review:** current Flutter/Shared security boundaries are documented in [SECURITY-AND-PRIVACY.md](SECURITY-AND-PRIVACY.md). This original review is preserved as dated evidence rather than overwritten.
 
 # Security and code-quality review — v1.16.0 candidate
