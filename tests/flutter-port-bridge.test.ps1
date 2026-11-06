@@ -333,3 +333,38 @@ try {
     }
 }
 
+
+# A completed shared run has no pipe or descriptor. The bridge must report
+# the durable outcome rather than stale "running" or an unreachable-owner error.
+$sharedOldLocal=$env:LOCALAPPDATA
+$sharedFixture=Join-Path ([IO.Path]::GetTempPath()) ('flutter-shared-result-'+[guid]::NewGuid().ToString('N'))
+try {
+    $env:LOCALAPPDATA=$sharedFixture
+    $directory=Join-Path $sharedFixture 'CodexResumeScheduler'
+    [void](New-Item -Path $directory -ItemType Directory -Force)
+    $name='CodexResume-20261106-0952-5604ee2d'
+    $job=Join-Path $directory ($name+'.json')
+    @{executionMode='shared'} | ConvertTo-Json -Compress |
+        Set-Content -LiteralPath $job -Encoding utf8
+    $outcome=[IO.Path]::ChangeExtension($job,'.result.json')
+    @{schema=1;status='completed';at='2026-11-06T15:54:17Z';
+      attempt=0;exitCode=0;message='';nextJob=''} |
+      ConvertTo-Json -Compress | Set-Content -LiteralPath $outcome -Encoding utf8
+    $payload=@{name=$name} | ConvertTo-Json -Compress
+    $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
+    $lines=@(& pwsh -NoProfile -NonInteractive -STA -File $bridge -Action shared-status -Payload $encoded)
+    $status=$LASTEXITCODE
+    if($status -ne 0 -or -not $lines){throw 'Completed shared job did not return a status.'}
+    $answer=($lines | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+    if($answer.ok -ne $true -or $answer.result.status -cne 'completed' -or
+       $answer.result.offline -ne $true -or $answer.result.nativeViewers -ne 0){
+        throw "Shared status did not recover the persisted completed outcome: $($answer | ConvertTo-Json -Compress)"
+    }
+    Write-Host 'Flutter shared-session archived-outcome bridge PASS (no Codex execution).' -ForegroundColor Green
+} finally {
+    if($null -eq $sharedOldLocal){Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue}
+    else{$env:LOCALAPPDATA=$sharedOldLocal}
+    if(Test-Path -LiteralPath $sharedFixture){
+        Remove-Item -LiteralPath $sharedFixture -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}

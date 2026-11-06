@@ -372,7 +372,10 @@ export class SharedSessionHost extends EventEmitter {
   async close() {
     this.closing = true;
     this.emit('shutdown');
-    for (const socket of this.sockets) socket.end();
+    // A remote terminal may keep its named-pipe lease open after a maximum
+    // lifetime expires. Force-close locally owned sockets so server.close()
+    // cannot hang waiting for a half-open client.
+    for (const socket of this.sockets) socket.destroy();
     this.remoteConnection?.close();
     await new Promise(resolve => this.server?.close(() => resolve()) ?? resolve());
     if (this.child) {

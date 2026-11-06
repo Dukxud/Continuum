@@ -169,3 +169,43 @@ test('shared owner closes after a bounded idle grace or maximum lifetime', async
   assert.equal(await host.waitForNativeViewers({ idleMs: 5, maxMs: 30 }), 'maximum');
   host.nativeViewers.clear();
 });
+
+test('owner closes promptly even if a native terminal lease is still connected', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'continuum-remote-close-'));
+  const host = new SharedSessionHost({
+    job: { sessionId, repo: process.cwd(), message: 'Continue.' },
+    jobName, appDir: directory, codexEntry: fakeServer, remote: true,
+    reservePort: async () => 45622,
+    spawnServer: () => spawn(process.execPath, [fakeServer], {
+      stdio: ['pipe','pipe','pipe'],
+      env: { ...process.env, FAKE_THREAD_ID: sessionId },
+    }),
+    connectRemote: async ({ child }) => ({
+      protocol: new AppServerProtocol(child), close() {},
+    }),
+  });
+  t.after(async () => {
+    await host.close();
+    await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  });
+  const running = host.begin();
+  running.catch(() => {});
+  await waitFor(() => host.pending.has('100'));
+  const viewer = await connectToSession(locationFor(directory, jobName).descriptor, () => {});
+  viewer.write(JSON.stringify({ action: 'native-attach' }) + '\n');
+  await waitFor(() => host.nativeViewers.size === 1);
+  viewer.write(JSON.stringify({ action: 'answer', id: '100', result: { decision: 'accept' } }) + '\n');
+  await waitFor(() => host.pending.has('101'));
+  viewer.write(JSON.stringify({ action: 'answer', id: '101', result: {
+    answers: { choice: { answers: ['Yes'] } },
+  } }) + '\n');
+  assert.equal(await running, 'completed');
+  assert.equal(await host.waitForNativeViewers({ idleMs: 10, maxMs: 30 }), 'maximum');
+  // A hung native client must not prevent the owner from cleaning up.
+  await Promise.race([
+    host.close(),
+    sleep(1500).then(() => { throw new Error('Owner shutdown blocked on TUI lease'); }),
+  ]);
+  assert.equal(host.nativeViewers.size, 0);
+  viewer.destroy();
+});
