@@ -1,3 +1,5 @@
+> **Historical v1.16 source review:** statements about PR #16 remaining draft were accurate when written, **not** merge instructions for the current Continuum baseline. See [docs index](README.md).
+
 # Historical adversarial source review — v1.16 development branch
 
 ## Scope and verification
