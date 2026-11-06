@@ -165,7 +165,7 @@ class SchedulerController extends ChangeNotifier {
           ? preferredAccess : 'workspace-write';
         autoResumeOnLimit = field(draft, 'autoResumeOnLimit') == true;
         final storedExecutionMode = stringField(draft, 'executionMode');
-        executionMode = const ['terminal', 'background'].contains(storedExecutionMode)
+        executionMode = const ['terminal', 'background', 'shared'].contains(storedExecutionMode)
           ? storedExecutionMode
           : autoResumeOnLimit ? 'background' : 'terminal';
         micro = field(settings, 'microMode') == true;
@@ -362,9 +362,9 @@ class SchedulerController extends ChangeNotifier {
     if (accessMode != null) access = accessMode;
     if (reasoning != null) effort = reasoning;
     if (autoResumeOnLimit != null) this.autoResumeOnLimit = autoResumeOnLimit;
-    if (executionMode != null && const ['terminal','background'].contains(executionMode)) {
+    if (executionMode != null && const ['terminal','background','shared'].contains(executionMode)) {
       this.executionMode = executionMode;
-      if (executionMode == 'terminal') this.autoResumeOnLimit = false;
+      if (executionMode != 'background') this.autoResumeOnLimit = false;
     }
     final previousUsageTarget = usageTargetModel;
     var modeChanged = false;
@@ -581,6 +581,17 @@ class SchedulerController extends ChangeNotifier {
       busy = false; _changed();
     }
   }
+
+  /// A read-only snapshot of the existing App Server owner. Never resumes
+  /// Codex or creates another writer.
+  Future<Map<String, dynamic>> readSharedSession(String name) =>
+      adapter.call('shared-status', {'name': name});
+
+  /// Sends an explicit user response to the owner already running this turn.
+  Future<Map<String, dynamic>> replySharedSession(
+      String name, String requestId, Map<String, dynamic> result) =>
+      adapter.call('shared-answer',
+        {'name': name, 'requestId': requestId, 'result': result});
 
   Future<Map<String, dynamic>> cancel(String name) async {
     busy = true; _changed();
