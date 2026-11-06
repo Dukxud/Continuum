@@ -15,11 +15,46 @@ if (!isAbsolute(codexEntry ?? '')) {
   console.error('Usage: node tests/shared-codex-native-probe.mjs ABSOLUTE_CODEX_CLI_JS');
   process.exit(2);
 }
-const runId = 'BP199';
-const jobName = 'CodexResume-20261105-2211-a11ce999';
+const runId = 'BP200';
+const jobName = 'CodexResume-20261105-2220-a11ce999';
 const deadline = 90000;
 const seen = [];
 const print = message => process.stdout.write('[' + runId + '] ' + message + '\n');
+
+async function withDeadline(promise, maxMs, message) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), maxMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function waitForCompletedTurn(api, threadId) {
+  let dispose = () => {};
+  const promise = new Promise((resolve, reject) => {
+    const onMessage = message => {
+      if (message.method !== 'turn/completed' || message.params?.threadId !== threadId) return;
+      dispose();
+      resolve(message.params.turn);
+    };
+    const onClosed = error => { dispose(); reject(error); };
+    dispose = () => {
+      api.off('message', onMessage);
+      api.off('closed', onClosed);
+    };
+    api.on('message', onMessage);
+    api.on('closed', onClosed);
+  });
+  // An RPC failure can occur before the observer is awaited.
+  promise.catch(() => {});
+  return { promise, dispose };
+}
 
 async function waitForFile(path, maxMs = 15000) {
   const end = Date.now() + maxMs;
@@ -57,6 +92,31 @@ async function main() {
     const threadId = created?.thread?.id;
     assert.ok(isUuid(threadId), 'Codex did not create a valid disposable thread');
     print('PASS - Disposable thread created (original conversation untouched)');
+
+    // Codex 0.151+ does not necessarily persist a zero-turn thread.
+    // Finish a genuine first turn before trying to resume it in another process.
+    const seed = waitForCompletedTurn(api, threadId);
+    try {
+      const started = await api.request('turn/start', {
+        threadId,
+        input: [{ type: 'text', text: 'Reply with exactly: Ready.' }],
+        cwd: dir,
+        approvalPolicy: 'never',
+        sandboxPolicy: { type: 'readOnly' },
+      });
+      assert.ok(started?.turn?.id, 'Seed turn was not acknowledged');
+      const completed = await withDeadline(seed.promise, deadline, 'Disposable seed turn timed out');
+      assert.equal(completed?.id, started.turn.id, 'Different seed turn completed');
+      assert.equal(completed?.status, 'completed', 'Disposable seed turn failed');
+    } finally {
+      seed.dispose();
+    }
+    const persisted = await api.request('thread/turns/list', {
+      threadId, limit: 5, sortDirection: 'desc', itemsView: 'notLoaded',
+    });
+    assert.ok(Array.isArray(persisted?.data) && persisted.data.length > 0,
+      'First turn completed but thread history was not persisted');
+    print('PASS - Seed turn completed and persisted before App Server restart');
     await stop(initialChild);
     initialChild = undefined;
 
@@ -77,10 +137,7 @@ async function main() {
     assert.equal(host.sockets.size, 2, 'Not exactly two attached viewers');
     print('PASS - Two authenticated viewers, one Codex App Server owner');
 
-    const outcome = await Promise.race([
-      completion,
-      delay(deadline).then(() => { throw new Error('Native turn timed out'); }),
-    ]);
+    const outcome = await withDeadline(completion, deadline, 'Native resumed turn timed out');
     assert.equal(outcome, 'completed', 'Native Codex turn did not complete');
     assert.ok(host.events.some(event => event.kind === 'turn' && event.method === 'turn/completed'));
     assert.ok(seen.some(({ viewer, msg }) => viewer === 1 && msg.action === 'snapshot'));
