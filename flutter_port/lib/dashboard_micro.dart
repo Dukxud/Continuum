@@ -12,9 +12,12 @@ extension _DashboardMicro on _SchedulerHomeState {
     final activity = running.isNotEmpty
       ? state.activities[stringField(running.first, 'Name')] : null;
     final activityLabel = stringField(activity, 'Summary');
+    final sharedRunning = running.isNotEmpty &&
+      stringField(running.first, 'ExecutionMode') == 'shared';
     final terminalRunning = running.isNotEmpty &&
       stringField(running.first, 'ExecutionMode') == 'terminal';
-    final status = terminalRunning ? 'RUNNING · NATIVE TERMINAL'
+    final status = sharedRunning ? 'RUNNING · SHARED SESSION'
+      : terminalRunning ? 'RUNNING · NATIVE TERMINAL'
       : running.isNotEmpty
       ? 'RUNNING · ${activityLabel.isNotEmpty ? activityLabel : 'Waiting for Codex events'}'
       : next.isNotEmpty
