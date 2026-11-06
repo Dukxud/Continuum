@@ -124,7 +124,13 @@ test('native credentials are private, require active owner, and never fork the t
   assert.deepEqual(args.slice(0, 4),
     ['--listen', 'ws://127.0.0.1:45621', '--ws-auth', 'capability-token']);
   const events = [];
-  const viewer = await connectToSession(descriptor, message => events.push(message));
+  let assigned = false;
+  const viewer = await connectToSession(descriptor, message => {
+    if (message.action === 'snapshot') assert.equal(assigned, true,
+      'Initial snapshot must follow the resolved socket');
+    events.push(message);
+  });
+  assigned = true;
   await waitFor(() => host.sockets.size === 1);
   viewer.write(JSON.stringify({ action: 'native-attach' }) + '\n');
   await waitFor(() => events.some(message => message.action === 'native-credentials'));

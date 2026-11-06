@@ -45,8 +45,10 @@ export async function connectToSession(descriptorPath, onMessage) {
           settled = true;
           clearTimeout(timer);
           resolve(socket);
-          // The caller must receive its socket before its first snapshot.
-          queueMicrotask(() => {
+          // Promise assimilation may outlive the current microtask.
+          // Deliver the first snapshot on the next event-loop turn so callers
+          // can first receive and assign the authenticated socket.
+          setImmediate(() => {
             onMessage(msg);
             snapshotDelivered = true;
             for (const event of buffered) onMessage(event);
