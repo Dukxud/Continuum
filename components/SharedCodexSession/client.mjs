@@ -36,8 +36,21 @@ function displayRequest(request, output) {
     return;
   }
   if (request.method.endsWith('requestApproval')) {
-    output.write('\nApproval requested: ' + (p.reason ?? '') + '\n' + (p.command ?? '') +
-      '\n[a]pprove / [d]ecline / [c]ancel: ');
+    output.write('\nApproval requested: ' + (p.reason ?? '') + '\n');
+    if (p.command) output.write(p.command + '\n');
+    if (p.networkApprovalContext) {
+      const net = p.networkApprovalContext;
+      output.write('Network: ' + (net.protocol ?? '') + '://' + (net.host ?? '') + '\n');
+    }
+    if (p.grantRoot) output.write('Access root: ' + p.grantRoot + '\n');
+    for (const change of p.proposedChanges ?? []) {
+      output.write('Change ' + change.kind + ': ' + change.path + '\n' + change.diff + '\n');
+    }
+    const safe = request.method === 'item/fileChange/requestApproval'
+      ? (p.proposedChanges?.length ?? 0) > 0
+      : !!(p.command || p.networkApprovalContext);
+    if (!safe) output.write('Approval disabled: no reviewable command/change details.\n');
+    output.write(safe ? '[a]pprove / [d]ecline / [c]ancel: ' : '[d]ecline / [c]ancel: ');
     return;
   }
   output.write('\nCodex needs input (' + request.method + '); use Continuum to respond.\n');
@@ -75,6 +88,7 @@ export async function terminalWatch(descriptorPath, input = process.stdin, outpu
       }
     } else if (msg.action === 'fatal' || msg.action === 'error') {
       output.write('\n[' + msg.action + '] ' + msg.message + '\n');
+      if (msg.action === 'error') socket?.write(JSON.stringify({ action: 'status' }) + '\n');
     }
   });
   rl.on('line', line => {
@@ -97,6 +111,14 @@ export async function terminalWatch(descriptorPath, input = process.stdin, outpu
       } else if (request.method.endsWith('requestApproval')) {
         const decision = ({ a: 'accept', d: 'decline', c: 'cancel' })[line.trim().toLowerCase()];
         if (!decision) { output.write('Use a / d / c: '); return; }
+        const p = request.params ?? {};
+        const mayApprove = request.method === 'item/fileChange/requestApproval'
+          ? (p.proposedChanges?.length ?? 0) > 0
+          : !!(p.command || p.networkApprovalContext);
+        if (decision === 'accept' && !mayApprove) {
+          output.write('Cannot approve without reviewable details. Decline or cancel: ');
+          return;
+        }
         result = { decision };
       } else { output.write('Unsupported prompt type; no action taken.\n'); return; }
       socket.write(JSON.stringify({ action: 'answer', id: request.id, result }) + '\n');
