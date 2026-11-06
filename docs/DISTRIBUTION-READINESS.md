@@ -3,6 +3,7 @@
 ## Current factual state
 
 - Repository visibility: **public** at [Dukxud/codex-resume-scheduler](https://github.com/Dukxud/codex-resume-scheduler).
+- The repository was created **27 Oct 2026**, less than two weeks before this review. Its public metadata had **no topics, no homepage, zero stars and zero forks** when inspected on 6 Nov 2026; GitHub's repository description still led with the older "usage resets" scheduler framing, not Flutter/Shared native TUI.
 - `main` contains merged Flutter Continuum foundation and Shared native TUI integration (PRs #17 and #18).
 - The [latest public GitHub Release](https://github.com/Dukxud/codex-resume-scheduler/releases/latest), **v1.11.0**, is the **older PowerShell/WinForms ZIP**, not the Flutter desktop app. Its release asset is a ZIP, not a signed Continuum installer.
 - The current Flutter product has a Windows CI **unsigned preview** and a source build script. CI artifacts have limited retention and are not beginner-friendly install downloads.
