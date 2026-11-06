@@ -37,6 +37,9 @@ test('one App Server process, two viewers, command approval and user question', 
   assert.equal(host.sockets.size, 2);
   first.write(JSON.stringify({ action: 'answer', id: '100', result: { decision: 'accept' } }) + '\n');
   await waitFor(() => host.pending.has('101'));
+  // A second viewer cannot approve the already-consumed request.
+  second.write(JSON.stringify({ action: 'answer', id: '100', result: { decision: 'accept' } }) + '\n');
+  await waitFor(() => seen.some(event => event.action === 'error' && /expired/.test(event.message)));
   second.write(JSON.stringify({ action: 'answer', id: '101', result: { answers: { choice: { answers: ['Yes'] } } } }) + '\n');
   assert.equal(await running, 'completed');
   assert.equal(host.pending.size, 0);
@@ -79,4 +82,43 @@ test('reject implicit approvals, unknown questions and permission escalation', (
     { answers: { other: { answers: ['wrong'] } } }));
   assert.throws(() => validateUserResponse(
     { method:'item/permissions/requestApproval' }, { permissions: { network: 'all' } }));
+});
+
+
+test('reject approvals scoped to another active turn', () => {
+  const host = new SharedSessionHost({
+    job: { sessionId: thread, repo: process.cwd(), message: 'Continue.' },
+    jobName, appDir: tmpdir(), codexEntry: fake,
+  });
+  host.turnId = 'active-turn';
+  host.onAppMessage({ id: 45, method: 'item/commandExecution/requestApproval',
+    params: { threadId: thread, turnId: 'stale-turn', command: 'echo unsafe' } });
+  assert.equal(host.status, 'failed');
+  assert.equal(host.pending.size, 0);
+});
+
+test('reject duplicated server request IDs and unrelated resolution notifications', () => {
+  const host = new SharedSessionHost({
+    job: { sessionId: thread, repo: process.cwd(), message: 'Continue.' },
+    jobName, appDir: tmpdir(), codexEntry: fake,
+  });
+  host.turnId = 'active-turn';
+  const request = { id: 45, method: 'item/commandExecution/requestApproval',
+    params: { threadId: thread, turnId: 'active-turn', command: 'echo safe' } };
+  host.onAppMessage(request);
+  assert.equal(host.pending.size, 1);
+  host.onAppMessage({ method: 'serverRequest/resolved',
+    params: { threadId: 'wrong-thread', requestId: 45 } });
+  assert.equal(host.status, 'failed');
+  assert.equal(host.pending.size, 0);
+
+  const another = new SharedSessionHost({
+    job: { sessionId: thread, repo: process.cwd(), message: 'Continue.' },
+    jobName, appDir: tmpdir(), codexEntry: fake,
+  });
+  another.turnId = 'active-turn';
+  another.onAppMessage(request);
+  another.onAppMessage(request);
+  assert.equal(another.status, 'failed');
+  assert.equal(another.pending.size, 0);
 });
