@@ -587,6 +587,11 @@ class SchedulerController extends ChangeNotifier {
   Future<Map<String, dynamic>> readSharedSession(String name) =>
       adapter.call('shared-status', {'name': name});
 
+  /// Opens an independent terminal viewer of the existing App Server owner;
+  /// this never resumes a second Codex conversation.
+  Future<Map<String, dynamic>> openSharedViewer(String name) =>
+      adapter.call('shared-open', {'name': name});
+
   /// Sends an explicit user response to the owner already running this turn.
   Future<Map<String, dynamic>> replySharedSession(
       String name, String requestId, Map<String, dynamic> result) =>
