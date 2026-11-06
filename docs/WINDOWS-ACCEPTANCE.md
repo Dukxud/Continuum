@@ -1,3 +1,5 @@
+> **Archived v1.16 WinForms acceptance procedure (historical PR #16).** Do not follow its outdated instructions to merge PR #16 or treat it as the present Flutter gate. For merged Continuum `main`, use [CONTINUUM-WINDOWS-ACCEPTANCE.md](CONTINUUM-WINDOWS-ACCEPTANCE.md).
+
 # Manual Windows acceptance gate — v1.16
 
 This checklist is for the exact PR #16 commit on BLACK-PUDDLE. Local execution is not a GitHub Actions run; both use the same acceptance script.
