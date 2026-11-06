@@ -33,6 +33,7 @@ test('one App Server process, two viewers, command approval and user question', 
   const seen = [];
   const first = await connectToSession(descriptor, event => seen.push(event));
   const second = await connectToSession(descriptor, event => seen.push(event));
+  await waitFor(() => host.sockets.size === 2);
   assert.equal(host.sockets.size, 2);
   first.write(JSON.stringify({ action: 'answer', id: '100', result: { decision: 'accept' } }) + '\n');
   await waitFor(() => host.pending.has('101'));
