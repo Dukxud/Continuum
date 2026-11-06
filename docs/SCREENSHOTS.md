@@ -8,7 +8,15 @@ The operator captured a real **BP204** Shared-session test showing the Continuum
 
 **Status:** A subsequent fix kept the owner alive while a native TUI lease is open and added persisted-outcome fallback. The Windows mock/build gate passed; the fixed behavior still needs new signed-in Windows evidence. A current hero screenshot must be captured only after that pass.
 
-> The original operator screenshot is included in the conversation evidence, **not automatically published to this public repository**. The repository does not yet contain an authorized, sanitized current product screenshot. Use the capture process below and add real files here after reviewing for personal data.
+### Actual BP204 Windows screenshots — pre-fix, not a release demo
+
+| Continuum Live activity | Native Codex terminal |
+| --- | --- |
+| ![Pre-fix live activity panel showing inaccessible shared session](screenshots/historical/bp204-live-activity.webp) | ![Pre-fix native TUI after scheduled turn showing reconnect state](screenshots/historical/bp204-native-terminal.webp) |
+
+Both images are **real crops of the operator-supplied November 6 Windows capture**, with local paths/session identifiers redacted and resolution reduced. The Git blobs were verified against the sanitized local source files. They show a **historical lifecycle failure**, not evidence that the new fix works.
+
+**Fresh current product screenshots are still needed** before advertising or publishing a production release. Use the capture process below and add new reviewed images with exact build and outcome metadata.
 
 ## Screenshot checklist for a credible public gallery
 
