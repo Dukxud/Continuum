@@ -62,6 +62,7 @@ export class SharedSessionHost extends EventEmitter {
     this.events = [];
     this.status = 'starting';
     this.turnId = null;
+    this.earlyRequests = [];
     this.completed = false;
     this.protocol = null;
     this.done = new Promise((resolve, reject) => { this.resolveDone = resolve; this.rejectDone = reject; });
@@ -157,7 +158,12 @@ export class SharedSessionHost extends EventEmitter {
       const started = await this.protocol.request('turn/start', params);
       if (!started?.turn?.id) throw new Error('Codex failed to acknowledge the turn');
       this.turnId = started.turn.id;
-      if (!this.completed) this.status = 'running';
+      // A fast server may send a user question before the turn/start
+      // response is processed. Never expose a request with an unverified
+      // turn ID, even briefly.
+      const early = this.earlyRequests.splice(0);
+      for (const message of early) this.onAppMessage(message);
+      if (!this.completed) this.status = this.pending.size ? 'needs-input' : 'running';
       this.broadcast(this.snapshot());
       return this.done;
     } catch (error) {
@@ -186,8 +192,20 @@ export class SharedSessionHost extends EventEmitter {
       }
     }
     if (Object.hasOwn(message, 'id') && isServerRequest(message.method)) {
-      if (message.params?.threadId !== this.job.sessionId ||
-          (this.turnId && message.params?.turnId !== this.turnId)) {
+      if (message.params?.threadId !== this.job.sessionId) {
+        this.fatal(new Error('Cross-thread Codex server request refused'));
+        return;
+      }
+      if (!this.turnId) {
+        if (this.earlyRequests.length >= 32 ||
+            this.earlyRequests.some(request => String(request.id) === String(message.id))) {
+          this.fatal(new Error('Duplicate or excessive pre-turn approval requests'));
+          return;
+        }
+        this.earlyRequests.push(message);
+        return;
+      }
+      if (message.params?.turnId !== this.turnId) {
         this.fatal(new Error('Cross-thread or cross-turn Codex server request refused'));
         return;
       }
@@ -303,6 +321,7 @@ export class SharedSessionHost extends EventEmitter {
     this.status = 'failed';
     this.completed = true;
     this.pending.clear();
+    this.earlyRequests.length = 0;
     this.broadcast({ action: 'fatal', message: limitText(error.message) });
     this.rejectDone(error);
   }

@@ -114,6 +114,7 @@ test('native credentials are private, require active owner, and never fork the t
   const running = host.begin();
   running.catch(() => {});
   await waitFor(() => host.pending.has('100'));
+  assert.equal(host.status, 'needs-input');
   const descriptor = locationFor(directory, jobName).descriptor;
   const disk = JSON.parse(await readFile(descriptor, 'utf8'));
   assert.equal(disk.token, undefined);

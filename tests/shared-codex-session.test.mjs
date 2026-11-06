@@ -28,6 +28,7 @@ test('one App Server process, two viewers, command approval and user question', 
   t.after(async () => { await host.close(); await rm(dir, { recursive: true, force: true }); });
   const running = host.begin();
   await waitFor(() => host.pending.has('100'));
+  assert.equal(host.status, 'needs-input', 'Immediate approval must retain needs-input status');
   const descriptor = locationFor(dir, jobName).descriptor;
   assert.ok((await readFile(descriptor, 'utf8')).includes('secret'));
   const seen = [];
@@ -121,4 +122,20 @@ test('reject duplicated server request IDs and unrelated resolution notification
   another.onAppMessage(request);
   assert.equal(another.status, 'failed');
   assert.equal(another.pending.size, 0);
+});
+
+test('pre-turn approvals are buffered until their turn ID is verified', () => {
+  const host = new SharedSessionHost({
+    job: { sessionId: thread, repo: process.cwd(), message: 'Continue.' },
+    jobName, appDir: tmpdir(), codexEntry: fake,
+  });
+  const request = { id: 55, method: 'item/commandExecution/requestApproval',
+    params: { threadId: thread, turnId: 'wrong-turn', command: 'echo invalid' } };
+  host.onAppMessage(request);
+  assert.equal(host.pending.size, 0);
+  assert.equal(host.earlyRequests.length, 1);
+  host.turnId = 'actual-turn';
+  for (const early of host.earlyRequests.splice(0)) host.onAppMessage(early);
+  assert.equal(host.status, 'failed');
+  assert.equal(host.pending.size, 0);
 });
