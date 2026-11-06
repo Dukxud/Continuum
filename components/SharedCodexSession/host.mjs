@@ -90,6 +90,9 @@ export class SharedSessionHost extends EventEmitter {
     try {
       const child = this.spawnServer();
       this.child = child;
+      // Windows may release the process before its stdio pipes close. Track
+      // the full close event so consumers can safely clean temporary workspaces.
+      this.childClosed = new Promise(resolve => child.once('close', resolve));
       // The real Codex App Server can log extensively on stderr. Drain it,
       // without copying private process output into the shared UI snapshot,
       // so the pipe never blocks the single conversation owner.
@@ -263,11 +266,24 @@ export class SharedSessionHost extends EventEmitter {
   async close() {
     for (const socket of this.sockets) socket.end();
     await new Promise(resolve => this.server?.close(() => resolve()) ?? resolve());
-    if (this.child && this.child.exitCode === null) {
-      this.child.kill();
-      await Promise.race([new Promise(resolve => this.child.once('exit', resolve)),
-        new Promise(resolve => setTimeout(resolve, this.shutdownGraceMs))]);
-      if (this.child.exitCode === null) this.child.kill('SIGKILL');
+    if (this.child) {
+      const closed = this.childClosed ?? Promise.resolve();
+      const waitForClose = async () => {
+        let timer;
+        try {
+          return await Promise.race([
+            closed.then(() => true),
+            new Promise(resolve => { timer = setTimeout(() => resolve(false), this.shutdownGraceMs); }),
+          ]);
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+      if (this.child.exitCode === null && this.child.signalCode === null) this.child.kill();
+      if (!await waitForClose()) {
+        if (this.child.exitCode === null && this.child.signalCode === null) this.child.kill('SIGKILL');
+        if (!await waitForClose()) throw new Error('Codex App Server did not release its process handles');
+      }
     }
     await rm(this.locations.descriptor, { force: true });
     if (process.platform !== 'win32') await rm(this.locations.endpoint, { force: true });
