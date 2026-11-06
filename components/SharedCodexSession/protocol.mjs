@@ -74,6 +74,14 @@ export function validateUserResponse(request, result) {
   if (request.method === 'item/commandExecution/requestApproval' || request.method === 'item/fileChange/requestApproval') {
     if (!['accept', 'acceptForSession', 'decline', 'cancel'].includes(result.decision)) throw new Error('Unsupported approval decision');
     if (Object.keys(result).length !== 1) throw new Error('Unexpected approval attributes');
+    if (result.decision.startsWith('accept')) {
+      if (request.method === 'item/fileChange/requestApproval' &&
+          !request.params?.proposedChanges?.length) throw new Error('Cannot approve file edits without a reviewable change preview');
+      if (request.method === 'item/commandExecution/requestApproval' &&
+          !request.params?.command && !request.params?.networkApprovalContext) {
+        throw new Error('Cannot approve an unspecified command or network destination');
+      }
+    }
   } else if ((request.method === 'item/tool/requestUserInput' || request.method === 'tool/requestUserInput')) {
     const questions = request.params?.questions;
     if (!Array.isArray(questions) || !result.answers || typeof result.answers !== 'object' || Array.isArray(result.answers)) throw new Error('Malformed question answers');
