@@ -76,9 +76,14 @@ export function validateUserResponse(request, result) {
     if (Object.keys(result).length !== 1) throw new Error('Unexpected approval attributes');
     if (result.decision.startsWith('accept')) {
       if (request.method === 'item/fileChange/requestApproval' &&
-          !request.params?.proposedChanges?.length) throw new Error('Cannot approve file edits without a reviewable change preview');
+          (!request.params?.proposedChanges?.length || request.params?.previewComplete !== true)) throw new Error('Cannot approve file edits without a reviewable change preview');
       if (request.method === 'item/commandExecution/requestApproval' &&
-          !request.params?.command && !request.params?.networkApprovalContext) {
+          !request.params?.command && !(
+            typeof request.params?.networkApprovalContext?.host === 'string' &&
+            request.params.networkApprovalContext.host.trim() &&
+            typeof request.params.networkApprovalContext.protocol === 'string' &&
+            request.params.networkApprovalContext.protocol.trim()
+          )) {
         throw new Error('Cannot approve an unspecified command or network destination');
       }
     }
