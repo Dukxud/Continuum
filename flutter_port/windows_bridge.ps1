@@ -2,7 +2,7 @@
 # The existing verified worker owns all execution and account safety checks.
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('load','labels','pending','usage','select','schedule','cancel','evidence','hide','save','browse','shared-status','shared-answer')][string]$Action,
+    [Parameter(Mandatory)][ValidateSet('load','labels','pending','usage','select','schedule','cancel','evidence','hide','save','browse','shared-status','shared-answer','shared-open')][string]$Action,
     [string]$Payload = ''
 )
 $ErrorActionPreference='Stop'
@@ -307,6 +307,32 @@ try {
             $lines=@(& node.exe $script status $job)
             if($LASTEXITCODE -ne 0 -or $lines.Count -eq 0){throw 'Shared session is not accessible.'}
             $result=($lines | Select-Object -Last 1) | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+        }
+        'shared-open' {
+            $name=[string]$request.name
+            if($name -cnotmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[0-9a-fA-F]{8}$'){throw 'Invalid shared-session name.'}
+            $job=Join-Path $appDir ($name+'.json')
+            if(-not (Test-Path -LiteralPath $job -PathType Leaf)){throw 'Shared job not found.'}
+            $saved=Get-Content -LiteralPath $job -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            if([string]$saved.executionMode -cne 'shared'){throw 'Job does not use shared execution.'}
+            $script=Join-Path $source 'components/SharedCodexSession/main.mjs'
+            $node=(Get-Command node.exe -ErrorAction Stop).Source
+            # A viewer only attaches to the authenticated, already-running owner.
+            # Never launch codex resume or a new App Server from this action.
+            $lines=@(& $node $script status $job)
+            if($LASTEXITCODE -ne 0 -or $lines.Count -eq 0){throw 'Shared session owner is not reachable.'}
+            $program=Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
+            if(-not (Test-Path -LiteralPath $program -PathType Leaf)){throw 'PowerShell 7 is missing.'}
+            $cmd="& '$($node.Replace("'","''"))' '$($script.Replace("'","''"))' watch '$($job.Replace("'","''"))'"
+            $encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))
+            $wt=Get-Command wt.exe -ErrorAction SilentlyContinue
+            if($wt){
+                $args='-w new new-tab --title "Continuum viewer" "'+$program+'" -NoLogo -NoExit -EncodedCommand '+$encoded
+                [void](Start-Process -FilePath $wt.Source -ArgumentList $args -PassThru -ErrorAction Stop)
+            }else{
+                [void](Start-Process -FilePath $program -ArgumentList @('-NoLogo','-NoExit','-EncodedCommand',$encoded) -PassThru -ErrorAction Stop)
+            }
+            $result=@{opened=$true;viewerOnly=$true}
         }
         'shared-answer' {
             $name=[string]$request.name
