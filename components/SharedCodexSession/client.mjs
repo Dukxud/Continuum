@@ -6,7 +6,8 @@ export async function connectToSession(descriptorPath, onMessage) {
   const { endpoint, secret } = await loadDescriptor(descriptorPath);
   return new Promise((resolve, reject) => {
     const socket = connect(endpoint);
-    let input = '', authenticated = false, settled = false;
+    let input = '', authenticated = false, settled = false, snapshotDelivered = false;
+    const buffered = [];
     const timer = setTimeout(() => {
       if (!authenticated) { reject(new Error('Shared owner authentication timed out')); socket.destroy(); }
     }, 5000);
@@ -45,7 +46,14 @@ export async function connectToSession(descriptorPath, onMessage) {
           clearTimeout(timer);
           resolve(socket);
           // The caller must receive its socket before its first snapshot.
-          queueMicrotask(() => onMessage(msg));
+          queueMicrotask(() => {
+            onMessage(msg);
+            snapshotDelivered = true;
+            for (const event of buffered) onMessage(event);
+            buffered.length = 0;
+          });
+        } else if (!snapshotDelivered) {
+          buffered.push(msg);
         } else {
           onMessage(msg);
         }
