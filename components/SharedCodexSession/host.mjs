@@ -135,12 +135,19 @@ export class SharedSessionHost extends EventEmitter {
     if (message.method === 'item/started' && message.params?.item?.type === 'fileChange') {
       const item = message.params.item;
       if (item.id && Array.isArray(item.changes)) {
-        this.reviewableFileChanges.set(item.id,
-          item.changes.slice(0, 16).map(change => ({
+        const complete = item.changes.length > 0 && item.changes.length <= 16 &&
+          item.changes.every(change =>
+            typeof change.path === 'string' && change.path.length <= 12000 &&
+            typeof change.kind === 'string' && change.kind.length <= 12000 &&
+            typeof change.diff === 'string' && change.diff.length <= 2500);
+        this.reviewableFileChanges.set(item.id, {
+          complete,
+          changes: item.changes.slice(0, 16).map(change => ({
             path: limitText(change.path),
             kind: limitText(change.kind),
             diff: limitText(change.diff).slice(0, 2500),
-          })));
+          })),
+        });
       }
     }
     if (Object.hasOwn(message, 'id') && isServerRequest(message.method)) {
@@ -151,7 +158,9 @@ export class SharedSessionHost extends EventEmitter {
       const id = String(message.id);
       const params = { ...message.params };
       if (message.method === 'item/fileChange/requestApproval') {
-        params.proposedChanges = this.reviewableFileChanges.get(params.itemId) ?? [];
+        const review = this.reviewableFileChanges.get(params.itemId);
+        params.proposedChanges = review?.changes ?? [];
+        params.previewComplete = review?.complete === true;
       }
       this.pending.set(id, { id, method: message.method, params });
       this.status = 'needs-input';
