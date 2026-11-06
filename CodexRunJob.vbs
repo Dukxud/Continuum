@@ -1,10 +1,16 @@
-' Windows Script Host performs the scheduled launch without displaying a terminal.
-' Wait for PowerShell: Task Scheduler must track the actual Codex process lifetime.
+' Windows Script Host launches one verified job in the user's interactive desktop.
+' Background jobs remain hidden; terminal jobs inherit a real console for
+' native Codex questions and approvals. Both wait for PowerShell to exit.
 Option Explicit
-Dim shell, files, folder, script, jobFile, command, status, pwsh
+Dim shell, files, folder, script, jobFile, command, status, pwsh, visibility
 Set shell = CreateObject("WScript.Shell")
 Set files = CreateObject("Scripting.FileSystemObject")
-If WScript.Arguments.Count <> 1 Then WScript.Quit 2
+If WScript.Arguments.Count < 1 Or WScript.Arguments.Count > 2 Then WScript.Quit 2
+visibility = 0
+If WScript.Arguments.Count = 2 Then
+    If WScript.Arguments(1) <> "terminal" Then WScript.Quit 2
+    visibility = 1
+End If
 folder = files.GetParentFolderName(WScript.ScriptFullName)
 script = files.BuildPath(folder, "CodexResumeScheduler.ps1")
 jobFile = WScript.Arguments(0)
@@ -16,7 +22,7 @@ If Not files.FileExists(pwsh) Then WScript.Quit 2
 command = Chr(34) & pwsh & Chr(34) & " -NoLogo -NoProfile -ExecutionPolicy Bypass -File " & Chr(34) & script & Chr(34) & _
           " -RunJob -JobFile " & Chr(34) & jobFile & Chr(34)
 On Error Resume Next
-status = shell.Run(command, 0, True)
+status = shell.Run(command, visibility, True)
 If Err.Number <> 0 Then
     Dim errorPath, errFile
     ' Launcher diagnostics must remain with the scheduled job, including QA.

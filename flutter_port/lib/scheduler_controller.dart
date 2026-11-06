@@ -30,6 +30,9 @@ class SchedulerController extends ChangeNotifier {
   String repo = '';
   String message = 'Resume.';
   String access = 'workspace-write';
+  /// New Flutter tasks can use the native TUI. Existing job payloads that
+  /// omit this field continue in the original unattended background mode.
+  String executionMode = 'terminal';
   bool autoResumeOnLimit = false;
   bool compact = false;
   bool micro = false;
@@ -161,6 +164,10 @@ class SchedulerController extends ChangeNotifier {
         access = const ['workspace-write', 'read-only', 'yolo'].contains(preferredAccess)
           ? preferredAccess : 'workspace-write';
         autoResumeOnLimit = field(draft, 'autoResumeOnLimit') == true;
+        final storedExecutionMode = stringField(draft, 'executionMode');
+        executionMode = const ['terminal', 'background'].contains(storedExecutionMode)
+          ? storedExecutionMode
+          : autoResumeOnLimit ? 'background' : 'terminal';
         micro = field(settings, 'microMode') == true;
         compact = micro || field(settings, 'compactMode') == true;
         alwaysOnTop = field(settings, 'alwaysOnTop') == true;
@@ -342,7 +349,8 @@ class SchedulerController extends ChangeNotifier {
   void edit({
     String? repository, String? instruction, String? accessMode,
     String? reasoning, bool? compactMode, bool? microMode,
-    bool? pinOnTop, bool? autoResumeOnLimit, DateTime? time,
+    bool? pinOnTop, bool? autoResumeOnLimit, String? executionMode,
+    DateTime? time,
   }) {
     if (repository != null) {
       ++_repositoryEditEpoch;
@@ -354,6 +362,10 @@ class SchedulerController extends ChangeNotifier {
     if (accessMode != null) access = accessMode;
     if (reasoning != null) effort = reasoning;
     if (autoResumeOnLimit != null) this.autoResumeOnLimit = autoResumeOnLimit;
+    if (executionMode != null && const ['terminal','background'].contains(executionMode)) {
+      this.executionMode = executionMode;
+      if (executionMode == 'terminal') this.autoResumeOnLimit = false;
+    }
     final previousUsageTarget = usageTargetModel;
     var modeChanged = false;
     if (microMode != null && micro != microMode) {
@@ -503,6 +515,7 @@ class SchedulerController extends ChangeNotifier {
     'draft': {
       'sessionId': sessionId ?? '', 'repo': repo, 'model': model ?? '',
       'effort': effort ?? '', 'access': access, 'message': message,
+      'executionMode': executionMode,
       'autoResumeOnLimit': autoResumeOnLimit,
       'runAt': localIsoSecond(runAt),
     },
@@ -549,6 +562,7 @@ class SchedulerController extends ChangeNotifier {
       final response = await adapter.call('schedule', {
         'sessionId': sessionId, 'repo': repo, 'model': model, 'effort': effort,
         'access': access, 'message': message.trim(), 'runAt': localIsoSecond(runAt),
+        'executionMode': executionMode,
         'autoResumeOnLimit': autoResumeOnLimit,
         'confirmUnrestricted': confirmUnrestricted, 'confirmOverlap': confirmOverlap,
       });

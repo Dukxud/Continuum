@@ -27,8 +27,9 @@ if(process.argv.includes('app-server')){
   if(m.method==='model/list')process.stdout.write(JSON.stringify({id:m.id,result:{data:[{model:'test-model',displayName:'Mock',defaultReasoningEffort:'high',supportedReasoningEfforts:[{reasoningEffort:'high'}],isDefault:true}],nextCursor:null}})+'\n');
   if(m.method==='account/rateLimits/read')process.stdout.write(JSON.stringify({id:m.id,result:{accountId:process.env.CODEX_STUB_ACCOUNT==='missing'?null:(process.env.CODEX_STUB_ACCOUNT||'acct-1'),ordinaryUsageAllowed:process.env.CODEX_STUB_DENY!=='1',rateLimits:{limitId:'test-model',normalModelSlug:'test-model',primary:{usedPercent:process.env.CODEX_STUB_DENY==='1'?100:0,resetsAt:Math.floor(Date.now()/1000)+3600,windowDurationMins:300}}}})+'\n');
  });
-}else if(process.argv.includes('exec')){
- if(process.env.CODEX_STUB_MARKER)fs.writeFileSync(process.env.CODEX_STUB_MARKER,'executed');
+}else if(process.argv.includes('exec')||process.argv.includes('resume')){
+ if(process.env.CODEX_STUB_MARKER)fs.writeFileSync(process.env.CODEX_STUB_MARKER,
+   JSON.stringify(process.argv.slice(2)));
  if(process.env.CODEX_STUB_EMIT_WRITER==='1')console.log(JSON.stringify({type:'turn.failed',error:{message:'thread-store conflict: thread already has an active writer'}}));
  else if(process.env.CODEX_STUB_EMIT_LIMIT==='1')console.log(JSON.stringify({type:'turn.failed',error:{message:'Usage limit exceeded'}}));
  else console.log(JSON.stringify({type:'turn.completed'}));
@@ -56,13 +57,14 @@ exit /b %errorlevel%
     $settingsDir=Join-Path $temp 'isolated-appdata'
     [void](New-Item -ItemType Directory -Path $settingsDir -Force)
 
-    function Run-CodexStub([int]$expectedExit,[bool]$auto,[string]$activeAccount,[bool]$emitLimit,[bool]$writerConflict=$false,[string]$savedAccountId=$expectedAccountIdentity,[bool]$denyUsage=$false) {
+    function Run-CodexStub([int]$expectedExit,[bool]$auto,[string]$activeAccount,[bool]$emitLimit,[bool]$writerConflict=$false,[string]$savedAccountId=$expectedAccountIdentity,[bool]$denyUsage=$false,[string]$executionMode='background') {
         if(Test-Path $marker){Remove-Item -LiteralPath $marker -Force}
         if(Test-Path $outcomePath){Remove-Item -LiteralPath $outcomePath -Force}
         [pscustomobject]@{
             sessionId='00000000-0000-0000-0000-000000000001'
             repo=$repoRoot;branch='feature';model='test-model';effort='high'
             access='read-only';message='Resume.';autoResume=$auto
+            executionMode=$executionMode
             retryAttempt=0;accountId=$savedAccountId;runtimeFingerprint=$fingerprint
             log=(Join-Path $temp 'worker.log')
         } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $jobPath
@@ -128,8 +130,28 @@ exit /b %errorlevel%
     Require ($ok.Exit -eq 0 -and $ok.Executed) "Successful Codex execution must return zero: $($ok.Output) $($ok.Errors)"
     $outcome=Read-JobOutcome -Path $outcomePath
     Require ($outcome.status -eq "completed" -and $outcome.exitCode -eq 0) "Successful run must report completed outcome."
+    # A terminal run uses the original conversation with a direct TUI and
+    # no JSON pipeline. Its exit zero is not proof of completed work.
+    Remove-Item -LiteralPath (Join-Path $temp 'job.jsonl') -Force
+    $interactive=Run-CodexStub 0 $false 'acct-1' $false $false $expectedAccountIdentity $false 'terminal'
+    Require ($interactive.Exit -eq 0 -and $interactive.Executed) "Native terminal Codex was not invoked: $($interactive.Output) $($interactive.Errors)"
+    $interactiveArgs=@(Get-Content -LiteralPath $marker -Raw | ConvertFrom-Json)
+    Require ($interactiveArgs[0] -ceq 'resume' -and $interactiveArgs -ccontains '00000000-0000-0000-0000-000000000001' -and
+        $interactiveArgs -ccontains 'Resume.' -and $interactiveArgs -ccontains 'read-only' -and $interactiveArgs -cnotcontains '--json') 'Terminal launch did not preserve session, instruction and permissions or used noninteractive output.'
+    Require (-not (Test-Path -LiteralPath (Join-Path $temp 'job.jsonl'))) 'Native TUI must not be piped into JSONL output.'
+    $outcome=Read-JobOutcome -Path $outcomePath
+    Require ($outcome.status -eq 'finished' -and $outcome.exitCode -eq 0) 'Interactive exit must not be misreported as task completion.'
+    $interactiveFailed=Run-CodexStub 17 $false 'acct-1' $false $false $expectedAccountIdentity $false 'terminal'
+    Require ($interactiveFailed.Exit -eq 17 -and (Read-JobOutcome -Path $outcomePath).status -eq 'failed') 'Interactive Codex failure was not preserved.'
+    $terminalWrongAccount=Run-CodexStub 0 $false 'wrong-workspace' $false $false $expectedAccountIdentity $false 'terminal'
+    Require ($terminalWrongAccount.Exit -ne 0 -and -not $terminalWrongAccount.Executed) 'Terminal mode bypassed the workspace identity check.'
+    $terminalArgs=Get-CodexTaskArguments -Runner (Join-Path $temp 'CodexRunJob.vbs') -JobFile $jobPath -ExecutionMode 'terminal'
+    $backgroundArgs=Get-CodexTaskArguments -Runner (Join-Path $temp 'CodexRunJob.vbs') -JobFile $jobPath
+    Require ($terminalArgs.EndsWith(' terminal') -and -not $backgroundArgs.EndsWith(' terminal')) 'Terminal visibility did not remain opt-in per task.'
     # Child processes inherit a different LOCALAPPDATA. Events and outcomes
     # must live beside the immutable job payload, not there.
+    $backToBackground=Run-CodexStub 0 $false 'acct-1' $false
+    Require ($backToBackground.Exit -eq 0 -and $backToBackground.Executed) 'Legacy background launch regressed.'
     $expectedEvents=Join-Path $temp 'job.jsonl'
     $wrongEvents=Join-Path (Join-Path $settingsDir 'CodexResumeScheduler') 'job.jsonl'
     Require (Test-Path -LiteralPath $expectedEvents -PathType Leaf) 'Worker wrote execution events outside its job directory.'

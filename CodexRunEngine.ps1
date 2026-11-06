@@ -79,9 +79,14 @@ function Get-CodexRuntimeFiles {
     )
 }
 function Get-CodexTaskArguments {
-    param([string]$Runner,[string]$JobFile)
+    param([string]$Runner,[string]$JobFile,
+          [ValidateSet('background','terminal')][string]$ExecutionMode='background')
     if ($Runner.Contains('"') -or $JobFile.Contains('"')) { throw 'Unsafe quote in task path.' }
-    return '//B //Nologo "' + $Runner + '" "' + $JobFile + '"'
+    # A terminal run deliberately gets a console; existing tasks keep their
+    # original one-argument, hidden launch contract.
+    $arguments='//B //Nologo "' + $Runner + '" "' + $JobFile + '"'
+    if($ExecutionMode -eq 'terminal'){$arguments+=' terminal'}
+    return $arguments
 }
 # One Codex thread can have only one writer. Keep the mutex for the entire
 # scheduled continuation, including the time spent inside the Codex process.
@@ -160,6 +165,11 @@ function Invoke-CodexScheduledJob {
         if ($job.effort -notmatch '^[a-zA-Z][a-zA-Z0-9_-]{0,40}$') { throw 'Invalid reasoning effort.' }
         if ($job.model -and $job.model -notmatch '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}$') { throw 'Invalid model identifier.' }
         if ($job.access -notin @('read-only','workspace-write','yolo')) { throw 'Invalid saved access setting.' }
+        $executionMode=if($job.executionMode){[string]$job.executionMode}else{'background'}
+        if($executionMode -cnotin @('background','terminal')){throw 'Invalid saved execution mode.'}
+        if($executionMode -eq 'terminal' -and (Test-CodexContinuationPolicy $job)){
+            throw 'Interactive terminal runs cannot use automatic quota continuation.'
+        }
         if (-not (Test-Path -LiteralPath $job.repo -PathType Container)) { throw 'Repository no longer exists.' }
         $root = Get-GitRepositoryRoot -Path $job.repo
         if (-not $root -or ($root.TrimEnd([char[]]@('/','\')) -ine ([string]$job.repo).TrimEnd([char[]]@('/','\')))) { throw 'Saved directory is no longer the repository root.' }
@@ -233,6 +243,36 @@ function Invoke-CodexScheduledJob {
             Write-Host $message -ForegroundColor Yellow
             return 1
         }
+        # Both execution modes inherit the same verified identity, branch,
+        # quota and session mutex. Only the Codex UI/transport differs.
+        $codex = (Get-Command codex.cmd -ErrorAction Stop).Source
+        [void](New-Item -Path $AppDirectory -ItemType Directory -Force -ErrorAction Stop)
+        $PSNativeCommandUseErrorActionPreference = $false
+        if($executionMode -eq 'terminal'){
+            # The interactive TUI MUST inherit real stdin/stdout/stderr:
+            # piping through Tee-Object would prevent prompts and approvals.
+            $argsList=@('resume','-m',$model,'-c',"model_reasoning_effort=$($job.effort)",'-C',$root)
+            switch ($job.access) {
+                'yolo'            { $argsList += '--dangerously-bypass-approvals-and-sandbox' }
+                'workspace-write' { $argsList += @('--sandbox','workspace-write') }
+                'read-only'       { $argsList += @('--sandbox','read-only') }
+            }
+            $argsList+=@([string]$job.sessionId,[string]$job.message)
+            Write-Host 'Starting interactive Codex in this terminal. Questions and approvals appear here.' -ForegroundColor Cyan
+            & $codex @argsList
+            $result=$LASTEXITCODE
+            Write-Host "Codex terminal exit code: $result" -ForegroundColor $(if($result -eq 0){'Green'}else{'Yellow'})
+            if([int]$result -eq 0){
+                # A TUI can exit voluntarily before the user-requested work
+                # completes. Only the user can verify task completion.
+                Set-CodexRunOutcome -JobFile $JobFile -Status 'finished' -ExitCode 0 -Attempt ([int]$job.retryAttempt) -Message 'Interactive Codex terminal exited; verify the conversation for completion.'
+                return 0
+            }
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -ExitCode ([int]$result) -Attempt ([int]$job.retryAttempt) -Message 'Interactive Codex exited unsuccessfully; check the terminal and conversation.'
+            return [int]$result
+        }
+        # Legacy unattended execution remains byte-for-byte compatible with
+        # existing background jobs and retains structured JSONL evidence.
         $argsList = @('exec','--json','-m',$model,'-c',"model_reasoning_effort=$($job.effort)",'-C',$root)
         if (-not $model) { $argsList = @('exec','--json','-c',"model_reasoning_effort=$($job.effort)",'-C',$root) }
         switch ($job.access) {
@@ -241,11 +281,7 @@ function Invoke-CodexScheduledJob {
             'read-only'       { $argsList += @('--sandbox','read-only') }
         }
         $argsList += @('resume', [string]$job.sessionId, [string]$job.message)
-        $codex = (Get-Command codex.cmd -ErrorAction Stop).Source
-        [void](New-Item -Path $AppDirectory -ItemType Directory -Force -ErrorAction Stop)
         $events = Join-Path $appDir (([IO.Path]::GetFileNameWithoutExtension($JobFile)) + '.jsonl')
-        # Preserve the native process exit code rather than promoting a nonzero exit to an unrelated PowerShell exception.
-        $PSNativeCommandUseErrorActionPreference = $false
         & $codex @argsList 2>&1 | Tee-Object -FilePath $events | Out-Host
         $result = $LASTEXITCODE
         Write-Host "Codex exit code: $result" -ForegroundColor $(if ($result -eq 0) { 'Green' } else { 'Yellow' })

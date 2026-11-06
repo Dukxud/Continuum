@@ -138,7 +138,18 @@ try {
                 Select-Object -First 8)){
             $name=[string]$task.Name
             if($name -cmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[0-9a-fA-F]{8}$'){
-                $activities[$name]=Get-CodexRunActivity -Directory $appDir -Name $name
+                if($task.ExecutionMode -eq 'terminal'){
+                    # The TUI owns its real console; it does not emit the
+                    # background JSONL format. Never fabricate live events.
+                    $activities[$name]=@{
+                        Available=$false
+                        Summary='Native Codex terminal active — answer questions there'
+                        Recent=@(); Timeline=@(); StartedAt=$null
+                        UpdatedAt=$null; CompletedCommands=0; FileChanges=0
+                    }
+                }else{
+                    $activities[$name]=Get-CodexRunActivity -Directory $appDir -Name $name
+                }
             }
         }
         return $activities

@@ -266,7 +266,18 @@ void main() {
     final toggle = find.byKey(const Key('auto-resume-on-limit'));
     expect(toggle, findsOneWidget);
     expect(tester.widget<Switch>(toggle).value, isFalse);
-    expect(find.text('Auto-resume if usage limits stop Codex'), findsOneWidget);
+    expect(tester.widget<Switch>(toggle).onChanged, isNull,
+      reason: 'Native Codex questions cannot be treated as unattended retries');
+    expect(find.text('Native terminal'), findsOneWidget);
+    final mode = find.byKey(const ValueKey<String>(
+      'deck-execution-mode:terminal'));
+    expect(mode, findsOneWidget);
+    await tester.tap(mode);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.tap(find.text('Background').last);
+    await tester.pump();
+    expect(tester.widget<Switch>(toggle).onChanged, isNotNull);
     await tester.tap(toggle);
     await tester.pump();
     expect(tester.widget<Switch>(toggle).value, isTrue);

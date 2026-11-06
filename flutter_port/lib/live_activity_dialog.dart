@@ -85,6 +85,7 @@ class _LiveActivityDialogState extends State<LiveActivityDialog> {
     final active = current != null &&
       stringField(current, 'Status') == 'Running' ? current : null;
     final status = _stateLabel(current, history);
+    final nativeTerminal = stringField(widget.run, 'ExecutionMode') == 'terminal';
     final activity = _lastActivity;
     final recent = field(activity, 'Recent');
     final structured = recordList(field(activity, 'Timeline'));
@@ -154,8 +155,11 @@ class _LiveActivityDialogState extends State<LiveActivityDialog> {
                   fontSize: 10, fontWeight: FontWeight.w800,
                   letterSpacing: 1.2)),
               const SizedBox(height: 5),
-              Text(summary.isEmpty
-                ? 'Waiting for Codex events' : summary,
+              Text(nativeTerminal
+                ? 'Codex is running in its native terminal. '
+                  'Switch to that window to answer questions and approvals.'
+                : summary.isEmpty
+                  ? 'Waiting for Codex events' : summary,
                 key: const Key('live-dialog-status'),
                 style: const TextStyle(color: DeckColor.text,
                   fontSize: 14, fontWeight: FontWeight.w700)),
@@ -178,9 +182,11 @@ class _LiveActivityDialogState extends State<LiveActivityDialog> {
                       : 'Show all (${timeline.length})')),
               ]),
               if (visible.isEmpty)
-                const Padding(padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Text('No milestones recorded yet.',
-                    style: TextStyle(color: DeckColor.muted))),
+                Padding(padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Text(nativeTerminal
+                    ? 'The native Codex terminal owns the interactive display.'
+                    : 'No milestones recorded yet.',
+                    style: const TextStyle(color: DeckColor.muted))),
               for (final entry in visible)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 5),
@@ -198,9 +204,12 @@ class _LiveActivityDialogState extends State<LiveActivityDialog> {
                             fontSize: 10)),
                     ])),
               const SizedBox(height: 8),
-              Text(active != null
-                ? 'Automatically updated from Windows every 2 seconds.'
-                : 'Last observed activity retained for inspection.',
+              Text(nativeTerminal
+                ? 'Windows run state updates automatically. '
+                  'The interactive terminal is the source of questions.'
+                : active != null
+                  ? 'Automatically updated from Windows every 2 seconds.'
+                  : 'Last observed activity retained for inspection.',
                 style: const TextStyle(color: DeckColor.subtle,
                   fontSize: 10)),
             ],

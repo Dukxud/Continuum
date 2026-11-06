@@ -304,7 +304,7 @@ class _SchedulerHomeState extends State<SchedulerHome> with WindowListener {
     var unrestricted = false;
     if (state.access == 'yolo') {
       unrestricted = await confirm('Unrestricted access',
-        'Unattended commands will run without sandbox or approval prompts.');
+        'Commands will run without sandbox or approval prompts.');
       if (!unrestricted || !mounted) return;
     }
     final similar = state.upcoming.where((r) =>

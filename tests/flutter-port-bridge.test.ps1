@@ -242,7 +242,7 @@ try {
         sessionId='11111111-1111-1111-1111-111111111111'
         repo='C:\fixture\repo';model='gpt-test';effort='medium'
         access='read-only';message='Resume.';runAt=$future
-        autoResumeOnLimit=$true
+        executionMode='background';autoResumeOnLimit=$true
     }
     $body=@{draft=$draft;compactMode=$true;microMode=$true;alwaysOnTop=$true} | ConvertTo-Json -Compress -Depth 6
     $payload=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($body))
@@ -253,7 +253,8 @@ try {
     if($reply.ok -ne $true){throw "Preferences save rejected: $($reply.error)"}
     $saved=Get-Content -LiteralPath (Join-Path $settingsFixture 'CodexResumeScheduler\settings.json') -Raw | ConvertFrom-Json
     if($saved.draft.autoResumeOnLimit -ne $true -or $saved.draft.repo -cne 'C:\fixture\repo' -or
-       $saved.microMode -ne $true -or $saved.alwaysOnTop -ne $true -or $saved.compactMode -ne $true){
+       $saved.microMode -ne $true -or $saved.alwaysOnTop -ne $true -or $saved.compactMode -ne $true -or
+       $saved.draft.executionMode -cne 'background'){
         throw 'Persisted preferences lost the auto-resume opt-in or repository.'
     }
     $draft.autoResumeOnLimit='true'
@@ -277,6 +278,31 @@ try {
         if($invalidExit -eq 0 -or $invalidReply.error -cne "Invalid window preference: $flag"){
             throw "Invalid persisted $flag preference was accepted."
         }
+    }
+    # Native interactive sessions are explicit and cannot silently inherit
+    # unattended quota continuation. These are read-only contract checks.
+    $draft.autoResumeOnLimit=$false
+    $draft.executionMode='terminal'
+    $terminalPayload=@{draft=$draft;compactMode=$false} | ConvertTo-Json -Compress -Depth 6
+    $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($terminalPayload))
+    $terminalReply=(& pwsh -NoProfile -NonInteractive -STA -File $bridge -Action save -Payload $encoded | Select-Object -Last 1) | ConvertFrom-Json
+    if($terminalReply.ok -ne $true){throw "Interactive draft could not be saved: $($terminalReply.error)"}
+    $terminalSaved=Get-Content -LiteralPath (Join-Path $settingsFixture 'CodexResumeScheduler/settings.json') -Raw | ConvertFrom-Json
+    if($terminalSaved.draft.executionMode -cne 'terminal'){throw 'Saved native-terminal mode was lost.'}
+    $draft.autoResumeOnLimit=$true
+    $conflict=@{draft=$draft;compactMode=$false} | ConvertTo-Json -Compress -Depth 6
+    $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($conflict))
+    $conflictReply=(& pwsh -NoProfile -NonInteractive -STA -File $bridge -Action save -Payload $encoded | Select-Object -Last 1) | ConvertFrom-Json
+    if($conflictReply.ok -ne $false -or $conflictReply.error -cne 'Automatic quota continuation requires Background execution.'){
+        throw 'Interactive terminal incorrectly accepted unattended quota continuation.'
+    }
+    $draft.autoResumeOnLimit=$false
+    $draft.executionMode='background;Write-Host hacked'
+    $invalidMode=@{draft=$draft;compactMode=$false} | ConvertTo-Json -Compress -Depth 6
+    $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($invalidMode))
+    $modeReply=(& pwsh -NoProfile -NonInteractive -STA -File $bridge -Action save -Payload $encoded | Select-Object -Last 1) | ConvertFrom-Json
+    if($modeReply.ok -ne $false -or $modeReply.error -cne 'Invalid saved execution mode.'){
+        throw 'Untrusted execution mode was accepted.'
     }
     Write-Host 'Flutter isolated preferences round-trip and strict opt-in validation PASS.' -ForegroundColor Green
 }finally{

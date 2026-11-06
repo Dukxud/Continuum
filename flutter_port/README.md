@@ -15,6 +15,34 @@ authored and passed in earlier builds, but renewed native visual, sizing,
 accessibility and real scheduling/cancellation acceptance on BLACK-PUDDLE
 are required for this revision. See docs/FLUTTER-PARITY.md.
 
+## Scheduled execution: native terminal or background
+
+New Flutter schedules default to **Native terminal**, which resumes the
+original Codex conversation in a real console with the configured model,
+permissions, reasoning effort and saved instruction. Codex itself owns the
+interactive UI; questions and approvals can be answered there. The existing
+session-level mutex, account/workspace binding, repository branch check and
+quota validation remain in effect. Terminal jobs still use one Windows Task
+Scheduler action and remain Running until the console's Codex process exits.
+
+Windows must have a signed-in interactive desktop. The scheduled launcher
+opens PowerShell 7 with a visible console, which follows the configured
+Windows default terminal application (including Windows Terminal if selected).
+Closing the Codex TUI exits the run; Windows records **Finished** rather than
+claiming the requested work is verified complete. The conversation's normal
+Codex history is the authoritative source of its responses.
+
+**Background** preserves the existing noninteractive `codex exec --json`
+worker, machine-readable event stream and bounded quota auto-continuation.
+The auto-continuation switch is unavailable in Native terminal mode. Existing
+scheduled payloads without `executionMode` continue as background jobs.
+
+This does **not** attach to a running hidden `exec` process or allow two
+independent clients to write the same conversation simultaneously. A thread
+still open in another Codex app must release its writer before the scheduled
+resume can own it. The shared App Server multi-client design remains
+experimental and is not substituted for these safety checks.
+
 ## Quota auto-resume — optional and bounded
 
 The **Auto-resume if usage limits stop Codex** switch in the handoff is off by

@@ -13,6 +13,7 @@ Require ((Get-CodexTaskDisplayState -When $past -TaskState 'Ready' -TaskInfo $ru
 Require ((Get-CodexTaskDisplayState -When $past -TaskState 'Ready' -TaskInfo ([pscustomobject]@{LastRunTime=$past;LastTaskResult=1}) -Now $now) -eq 'Failed (task exit 1)') 'Nonzero task exit must be visible.'
 Require ((Get-CodexTaskDisplayState -When $past -TaskState 'Ready' -TaskInfo ([pscustomobject]@{LastRunTime=[datetime]'1999-11-30';LastTaskResult=0}) -Now $now) -eq 'Overdue (execution unconfirmed)') 'Never claim execution on an unstarted task.'
 Require ((Get-CodexTaskDisplayState -When $past -TaskState 'Ready' -Outcome ([pscustomobject]@{status='blocked'}) -Now $now) -eq 'Blocked') 'Persisted blocked outcome must be visible.'
+Require ((Get-CodexTaskDisplayState -When $past -TaskState 'Ready' -Outcome ([pscustomobject]@{status='finished'}) -Now $now) -eq 'Finished') 'An interactive terminal exit must not be presented as verified Codex completion.'
 Require ((Get-CodexTaskDisplayState -When $now.AddMinutes(8) -TaskState 'Ready' -Now $now) -eq 'Scheduled') 'Future task should remain scheduled.'
 
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('codex-display-status-' + [guid]::NewGuid().ToString('N'))

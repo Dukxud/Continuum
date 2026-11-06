@@ -12,7 +12,10 @@ extension _DashboardMicro on _SchedulerHomeState {
     final activity = running.isNotEmpty
       ? state.activities[stringField(running.first, 'Name')] : null;
     final activityLabel = stringField(activity, 'Summary');
-    final status = running.isNotEmpty
+    final terminalRunning = running.isNotEmpty &&
+      stringField(running.first, 'ExecutionMode') == 'terminal';
+    final status = terminalRunning ? 'RUNNING · NATIVE TERMINAL'
+      : running.isNotEmpty
       ? 'RUNNING · ${activityLabel.isNotEmpty ? activityLabel : 'Waiting for Codex events'}'
       : next.isNotEmpty
       ? 'NEXT · ${countdown(dateField(next.first, 'When'))}'

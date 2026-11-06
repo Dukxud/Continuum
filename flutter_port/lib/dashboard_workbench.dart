@@ -247,13 +247,14 @@ extension _DashboardWorkbench on _SchedulerHomeState {
                 key: const Key('auto-resume-on-limit'),
                 value: state.autoResumeOnLimit,
                 activeTrackColor: DeckColor.mint,
-                onChanged: (value) => state.edit(autoResumeOnLimit: value),
+                onChanged: state.executionMode == 'terminal'
+                  ? null : (value) => state.edit(autoResumeOnLimit: value),
               ),
             ),
             const SizedBox(width: 7),
             const Expanded(child: Tooltip(
               message: 'Up to 3 bounded continuations, only after a verified quota reset. Each resumes with the selected permissions.',
-              child: Text('Auto-resume if usage limits stop Codex',
+              child: Text('Auto-resume if usage limits stop Codex (background only)',
                 maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: DeckColor.text, fontSize: 11.5,
                   fontWeight: FontWeight.w600)),
@@ -263,13 +264,29 @@ extension _DashboardWorkbench on _SchedulerHomeState {
           ]),
           const SizedBox(height: 5),
           Row(children: [
-            Expanded(child: Text(
-              state.canSchedule
-                ? 'Windows will verify the task again at launch.'
-                : 'A verified model and fresh account data are required.',
-              maxLines: 2, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: DeckColor.muted, fontSize: 10.5))),
+            Expanded(child: Row(children: [
+              const Text('RUN IN', style: TextStyle(
+                fontSize: 10, letterSpacing: 1.0,
+                color: DeckColor.muted, fontWeight: FontWeight.w700)),
+              const SizedBox(width: 9),
+              Expanded(child: SizedBox(height: 42, child: Tooltip(
+                message: 'Native terminal displays Codex questions and approvals. '
+                  'Background runs unattended and supports quota continuation.',
+                child: DeckSelect<String>(
+                  name: 'execution-mode',
+                  value: state.executionMode,
+                  items: const [
+                    DropdownMenuItem(value: 'terminal',
+                      child: Text('Native terminal')),
+                    DropdownMenuItem(value: 'background',
+                      child: Text('Background')),
+                  ],
+                  onChanged: (mode) {
+                    if (mode != null) state.edit(executionMode: mode);
+                  },
+                ),
+              ))),
+            ])),
             const SizedBox(width: 10),
             SizedBox(width: 193, child: DeckAction(
               label: 'Schedule once',

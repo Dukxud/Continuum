@@ -195,7 +195,7 @@ function Get-CodexTaskDisplayState {
         [datetime]$Now = (Get-Date)
     )
     if ($TaskState -eq 'Running') { return 'Running' }
-    if ($Outcome -and $Outcome.status -in @('completed','failed','blocked','deferred','cancelled')) {
+    if ($Outcome -and $Outcome.status -in @('completed','finished','failed','blocked','deferred','cancelled')) {
         return ([string]$Outcome.status).Substring(0,1).ToUpperInvariant() + ([string]$Outcome.status).Substring(1)
     }
     if ($When -gt $Now) { return 'Scheduled' }
@@ -233,6 +233,7 @@ function Get-UpcomingCodexTasks {
         $model = ''
         $createdAt = $null
         $quotaContinuation = $false
+        $executionMode = 'background'
         if (Test-Path -LiteralPath $json) {
             try {
                 $job = Get-Content -LiteralPath $json -Raw | ConvertFrom-Json
@@ -240,6 +241,7 @@ function Get-UpcomingCodexTasks {
                 $session = [string]$job.sessionId
                 $repo = [string]$job.repo
                 $model = [string]$job.model
+                if($job.executionMode -eq 'terminal'){$executionMode='terminal'}
                 if ([string]$job.createdAt -match '^\d{9,12}$') { $createdAt = [long]$job.createdAt }
                 $quotaContinuation = $job.continuationPolicy.mode -ceq 'quota-only' -and
                     [string]$job.retryAttempt -match '^[1-3]$'
@@ -276,6 +278,7 @@ function Get-UpcomingCodexTasks {
             Name = $name; When = $when; Repo = $repo; Session = $session
             Description = $description; Model = $model; CreatedAt = $createdAt
             Status = $runState; QuotaContinuation = $quotaContinuation
+            ExecutionMode = $executionMode
         }
     }
     # Active work must be shown FIRST; next scheduled jobs precede history.

@@ -337,17 +337,28 @@ void main() {
     await controller.start();
     expect(controller.autoResumeOnLimit, isFalse,
       reason: 'Older drafts must not gain automatic retries');
+    expect(controller.executionMode, 'terminal',
+      reason: 'New Flutter schedules must support native Codex prompts');
     await controller.schedule(confirmUnrestricted:false, confirmOverlap:false);
     expect(fake.schedules.last['autoResumeOnLimit'], isFalse);
+    expect(fake.schedules.last['executionMode'], 'terminal');
+    controller.edit(executionMode: 'background');
     controller.edit(autoResumeOnLimit: true);
     expect(controller.autoResumeOnLimit, isTrue);
     await controller.flushPreferences();
     expect((fake.saves.last['draft'] as Map)['autoResumeOnLimit'], isTrue);
     await controller.schedule(confirmUnrestricted:false, confirmOverlap:false);
     expect(fake.schedules.last['autoResumeOnLimit'], isTrue);
+    expect(fake.schedules.last['executionMode'], 'background');
+    controller.edit(executionMode: 'terminal');
+    expect(controller.autoResumeOnLimit, isFalse,
+      reason: 'Native TUI cannot use an unattended JSONL quota continuation');
+    await controller.schedule(confirmUnrestricted:false, confirmOverlap:false);
+    expect(fake.schedules.last['executionMode'], 'terminal');
     controller.edit(autoResumeOnLimit: false);
     await controller.flushPreferences();
     expect((fake.saves.last['draft'] as Map)['autoResumeOnLimit'], isFalse);
+    expect((fake.saves.last['draft'] as Map)['executionMode'], 'terminal');
     controller.dispose();
   });
 
