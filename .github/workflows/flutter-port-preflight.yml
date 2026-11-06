@@ -1,0 +1,140 @@
+name: Flutter port preflight (bounded)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'flutter_port/**'
+      - 'tests/flutter-port-*.test.ps1'
+      - 'tests/quota-continuation.test.ps1'
+      - 'tests/quota-continuation-lifecycle.test.ps1'
+      - 'tests/session-activity.test.ps1'
+      - 'tests/session-repository-reference.test.ps1'
+      - 'CodexSessionRepository.ps1'
+      - 'CodexRunActivity.ps1'
+      - 'tests/codex-run-activity.test.ps1'
+      - 'tests/codex-thread-title.test.js'
+      - 'tests/codex-worker-integration.test.ps1'
+      - 'CodexQuotaContinuation.ps1'
+      - 'CodexRunEngine.ps1'
+      - 'CodexData.ps1'
+      - 'tests/flutter-port-source.test.ps1'
+      - 'components/JobOutcomes/**'
+      - 'scripts/Package-CodexScheduler.ps1'
+      - '.github/workflows/flutter-port-preflight.yml'
+
+permissions:
+  contents: read
+
+# A newer revision cancels its predecessor. No retries, loops or deploy steps.
+concurrency:
+  group: flutter-port-preflight-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Analyze, test, build (Windows)
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact PR revision
+        uses: actions/checkout@v4
+
+      - name: Parse entire Windows bridge and worker source chain
+        shell: pwsh
+        run: pwsh -NoProfile -File ./tests/flutter-port-source.test.ps1
+
+      - name: Verify isolated worker and bounded quota continuations
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -STA -File ./tests/quota-continuation.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Quota continuation acceptance failed.' }
+          pwsh -NoProfile -STA -File ./tests/codex-worker-integration.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned worker integration failed.' }
+          pwsh -NoProfile -STA -File ./tests/quota-continuation-lifecycle.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Quota lifecycle integration failed.' }
+          pwsh -NoProfile -STA -File ./tests/session-activity.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Session activity naming acceptance failed.' }
+          pwsh -NoProfile -STA -File ./tests/session-repository-reference.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Session repository auto-discovery failed.' }
+          pwsh -NoProfile -STA -File ./tests/codex-run-activity.test.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Live Codex activity reader regression failed.' }
+          node ./tests/codex-thread-title.test.js
+          if ($LASTEXITCODE -ne 0) { throw 'Codex canonical thread-name support failed.' }
+
+      - name: Install pinned Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+
+      - name: Verify approved UI assets and bridge source
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File ./tests/flutter-port-source.test.ps1
+
+      - name: Test real Windows JSON bridge without registering tasks
+        shell: pwsh
+        run: pwsh -NoProfile -STA -File ./tests/flutter-port-bridge.test.ps1
+
+      - name: Generate Windows runner
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter create --platforms=windows --project-name codex_resume_flutter .
+
+      - name: Resolve dependencies
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter pub get
+
+      - name: Dart analyzer (errors and warnings fail)
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter analyze --no-fatal-infos
+
+      - name: Flutter widget and logic tests
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter test --exclude-tags visual-capture
+
+      - name: Capture unapproved UI evidence frames (not GPU parity)
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter test test/parity_capture_test.dart --update-goldens
+
+      - name: Attach UI evidence for adversarial comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-ui-captures-${{ github.event.pull_request.head.sha }}
+          path: flutter_port/test/captures/*.png
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Windows compilation without launching jobs
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter build windows --debug
+
+      - name: Compile standalone Windows release
+        shell: pwsh
+        working-directory: flutter_port
+        run: flutter build windows --release
+
+      - name: Package verified unsigned Windows preview
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -STA -File ./flutter_port/Build-WindowsPreview.ps1 `
+            -PackageVerifiedBuild `
+            -OutputDirectory ./flutter_port/build/review-out
+
+      - name: Attach private review archive (not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-windows-unsigned-${{ github.event.pull_request.head.sha }}
+          path: flutter_port/build/review-out/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+# Native rendering and Windows accessibility logs require separate on-device
+# review. A green workflow never certifies visual fidelity or task execution.

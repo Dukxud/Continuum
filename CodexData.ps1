@@ -1,12 +1,17 @@
 Import-Module (Join-Path $PSScriptRoot 'components/GitRepository/GitRepository.psm1') -Force -ErrorAction Stop
 Import-Module (Join-Path $PSScriptRoot 'components/SettingsStore/SettingsStore.psm1') -Force -ErrorAction Stop
 . (Join-Path $PSScriptRoot 'CodexJobStore.ps1')
+. (Join-Path $PSScriptRoot 'CodexSessionRepository.ps1')
 # Codex Resume Scheduler - local data readers (PowerShell 7).
 # Used by GUI background jobs; the scheduled CLI worker does not import this file.
 # No UI controls, timers, or persistent services.
 
 function Get-RepositoryRoot {
     param([string]$Path)
+    # App Server thread/read may return no CWD. An empty optional hint must
+    # fall through to session-local Git evidence, not reach the generic
+    # GitRepository module's mandatory Path parameter and abort discovery.
+    if([string]::IsNullOrWhiteSpace($Path)){return $null}
     return Get-GitRepositoryRoot -Path $Path
 }
 
@@ -40,6 +45,56 @@ function Get-RecentCliSessions {
     return $sessions
 }
 
+
+# Read only explicit user activity from the local Codex rollout. Never infer a
+# conversation title from assistant output, tool calls, or injected context.
+# Live sessions can be large, so inspect a bounded tail; fall back to the first
+# prompt when an active turn has produced more than the sampled amount of output.
+function Format-CodexSessionTitle {
+    param([AllowEmptyString()][string]$Title,[switch]$AllowShort)
+    $first=($Title -split '\r?\n' | Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_)
+    } | Select-Object -First 1)
+    $first=[regex]::Replace([string]$first,'[\p{Cc}\p{Cf}\s]+',' ').Trim()
+    if(((-not $AllowShort) -and $first.Length -lt 5) -or
+       $first -match '^(?:<[^>]*>|[^\p{L}\p{N}]+)$'){return $null}
+    if($first.Length -gt 58){return $first.Substring(0,57).TrimEnd()+'…'}
+    return $first
+}
+
+function Get-CodexSessionActivity {
+    param([Parameter(Mandatory)][string]$SessionFile)
+    if(-not (Test-Path -LiteralPath $SessionFile -PathType Leaf)){return $null}
+    foreach($sample in @('recent','initial')){
+        try {
+            $lines=if($sample -eq 'recent'){
+                @(Get-Content -LiteralPath $SessionFile -Tail 160 -ErrorAction Stop)
+            }else{
+                @(Get-Content -LiteralPath $SessionFile -TotalCount 60 -ErrorAction Stop)
+            }
+        }catch{return $null}
+        $last=$null
+        foreach($line in $lines){
+            if($line -notmatch '"type"\s*:\s*"(?:user_message|thread_goal_updated)"'){continue}
+            try {
+                $record=$line | ConvertFrom-Json -ErrorAction Stop
+                if([string]$record.type -cne 'event_msg'){continue}
+                $raw=switch([string]$record.payload.type){
+                    'user_message' { [string]$record.payload.message }
+                    'thread_goal_updated' { [string]$record.payload.goal.objective }
+                    default { '' }
+                }
+                # A bare continuation instruction is not a useful subject.
+                if($raw.Trim() -match '^(?i:resume|continue|go ahead|proceed|yes|ok|okay|do it)[.!\s]*$'){continue}
+                $caption=Format-CodexSessionTitle $raw
+                if($caption){$last=$caption}
+            }catch{continue}
+        }
+        if($last){return $last}
+    }
+    return $null
+}
+
 # A read-only Codex App Server lookup supplies the same persisted cwd that Codex
 # offers when resuming a conversation. A missing/error response is not evidence
 # that the conversation lacks a repository; callers retain local fallbacks.
@@ -63,7 +118,9 @@ function Get-ReportedThreadDirectory {
 
 function Find-SessionRepository {
     param($Session, [string]$ReportedCwd = $null,
-          [Parameter(Mandatory)][string]$AppDirectory)
+          [Parameter(Mandatory)][string]$AppDirectory,
+          [string]$CheckoutHome = $HOME,
+          [string]$CodexPreview = $null)
     if (-not $Session) { return $null }
     $candidates = [System.Collections.Generic.List[string]]::new()
     $reportedRoot = Get-RepositoryRoot $ReportedCwd
@@ -121,8 +178,9 @@ function Find-SessionRepository {
     }
     if ($roots.Count -eq 1) { return [pscustomobject]@{ Root = $roots[0]; Source = 'saved conversation fallback'; Candidates = $roots; AlternativeRoots = @() } }
     if ($roots.Count -gt 1) { return [pscustomobject]@{ Root = $null; Source = 'conflicting fallback worktrees'; Candidates = $roots; AlternativeRoots = $roots } }
-    return $null
+    return Find-ReferencedSessionRepository -Session $Session -HomeDirectory $CheckoutHome -CodexPreview $CodexPreview
 }
+
 
 # Resolve what Windows actually knows, not what a countdown suggests.
 # A zero Task Scheduler exit code without a worker outcome does NOT prove
@@ -137,7 +195,7 @@ function Get-CodexTaskDisplayState {
         [datetime]$Now = (Get-Date)
     )
     if ($TaskState -eq 'Running') { return 'Running' }
-    if ($Outcome -and $Outcome.status -in @('completed','failed','blocked','deferred','cancelled')) {
+    if ($Outcome -and $Outcome.status -in @('completed','finished','failed','blocked','deferred','cancelled')) {
         return ([string]$Outcome.status).Substring(0,1).ToUpperInvariant() + ([string]$Outcome.status).Substring(1)
     }
     if ($When -gt $Now) { return 'Scheduled' }
@@ -174,6 +232,8 @@ function Get-UpcomingCodexTasks {
         $repo = '-'
         $model = ''
         $createdAt = $null
+        $quotaContinuation = $false
+        $executionMode = 'background'
         if (Test-Path -LiteralPath $json) {
             try {
                 $job = Get-Content -LiteralPath $json -Raw | ConvertFrom-Json
@@ -181,7 +241,10 @@ function Get-UpcomingCodexTasks {
                 $session = [string]$job.sessionId
                 $repo = [string]$job.repo
                 $model = [string]$job.model
+                if($job.executionMode -eq 'terminal'){$executionMode='terminal'}
                 if ([string]$job.createdAt -match '^\d{9,12}$') { $createdAt = [long]$job.createdAt }
+                $quotaContinuation = $job.continuationPolicy.mode -ceq 'quota-only' -and
+                    [string]$job.retryAttempt -match '^[1-3]$'
             } catch { $description = 'Scheduled task (job data unreadable)' }
         } elseif ($name -match '^BP\d+-Codex-') {
             # Older manually registered BP tasks remain visible, read-only.
@@ -214,7 +277,8 @@ function Get-UpcomingCodexTasks {
         $items += [pscustomobject]@{
             Name = $name; When = $when; Repo = $repo; Session = $session
             Description = $description; Model = $model; CreatedAt = $createdAt
-            Status = $runState
+            Status = $runState; QuotaContinuation = $quotaContinuation
+            ExecutionMode = $executionMode
         }
     }
     # Active work must be shown FIRST; next scheduled jobs precede history.

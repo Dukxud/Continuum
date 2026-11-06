@@ -35,7 +35,7 @@ $script:appSourcePath = $PSCommandPath
 if ($RunJob) {
     # A scheduled worker inherits the machine's real LOCALAPPDATA, not the
     # GUI's isolated environment. Its immutable job-file path is authoritative
-    # for outcomes and events. New workers never register automatic retries.
+    # for outcomes and events. Only explicit bounded quota policy permits a child.
     if ([string]::IsNullOrWhiteSpace($JobFile) -or -not [IO.Path]::IsPathFullyQualified($JobFile)) {
         throw 'Scheduled job file path must be absolute.'
     }

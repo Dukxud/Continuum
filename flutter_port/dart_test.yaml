@@ -1,0 +1,3 @@
+# Captures are explicit CI evidence, not approved golden test baselines.
+tags:
+  visual-capture:

@@ -1,0 +1,12 @@
+# Pin the Flutter-recommended rules in the repository, not in generated files.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**

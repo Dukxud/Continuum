@@ -3,6 +3,8 @@ Import-Module (Join-Path $PSScriptRoot 'components/RuntimeBundle/RuntimeBundle.p
 Import-Module (Join-Path $PSScriptRoot 'components/OneTimeTasks/OneTimeTasks.psm1') -Force -ErrorAction Stop
 Import-Module (Join-Path $PSScriptRoot 'components/GitRepository/GitRepository.psm1') -Force -ErrorAction Stop
 Import-Module (Join-Path $PSScriptRoot 'components/JobOutcomes/JobOutcomes.psm1') -Force -ErrorAction Stop
+. (Join-Path $PSScriptRoot 'CodexQuotaContinuation.ps1')
+. (Join-Path $PSScriptRoot 'CodexTerminalRun.ps1')
 
 function Get-RepositoryBranch {
     param([string]$Path)
@@ -30,6 +32,22 @@ function Read-UsageState {
     return $state
 }
 
+# Read-only App Server check. A cleanup diagnostic can follow an actual
+# quota failure, but only a still-readable conversation may be rescheduled.
+function Assert-CodexConversationAvailable {
+    param([Parameter(Mandatory)][string]$SessionId)
+    $helper=Join-Path $PSScriptRoot 'CodexUsage.js'
+    $cli=Get-CodexCliJs
+    $lines=@(& node.exe $helper --cli-js $cli --thread-id $SessionId)
+    if($LASTEXITCODE -ne 0 -or $lines.Count -eq 0){
+        throw 'Codex conversation could not be read; automatic continuation refused.'
+    }
+    $thread=($lines | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
+    if($thread.ok -ne $true -or [string]$thread.threadId -cne $SessionId){
+        throw 'Codex returned no matching resumable conversation.'
+    }
+}
+
 function Assert-ModelEffortSupported {
     param([object[]]$Models, [string]$Model, [string]$Effort)
     $entry = @($Models | Where-Object { $_.id -ceq $Model }) | Select-Object -First 1
@@ -53,7 +71,8 @@ function Read-CodexModelCatalog {
 function Get-CodexRuntimeFiles {
     return @(
         'CodexResumeScheduler.ps1','CodexRunEngine.ps1',
-        'CodexUsage.js','CodexRunJob.vbs',
+        'CodexUsage.js','CodexRunJob.vbs','CodexQuotaContinuation.ps1',
+        'CodexTerminalRun.ps1',
         'components/RuntimeBundle/RuntimeBundle.psm1',
         'components/OneTimeTasks/OneTimeTasks.psm1',
         'components/GitRepository/GitRepository.psm1',
@@ -62,9 +81,14 @@ function Get-CodexRuntimeFiles {
     )
 }
 function Get-CodexTaskArguments {
-    param([string]$Runner,[string]$JobFile)
+    param([string]$Runner,[string]$JobFile,
+          [ValidateSet('background','terminal')][string]$ExecutionMode='background')
     if ($Runner.Contains('"') -or $JobFile.Contains('"')) { throw 'Unsafe quote in task path.' }
-    return '//B //Nologo "' + $Runner + '" "' + $JobFile + '"'
+    # A terminal run deliberately gets a console; existing tasks keep their
+    # original one-argument, hidden launch contract.
+    $arguments='//B //Nologo "' + $Runner + '" "' + $JobFile + '"'
+    if($ExecutionMode -eq 'terminal'){$arguments+=' terminal'}
+    return $arguments
 }
 # One Codex thread can have only one writer. Keep the mutex for the entire
 # scheduled continuation, including the time spent inside the Codex process.
@@ -101,11 +125,32 @@ function Test-CanonicalWorkspaceIdentity {
 # Task Scheduler reports handler success; the persisted outcome distinguishes
 # completed, failed, or blocked one-time work.
 function Set-CodexRunOutcome {
-    param([string]$JobFile,[string]$Status,$ExitCode=$null,[string]$Message='')
+    param([string]$JobFile,[string]$Status,$ExitCode=$null,[string]$Message='',
+          [int]$Attempt=0,[string]$NextJob='')
     if (-not $JobFile -or -not [IO.Path]::IsPathRooted($JobFile)) { return }
     $outcomePath=[IO.Path]::ChangeExtension($JobFile,'.result.json')
-    [void](Write-JobOutcome -Path $outcomePath -Status $Status -Attempt 0 -ExitCode $ExitCode -Message $Message)
+    [void](Write-JobOutcome -Path $outcomePath -Status $Status -Attempt $Attempt -ExitCode $ExitCode -Message $Message -NextJob $NextJob)
 }
+# The decision is single-shot. A reliable model-specific reset is required,
+# and a failure to register is reported without an invented future job.
+function Try-DeferCodexQuotaJob {
+    param($Job,[string]$JobFile,[string]$AppDirectory,
+          [string]$RuntimeDirectory,$Quota,[int]$ExitCode)
+    if(-not (Test-CodexContinuationPolicy $Job) -or [int]$Job.retryAttempt -ge 3){return $false}
+    $at=Get-VerifiedQuotaContinuationTime -Quota $Quota -AccountId ([string]$Job.accountId) -Model ([string]$Job.model)
+    if(-not $at){Write-Warning 'Quota exhausted, but no verified future reset for this model/workspace; no automatic continuation.';return $false}
+    try {
+        Assert-CodexConversationAvailable -SessionId ([string]$Job.sessionId)
+        $child=Register-CodexQuotaContinuation -Job $Job -JobFile $JobFile -AppDirectory $AppDirectory -RuntimeDirectory $RuntimeDirectory -When $at
+        Set-CodexRunOutcome -JobFile $JobFile -Status 'deferred' -Attempt ([int]$Job.retryAttempt) -ExitCode $ExitCode -NextJob $child.Name -Message "Waiting for verified quota reset at $($child.When.ToString('o'))"
+        Write-Host "Quota exhausted. One bounded continuation registered: $($child.Name) at $($child.When.ToString('o'))" -ForegroundColor Cyan
+        return $true
+    }catch{
+        Write-Warning "Quota continuation not registered: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 function Invoke-CodexScheduledJob {
     [CmdletBinding()]
     param([string]$JobFile, [string]$AppDirectory, [string]$RuntimeDirectory)
@@ -122,6 +167,11 @@ function Invoke-CodexScheduledJob {
         if ($job.effort -notmatch '^[a-zA-Z][a-zA-Z0-9_-]{0,40}$') { throw 'Invalid reasoning effort.' }
         if ($job.model -and $job.model -notmatch '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}$') { throw 'Invalid model identifier.' }
         if ($job.access -notin @('read-only','workspace-write','yolo')) { throw 'Invalid saved access setting.' }
+        $executionMode=if($job.executionMode){[string]$job.executionMode}else{'background'}
+        if($executionMode -cnotin @('background','terminal')){throw 'Invalid saved execution mode.'}
+        if($executionMode -eq 'terminal' -and (Test-CodexContinuationPolicy $job)){
+            throw 'Interactive terminal runs cannot use automatic quota continuation.'
+        }
         if (-not (Test-Path -LiteralPath $job.repo -PathType Container)) { throw 'Repository no longer exists.' }
         $root = Get-GitRepositoryRoot -Path $job.repo
         if (-not $root -or ($root.TrimEnd([char[]]@('/','\')) -ine ([string]$job.repo).TrimEnd([char[]]@('/','\')))) { throw 'Saved directory is no longer the repository root.' }
@@ -130,9 +180,38 @@ function Invoke-CodexScheduledJob {
         $sessionGuard = Enter-CodexSessionRun -SessionId ([string]$job.sessionId)
         if (-not $sessionGuard) {
             $message = 'Another scheduled continuation is active for this Codex conversation; duplicate execution refused.'
-            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode 1 -Message $message
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode 1 -Attempt ([int]$job.retryAttempt) -Message $message
             Write-Host $message -ForegroundColor Yellow
             return 1
+        }
+        # Every quota child must still be the child authorized by its saved
+        # parent and the registered Windows action at the moment it starts.
+        if($job.parentJob -or [int]$job.retryAttempt -gt 0){
+            $parentName=[string]$job.parentJob
+            if($parentName -cnotmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[a-fA-F0-9]{8}\z'){
+                throw 'Quota child has no valid parent job.'
+            }
+            $parentFile=Join-Path $appDir ($parentName+'.json')
+            $parentJob=Get-Content -LiteralPath $parentFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            $registered=Get-RegisteredCodexQuotaContinuation -Job $parentJob -JobFile $parentFile -Directory $appDir -RuntimeDirectory $RuntimeDirectory
+            if(-not $registered -or $registered.Name -cne [IO.Path]::GetFileNameWithoutExtension($JobFile)){
+                throw 'Quota child does not match its registered parent.'
+            }
+        }
+        # A process may stop after creating its child but before the parent
+        # outcome is written. Reconcile the persisted intent instead of
+        # executing the same Codex turn or registering another child.
+        $intentPath=Join-Path $appDir ([IO.Path]::GetFileNameWithoutExtension($JobFile)+'.continuation.json')
+        if(Test-Path -LiteralPath $intentPath -PathType Leaf){
+            try {
+                $linked=Get-RegisteredCodexQuotaContinuation -Job $job -JobFile $JobFile -Directory $appDir -RuntimeDirectory $RuntimeDirectory
+                Set-CodexRunOutcome -JobFile $JobFile -Status 'deferred' -Attempt ([int]$job.retryAttempt) -NextJob $linked.Name -Message "Existing quota continuation: $($linked.Name)"
+                Write-Host "Existing continuation preserved: $($linked.Name)" -ForegroundColor Cyan
+                return 0
+            }catch{
+                Write-Warning "Continuation registration requires review; refusing to run this parent twice: $($_.Exception.Message)"
+                return 1
+            }
         }
         $logFolder = Split-Path -Parent ([string]$job.log)
         [void](New-Item -ItemType Directory -Path $logFolder -Force)
@@ -143,9 +222,14 @@ function Invoke-CodexScheduledJob {
         Write-Host "Session: $($job.sessionId) | Repository: $root | Branch: $branch"
         Write-Host "Model: $($job.model) | Reasoning: $($job.effort) | Access: $($job.access) | Message: $($job.message)"
         $model = [string]$job.model
+        # A child must still reference a readable original thread at launch.
+        if((Test-CodexContinuationPolicy $job) -and [int]$job.retryAttempt -gt 0){
+            Assert-CodexConversationAvailable -SessionId ([string]$job.sessionId)
+        }
         Assert-ModelEffortSupported (Read-CodexModelCatalog) $model ([string]$job.effort)
-        # Every run has one opportunity. Verify selected workspace and quota
-        # immediately before execution; never register an automatic follow-up.
+        # Every invocation rechecks the pinned workspace and quota before
+        # execution. Only explicitly opted-in, verified quota exhaustion may
+        # register one bounded future continuation; unrelated failures stop.
         if (-not (Test-CanonicalWorkspaceIdentity ([string]$job.accountId))) {
             throw 'Scheduled job lacks verified workspace identity. Refresh usage and reschedule.'
         }
@@ -154,12 +238,42 @@ function Invoke-CodexScheduledJob {
             [string]$job.accountId -cne [string]$state.accountId) {
             throw 'Selected workspace identity is unavailable or changed; scheduled execution refused.'
         }
-        if ($state.canAttempt -eq $false) {
+        if ($state.canAttempt -ne $true) {
+            if(Try-DeferCodexQuotaJob -Job $job -JobFile $JobFile -AppDirectory $appDir -RuntimeDirectory $RuntimeDirectory -Quota $state -ExitCode 1){return 0}
             $message = if ($state.blockedReason) { [string]$state.blockedReason } else { 'Codex reports usage unavailable for the selected model.' }
-            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode 1 -Message $message
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode 1 -Attempt ([int]$job.retryAttempt) -Message $message
             Write-Host $message -ForegroundColor Yellow
             return 1
         }
+        # Both execution modes inherit the same verified identity, branch,
+        # quota and session mutex. Only the Codex UI/transport differs.
+        $codex = (Get-Command codex.cmd -ErrorAction Stop).Source
+        [void](New-Item -Path $AppDirectory -ItemType Directory -Force -ErrorAction Stop)
+        $PSNativeCommandUseErrorActionPreference = $false
+        if($executionMode -eq 'terminal'){
+            # The interactive TUI MUST inherit real stdin/stdout/stderr:
+            # piping through Tee-Object would prevent prompts and approvals.
+            $argsList=@('resume','-m',$model,'-c',"model_reasoning_effort=$($job.effort)",'-C',$root)
+            switch ($job.access) {
+                'yolo'            { $argsList += '--dangerously-bypass-approvals-and-sandbox' }
+                'workspace-write' { $argsList += @('--sandbox','workspace-write') }
+                'read-only'       { $argsList += @('--sandbox','read-only') }
+            }
+            $argsList+=@([string]$job.sessionId,[string]$job.message)
+            Write-Host 'Starting interactive Codex in this terminal. Questions and approvals appear here.' -ForegroundColor Cyan
+            $result=Invoke-CodexTerminal -CliEntry (Get-CodexCliJs) -Arguments $argsList
+            Write-Host "Codex terminal exit code: $result" -ForegroundColor $(if($result -eq 0){'Green'}else{'Yellow'})
+            if([int]$result -eq 0){
+                # A TUI can exit voluntarily before the user-requested work
+                # completes. Only the user can verify task completion.
+                Set-CodexRunOutcome -JobFile $JobFile -Status 'finished' -ExitCode 0 -Attempt ([int]$job.retryAttempt) -Message 'Interactive Codex terminal exited; verify the conversation for completion.'
+                return 0
+            }
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -ExitCode ([int]$result) -Attempt ([int]$job.retryAttempt) -Message 'Interactive Codex exited unsuccessfully; check the terminal and conversation.'
+            return [int]$result
+        }
+        # Legacy unattended execution remains byte-for-byte compatible with
+        # existing background jobs and retains structured JSONL evidence.
         $argsList = @('exec','--json','-m',$model,'-c',"model_reasoning_effort=$($job.effort)",'-C',$root)
         if (-not $model) { $argsList = @('exec','--json','-c',"model_reasoning_effort=$($job.effort)",'-C',$root) }
         switch ($job.access) {
@@ -168,11 +282,7 @@ function Invoke-CodexScheduledJob {
             'read-only'       { $argsList += @('--sandbox','read-only') }
         }
         $argsList += @('resume', [string]$job.sessionId, [string]$job.message)
-        $codex = (Get-Command codex.cmd -ErrorAction Stop).Source
-        [void](New-Item -Path $AppDirectory -ItemType Directory -Force -ErrorAction Stop)
         $events = Join-Path $appDir (([IO.Path]::GetFileNameWithoutExtension($JobFile)) + '.jsonl')
-        # Preserve the native process exit code rather than promoting a nonzero exit to an unrelated PowerShell exception.
-        $PSNativeCommandUseErrorActionPreference = $false
         & $codex @argsList 2>&1 | Tee-Object -FilePath $events | Out-Host
         $result = $LASTEXITCODE
         Write-Host "Codex exit code: $result" -ForegroundColor $(if ($result -eq 0) { 'Green' } else { 'Yellow' })
@@ -180,14 +290,21 @@ function Invoke-CodexScheduledJob {
         # Report native thread-writer conflicts rather than a generic failure.
         if ($result -ne 0 -and (Select-String -LiteralPath $events -Pattern 'thread-store conflict|already has an active writer' -Quiet)) {
             $message = 'Codex reports an existing active writer for this conversation. Scheduled run blocked.'
-            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode ([int]$result) -Message $message
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'blocked' -ExitCode ([int]$result) -Attempt ([int]$job.retryAttempt) -Message $message
             return [int]$result
         }
         if ([int]$result -eq 0) {
-            Set-CodexRunOutcome -JobFile $JobFile -Status 'completed' -ExitCode 0
+            Set-CodexRunOutcome -JobFile $JobFile -Status 'completed' -ExitCode 0 -Attempt ([int]$job.retryAttempt)
             return 0
         }
-        Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -ExitCode ([int]$result) -Message 'Codex exited unsuccessfully.'
+        if((Test-CodexContinuationPolicy $job) -and
+           (Test-CodexTerminalQuotaFailure -EventsPath $events)){
+            try {
+                $postQuota=Read-UsageState $model
+                if(Try-DeferCodexQuotaJob -Job $job -JobFile $JobFile -AppDirectory $appDir -RuntimeDirectory $RuntimeDirectory -Quota $postQuota -ExitCode ([int]$result)){return 0}
+            }catch{Write-Warning "Quota verification failed after Codex exit: $($_.Exception.Message)"}
+        }
+        Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -ExitCode ([int]$result) -Message 'Codex exited unsuccessfully; no verified automatic continuation was registered.' -Attempt ([int]$job.retryAttempt)
         return [int]$result
     } catch {
         $failure = "Scheduled run failed: $($_.Exception.Message)"
@@ -199,7 +316,7 @@ function Invoke-CodexScheduledJob {
                 Add-Content -LiteralPath $target -Value "$(Get-Date -Format o) $failure" -ErrorAction Stop
             } catch { }
         }
-        try { Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -ExitCode 1 -Message $failure } catch { }
+        try { Set-CodexRunOutcome -JobFile $JobFile -Status 'failed' -ExitCode 1 -Attempt ([int]$job.retryAttempt) -Message $failure } catch { }
         return 1
     } finally {
         # Releasing the writer lock must not depend on transcript shutdown.
@@ -217,3 +334,4 @@ function Invoke-CodexScheduledJob {
         Write-Host 'Run finished. Check the logs folder for the transcript.' -ForegroundColor Cyan
     }
 }
+

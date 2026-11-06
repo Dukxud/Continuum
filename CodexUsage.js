@@ -157,12 +157,94 @@ function normalizeThreadRead(result, expectedId) {
   if (!thread || thread.id !== expectedId) throw new Error('Codex returned unexpected thread metadata.');
   // thread/read does not resume a conversation or subscribe to turns.
   const cwd = typeof thread.cwd === 'string' && thread.cwd.trim() ? thread.cwd.trim() : null;
-  return {ok:true, threadId:expectedId, cwd};
+  // Use the Codex-owned title, not a guessed title from rollout messages.
+  // thread/read is a metadata-only operation (includeTurns is false).
+  const name = typeof thread.name === 'string' && thread.name.trim()
+    ? thread.name.trim() : null;
+  const preview = typeof thread.preview === 'string' && thread.preview.trim()
+    ? thread.preview.trim() : null;
+  return {ok:true, threadId:expectedId, cwd, name, preview};
 }
 function readThreadDirectory(cliJs, threadId, timeoutMs=10000) {
   if (typeof threadId !== 'string' || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(threadId))
     return Promise.reject(new Error('Invalid Codex conversation ID.'));
   return readCodexState(cliJs,{threadId,timeoutMs,catalog:false});
+}
+// One App Server process for the chooser, never one per conversation.
+// Requests are independent and bounded; an inaccessible thread cannot block
+// the titles of other sessions or the essential load path.
+function readThreadSummaries(cliJs, threadIds, timeoutMs=12000) {
+  const valid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+  if (!Array.isArray(threadIds) || threadIds.length > 30 ||
+      threadIds.some(id => typeof id !== 'string' || !valid.test(id)))
+    return Promise.reject(new Error('Invalid thread summary request.'));
+  const wanted = new Set(threadIds);
+  if (!wanted.size) return Promise.resolve({ok:true,threads:{}});
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath,
+      [cliJs,'app-server','--listen','stdio://'],
+      {stdio:['pipe','pipe','pipe'],windowsHide:true});
+    const lines = readline.createInterface({input:child.stdout});
+    const threads = {};
+    const seenCursors = new Set();
+    let settled = false, initialized = false, stderr = '', requestId = 1, pages = 0;
+    const timer = setTimeout(() => finish(null,{ok:true,threads,partial:true}),timeoutMs);
+    function finish(error, value) {
+      if (settled) return;
+      settled = true;clearTimeout(timer);lines.close();
+      child.stdin.on('error',()=>{});child.stdin.end();child.kill();
+      if (error) reject(error);else resolve(value);
+    }
+    function send(message) {
+      if (!settled) child.stdin.write(JSON.stringify(message)+'\n');
+    }
+    function requestPage(cursor = null) {
+      pages++;requestId++;
+      const params = {limit:100,sourceKinds:['cli','exec'],archived:false};
+      if (cursor) params.cursor = cursor;
+      send({id:requestId,method:'thread/list',params});
+    }
+    child.on('error',error=>finish(error));
+    child.stdin.on('error',error=>finish(error));
+    child.on('exit',code=>{
+      if (!settled) finish(new Error('Codex App Server exited ('+code+'). '+stderr.slice(-120)));
+    });
+    child.stderr.on('data',chunk=>{stderr=(stderr+chunk.toString()).slice(-300);});
+    lines.on('line',line=>{
+      let msg;try{msg=JSON.parse(line);}catch{return;}
+      if (!initialized) {
+        if (msg.id !== 1) return;
+        if (msg.error) return finish(new Error(msg.error.message||'Initialization failed.'));
+        initialized = true;send({method:'initialized',params:{}});requestPage();
+        return;
+      }
+      if (msg.id !== requestId) return;
+      if (msg.error) return pages === 1
+        ? finish(new Error(msg.error.message||'Codex thread listing failed.'))
+        : finish(null,{ok:true,threads,partial:true});
+      const result = msg.result || {};
+      for (const thread of Array.isArray(result.data) ? result.data : []) {
+        if (!thread || !wanted.has(thread.id)) continue;
+        const value = key => typeof thread[key] === 'string' && thread[key].trim()
+          ? thread[key].trim() : null;
+        threads[thread.id] = {
+          ok:true,threadId:thread.id,
+          cwd:value('cwd'),name:value('name'),preview:value('preview')
+        };
+        wanted.delete(thread.id);
+      }
+      const cursor = result.nextCursor;
+      if (!wanted.size || !cursor) return finish(null,{ok:true,threads,partial:false});
+      if (typeof cursor !== 'string' || seenCursors.has(cursor) || pages >= 6)
+        return finish(null,{ok:true,threads,partial:true});
+      seenCursors.add(cursor);
+      requestPage(cursor);
+    });
+    send({id:1,method:'initialize',params:{
+      clientInfo:{name:'codex_resume_scheduler',title:'Codex Resume Scheduler',version:'1.16.0'},
+      capabilities:{experimentalApi:true}
+    }});
+  });
 }
 async function main() {
   const flag=process.argv.indexOf('--cli-js'); const cliJs=flag>=0?process.argv[flag+1]:null;
@@ -170,10 +252,14 @@ async function main() {
   const modelFlag=process.argv.indexOf('--model'); const model=modelFlag>=0?process.argv[modelFlag+1]:null;
   const threadFlag=process.argv.indexOf('--thread-id');
   const threadId=threadFlag>=0?process.argv[threadFlag+1]:null;
-  const state=threadFlag>=0
-    ? await readThreadDirectory(path.resolve(cliJs),threadId)
-    : await readCodexState(path.resolve(cliJs),{model,catalog:!process.argv.includes('--rates-only'),modelsOnly:process.argv.includes('--models-only')});
+  const threadsFlag=process.argv.indexOf('--thread-ids');
+  const state=threadsFlag>=0
+    ? await readThreadSummaries(path.resolve(cliJs),
+      (process.argv[threadsFlag+1]||'').split(',').filter(Boolean))
+    : threadFlag>=0
+      ? await readThreadDirectory(path.resolve(cliJs),threadId)
+      : await readCodexState(path.resolve(cliJs),{model,catalog:!process.argv.includes('--rates-only'),modelsOnly:process.argv.includes('--models-only')});
   process.stdout.write(JSON.stringify(state)+'\n');
 }
 if(require.main===module) main().catch(e=>{process.stdout.write(JSON.stringify({ok:false,error:e.message})+'\n');process.exitCode=1;});
-module.exports={describeWindow,normalizeModels,selectBucket,summarizeRateLimits,readCodexState,readRateLimits,normalizeThreadRead,readThreadDirectory,identifyAccount};
+module.exports={describeWindow,normalizeModels,selectBucket,summarizeRateLimits,readCodexState,readRateLimits,normalizeThreadRead,readThreadDirectory,readThreadSummaries,identifyAccount};
