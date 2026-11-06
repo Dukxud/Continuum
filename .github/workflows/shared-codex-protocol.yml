@@ -1,0 +1,28 @@
+name: Shared interactive Codex protocol (bounded)
+on:
+  push:
+    branches:
+      - feat/shared-interactive-app-server
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shared-codex-protocol
+  cancel-in-progress: true
+
+jobs:
+  windows-protocol:
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify shared owner and two-client interactive protocol
+        shell: pwsh
+        run: |
+          node --test ./tests/shared-codex-session.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Shared interactive protocol failed.' }
