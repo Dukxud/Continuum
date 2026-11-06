@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feat/shared-interactive-app-server
+      - fix/continuum-windows-icon
   workflow_dispatch:
 
 permissions:
@@ -44,6 +45,14 @@ jobs:
         shell: pwsh
         working-directory: flutter_port
         run: flutter create --platforms=windows --project-name codex_resume_flutter .
+
+      - name: Apply and verify Continuum native window icon
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File ./flutter_port/Apply-WindowsIcon.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Native Windows icon patch failed.' }
+          pwsh -NoProfile -File ./flutter_port/Apply-WindowsIcon.ps1 -VerifyOnly
+          if ($LASTEXITCODE -ne 0) { throw 'Native icon did not survive verification.' }
 
       - name: Verify Flutter interactions and compile
         shell: pwsh
