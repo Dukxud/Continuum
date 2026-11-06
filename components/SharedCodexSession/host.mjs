@@ -151,11 +151,16 @@ export class SharedSessionHost extends EventEmitter {
       }
     }
     if (Object.hasOwn(message, 'id') && isServerRequest(message.method)) {
-      if (message.params?.threadId !== this.job.sessionId) {
-        this.fatal(new Error('Cross-thread Codex server request refused'));
+      if (message.params?.threadId !== this.job.sessionId ||
+          (this.turnId && message.params?.turnId !== this.turnId)) {
+        this.fatal(new Error('Cross-thread or cross-turn Codex server request refused'));
         return;
       }
       const id = String(message.id);
+      if (this.pending.has(id)) {
+        this.fatal(new Error('Duplicate Codex approval request ID'));
+        return;
+      }
       const params = { ...message.params };
       if (message.method === 'item/fileChange/requestApproval') {
         const review = this.reviewableFileChanges.get(params.itemId);
@@ -172,6 +177,10 @@ export class SharedSessionHost extends EventEmitter {
       return;
     }
     if (message.method === 'serverRequest/resolved') {
+      if (message.params?.threadId !== this.job.sessionId) {
+        this.fatal(new Error('Cross-thread approval resolution refused'));
+        return;
+      }
       this.pending.delete(String(message.params?.requestId));
       if (!this.pending.size) this.status = 'running';
       this.broadcast(this.snapshot());
@@ -227,12 +236,12 @@ export class SharedSessionHost extends EventEmitter {
         const id = String(command.id);
         const request = this.pending.get(id);
         validateUserResponse(request, command.result);
-        this.pending.delete(id);
         this.protocol.respond(Number.isSafeInteger(Number(id)) ? Number(id) : id, command.result);
+        this.pending.delete(id);
         if (!this.pending.size) this.status = 'running';
         this.broadcast(this.snapshot());
       } else if (command.action === 'steer') {
-        if (this.completed || !this.turnId || typeof command.text !== 'string' || !command.text.trim() || command.text.length > 4000) throw new Error('Cannot steer this turn');
+        if (this.completed || this.pending.size || !this.turnId || typeof command.text !== 'string' || !command.text.trim() || command.text.length > 4000) throw new Error('Cannot steer this turn');
         await this.protocol.request('turn/steer', { threadId: this.job.sessionId, expectedTurnId: this.turnId,
           input: [{ type: 'text', text: command.text }] });
       } else if (command.action === 'status') {
