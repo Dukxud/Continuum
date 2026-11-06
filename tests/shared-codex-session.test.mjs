@@ -44,6 +44,18 @@ test('one App Server process, two viewers, command approval and user question', 
   assert.equal(host.completed, true);
   first.end(); second.end();
 });
+test('file edits and unknown network requests never receive blind approval', () => {
+  const file = { method:'item/fileChange/requestApproval', params: { proposedChanges:[] } };
+  assert.throws(() => validateUserResponse(file, { decision:'accept' }));
+  assert.deepEqual(validateUserResponse(file, { decision:'decline' }), { decision:'decline' });
+  file.params.proposedChanges = [{ path:'src/test.dart', kind:'update', diff:'@@ -1 +1 @@' }];
+  assert.deepEqual(validateUserResponse(file, { decision:'accept' }), { decision:'accept' });
+  const command = { method:'item/commandExecution/requestApproval', params: {} };
+  assert.throws(() => validateUserResponse(command, { decision:'accept' }));
+  command.params.networkApprovalContext = { host:'example.test', protocol:'https' };
+  assert.deepEqual(validateUserResponse(command, { decision:'accept' }), { decision:'accept' });
+});
+
 test('both Codex question method variants require exact question IDs', () => {
   for (const method of ['item/tool/requestUserInput','tool/requestUserInput']) {
     const req = { method, params: { questions: [{ id: 'valid' }] } };
