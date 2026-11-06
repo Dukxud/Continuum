@@ -1,10 +1,11 @@
 import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { AppServerProtocol, isJobName, isUuid, isServerRequest, validateUserResponse } from './protocol.mjs';
+import { openRemoteProtocol, unusedLoopbackPort } from './remote.mjs';
 
 const MAX_INPUT_BYTES = 64 * 1024;
 const MAX_EVENTS = 160;
@@ -32,7 +33,9 @@ function publicEvent(message) {
 }
 
 export class SharedSessionHost extends EventEmitter {
-  constructor({ job, jobName, appDir, codexEntry, nodeBinary = process.execPath, spawnServer, shutdownGraceMs = 1000 }) {
+  constructor({ job, jobName, appDir, codexEntry, nodeBinary = process.execPath,
+    spawnServer, remote = false, connectRemote = openRemoteProtocol,
+    reservePort = unusedLoopbackPort, shutdownGraceMs = 1000 }) {
     super();
     if (!isJobName(jobName) || !isUuid(job.sessionId) || !isAbsolute(job.repo) || !job.message?.trim()) throw new Error('Invalid scheduled session');
     if (!isAbsolute(codexEntry)) throw new Error('Codex JavaScript entry must be absolute');
@@ -41,7 +44,15 @@ export class SharedSessionHost extends EventEmitter {
     this.appDir = appDir;
     this.codexEntry = codexEntry;
     this.nodeBinary = nodeBinary;
-    this.spawnServer = spawnServer ?? (() => spawn(nodeBinary, [codexEntry, 'app-server'], { stdio: ['pipe', 'pipe', 'pipe'], cwd: job.repo, windowsHide: true }));
+    this.spawnServer = spawnServer ?? (args => spawn(nodeBinary,
+      [codexEntry, 'app-server', ...args],
+      { stdio: ['pipe', 'pipe', 'pipe'], cwd: job.repo, windowsHide: true }));
+    this.remote = remote;
+    this.connectRemote = connectRemote;
+    this.reservePort = reservePort;
+    this.remoteToken = remote ? randomBytes(32).toString('hex') : null;
+    this.remoteEndpoint = null;
+    this.remoteConnection = null;
     this.shutdownGraceMs = shutdownGraceMs;
     this.locations = locationFor(appDir, jobName);
     this.secret = randomBytes(32).toString('hex');
@@ -88,7 +99,20 @@ export class SharedSessionHost extends EventEmitter {
     await writeFile(temp, JSON.stringify({ version: 1, job: this.jobName, endpoint, secret: this.secret, pid: process.pid }), { flag: 'wx', mode: 0o600 });
     await rename(temp, descriptor);
     try {
-      const child = this.spawnServer();
+      // The native TUI and Continuum must connect to exactly one App Server.
+      // The bearer token is never placed in CLI arguments, snapshots or logs.
+      let args = [];
+      if (this.remote) {
+        const port = await this.reservePort();
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+          throw new Error('Invalid App Server loopback port');
+        }
+        this.remoteEndpoint = 'ws://127.0.0.1:' + port;
+        const digest = createHash('sha256').update(this.remoteToken).digest('hex');
+        args = ['--listen', this.remoteEndpoint,
+          '--ws-auth', 'capability-token', '--ws-token-sha256', digest];
+      }
+      const child = this.spawnServer(args);
       this.child = child;
       // Windows may release the process before its stdio pipes close. Track
       // the full close event so consumers can safely clean temporary workspaces.
@@ -97,7 +121,15 @@ export class SharedSessionHost extends EventEmitter {
       // without copying private process output into the shared UI snapshot,
       // so the pipe never blocks the single conversation owner.
       child.stderr?.resume();
-      this.protocol = new AppServerProtocol(child);
+      if (this.remote) {
+        child.stdout?.resume();
+        this.remoteConnection = await this.connectRemote({
+          endpoint: this.remoteEndpoint, token: this.remoteToken, child,
+        });
+        this.protocol = this.remoteConnection.protocol;
+      } else {
+        this.protocol = new AppServerProtocol(child);
+      }
       this.protocol.on('malformed', () => this.fatal(
         new Error('Codex App Server returned an invalid JSON-RPC message')));
 
@@ -243,6 +275,17 @@ export class SharedSessionHost extends EventEmitter {
         this.pending.delete(id);
         if (!this.pending.size) this.status = 'running';
         this.broadcast(this.snapshot());
+      } else if (command.action === 'native-attach') {
+        if (!this.remote || !this.remoteEndpoint || !this.turnId || this.completed ||
+            !['running', 'needs-input'].includes(this.status)) {
+          throw new Error('Native TUI attachment requires a running shared owner');
+        }
+        // Credentials are returned only over the authenticated local named
+        // pipe. They are not persisted in the descriptor or public snapshot.
+        socket.write(JSON.stringify({ action: 'native-credentials',
+          endpoint: this.remoteEndpoint, token: this.remoteToken,
+          threadId: this.job.sessionId, cwd: this.job.repo }) + '\n');
+        return;
       } else if (command.action === 'steer') {
         if (this.completed || this.pending.size || !this.turnId || typeof command.text !== 'string' || !command.text.trim() || command.text.length > 4000) throw new Error('Cannot steer this turn');
         await this.protocol.request('turn/steer', { threadId: this.job.sessionId, expectedTurnId: this.turnId,
@@ -265,6 +308,7 @@ export class SharedSessionHost extends EventEmitter {
   }
   async close() {
     for (const socket of this.sockets) socket.end();
+    this.remoteConnection?.close();
     await new Promise(resolve => this.server?.close(() => resolve()) ?? resolve());
     if (this.child) {
       const closed = this.childClosed ?? Promise.resolve();
