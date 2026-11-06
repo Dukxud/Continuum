@@ -19,7 +19,7 @@ export async function connectToSession(descriptorPath, onMessage) {
     socket.on('close', () => {
       if (!settled) fail(new Error('Shared owner disconnected before authentication'));
     });
-    socket.once('connect', () => socket.write(JSON.stringify({ secret }) + '\\n'));
+    socket.once('connect', () => socket.write(JSON.stringify({ secret }) + '\n'));
     socket.setEncoding('utf8');
     socket.on('data', chunk => {
       input += chunk;
@@ -28,7 +28,7 @@ export async function connectToSession(descriptorPath, onMessage) {
         return;
       }
       for (;;) {
-        const i = input.indexOf('\\n');
+        const i = input.indexOf('\n');
         if (i < 0) return;
         const line = input.slice(0, i);
         input = input.slice(i + 1);
