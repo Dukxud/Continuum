@@ -35,7 +35,7 @@ class SharedFixtureAdapter implements SchedulerAdapter {
     }
     if (action == 'shared-open') {
       viewerOpens++;
-      return {'opened':true,'viewerOnly':true};
+      return {'opened':true,'nativeTui':true};
     }
     if (action == 'shared-answer') {
       responses.add(payload);
@@ -71,7 +71,7 @@ void main() {
     expect((adapter.responses.single['result'] as Map)['answers'],
       {'choice':{'answers':['Yes']}});
 
-    expect(find.text('APPROVAL REQUESTED'), findsOneWidget);
+    expect(find.text('COMMAND APPROVAL'), findsOneWidget);
     expect(find.text('npm test'), findsOneWidget);
     await tester.tap(find.text('Approve once'));
     await tester.pump(const Duration(milliseconds: 100));
@@ -79,6 +79,7 @@ void main() {
     expect(adapter.responses.last['result'], {'decision':'accept'});
     expect(find.text('Codex: completed'), findsOneWidget);
 
+    expect(find.text('Open Codex Terminal'), findsOneWidget);
     await tester.tap(find.byKey(const Key('shared-open-terminal')));
     await tester.pump(const Duration(milliseconds: 100));
     expect(adapter.viewerOpens, 1);
