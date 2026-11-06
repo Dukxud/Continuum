@@ -27,7 +27,7 @@ export async function connectToSession(descriptorPath, onMessage) {
 
 function displayRequest(request, output) {
   const p = request.params ?? {};
-  if (request.method === 'item/tool/requestUserInput') {
+  if ((request.method === 'item/tool/requestUserInput' || request.method === 'tool/requestUserInput')) {
     for (const question of p.questions ?? []) {
       output.write('\n? ' + (question.question ?? question.header ?? 'Codex question') + '\n');
       for (const [index, option] of (question.options ?? []).entries()) output.write('  ' + (index + 1) + '. ' + option.label + '\n');
@@ -81,7 +81,7 @@ export async function terminalWatch(descriptorPath, input = process.stdin, outpu
     if (pending.length) {
       const request = pending[0];
       let result;
-      if (request.method === 'item/tool/requestUserInput') {
+      if ((request.method === 'item/tool/requestUserInput' || request.method === 'tool/requestUserInput')) {
         const question = request.params.questions[questionIndex];
         const choice = Number(line.trim());
         const selected = Number.isInteger(choice) && choice >= 1 ? question.options?.[choice-1]?.label : undefined;
