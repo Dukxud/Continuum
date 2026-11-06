@@ -70,14 +70,31 @@ class RpcClient {
     }), 25000, method + ' timed out').finally(() => this.pending.delete(id));
   }
   waitForCompletedTurn(threadId) {
-    let listener;
-    const result = new Promise(resolve => {
+    let listener, timer;
+    let rejectCompletion;
+    const result = new Promise((resolve, reject) => {
+      rejectCompletion = reject;
       listener = message => {
-        if (message.method === 'turn/completed' && message.params?.threadId === threadId) resolve(message.params.turn);
+        if (message.method === 'turn/completed' && message.params?.threadId === threadId) {
+          dispose();
+          resolve(message.params.turn);
+        }
       };
       this.listeners.add(listener);
     });
-    return { result: timeout(result, 90000, 'Seed turn timed out'), dispose: () => this.listeners.delete(listener) };
+    const dispose = () => {
+      clearTimeout(timer);
+      this.listeners.delete(listener);
+    };
+    timer = setTimeout(() => {
+      dispose();
+      rejectCompletion(new Error('Seed turn timed out'));
+    }, 90000);
+    result.catch(() => {});
+    return {
+      result,
+      dispose: () => { dispose(); rejectCompletion(new Error('Seed observer disposed')); },
+    };
   }
 }
 
@@ -90,9 +107,8 @@ async function connect(url, token) {
   return new RpcClient(socket);
 }
 
-async function stop(child) {
+async function stop(child, closed) {
   if (!child) return;
-  const closed = child.exitCode !== null ? Promise.resolve() : once(child, 'close');
   if (child.exitCode === null && child.signalCode === null) child.kill();
   try { await timeout(closed, 2000, 'App Server close timed out'); }
   catch (error) {
@@ -104,7 +120,7 @@ async function stop(child) {
 
 async function main() {
   const dir = await mkdtemp(join(tmpdir(), 'continuum-native-tui-'));
-  let child, rpc;
+  let child, childClosed, rpc;
   try {
     const port = await unusedLoopbackPort();
     const url = 'ws://127.0.0.1:' + port;
@@ -114,6 +130,8 @@ async function main() {
       '--ws-auth', 'capability-token', '--ws-token-sha256', digest], {
       cwd: dir, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
     });
+    childClosed = once(child, 'close');
+    childClosed.catch(() => {});
     // Drain output to prevent the App Server from blocking on a full pipe.
     child.stdout.resume();
     child.stderr.resume();
@@ -165,7 +183,7 @@ async function main() {
     say('PASS - No fork, and only one Codex server process');
   } finally {
     rpc?.socket.close();
-    await stop(child);
+    await stop(child, childClosed);
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 }
