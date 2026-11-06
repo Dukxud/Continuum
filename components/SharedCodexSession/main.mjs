@@ -16,34 +16,37 @@ const jobName = basename(jobPath, '.json');
 const appDir = dirname(jobPath);
 const { descriptor } = locationFor(appDir, jobName);
 async function nativeCredentials(descriptorPath) {
-  let socket;
+  let socket, requested = false, settled = false;
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
+    const timer = setTimeout(() => fail(new Error('Timed out requesting native terminal credentials')), 5000);
+    const fail = error => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       socket?.destroy();
-      reject(new Error('Timed out requesting native terminal credentials'));
-    }, 5000);
+      reject(error);
+    };
     const handle = message => {
       try {
-        if (message.action === 'snapshot') {
+        if (message.action === 'snapshot' && !requested) {
+          requested = true;
           socket.write(JSON.stringify({ action: 'native-attach' }) + '\n');
         } else if (message.action === 'native-credentials') {
+          if (settled) return;
+          settled = true;
           clearTimeout(timer);
-          socket.end();
-          resolve(message);
+          resolve({ credentials: message, lease: socket });
         } else if (message.action === 'error' || message.action === 'disconnected') {
-          clearTimeout(timer);
-          socket?.destroy();
-          reject(new Error(message.message));
+          fail(new Error(message.message));
         }
-      } catch (error) {
-        clearTimeout(timer);
-        socket?.destroy();
-        reject(error);
-      }
+      } catch (error) { fail(error); }
     };
     connectToSession(descriptorPath, handle).then(
-      connection => { socket = connection; },
-      error => { clearTimeout(timer); reject(error); },
+      connection => {
+        socket = connection;
+        if (settled && !socket.destroyed) socket.destroy();
+      },
+      fail,
     );
   });
 }
@@ -58,28 +61,37 @@ async function run() {
     try {
       const outcome = await host.begin();
       if (outcome !== 'completed') { console.error('Codex turn ended: ' + outcome); process.exitCode = 1; }
-      else console.log('Codex turn completed.');
+      else {
+        console.log('Codex scheduled turn completed; keeping the shared owner while a native TUI is attached.');
+        await host.waitForNativeViewers();
+      }
     } finally { await host.close(); }
   } else if (mode === 'native') {
     const job = JSON.parse(await readFile(jobPath, 'utf8'));
     if (job.executionMode !== 'shared') throw new Error('Native viewer requires a shared session');
     // Clicking Open in Terminal explicitly requests the real Codex TUI.
     // No new App Server, turn/start, prompt, or fork is issued here.
-    const credentials = await nativeCredentials(descriptor);
-    if (!/^[a-f0-9]{64}$/i.test(credentials.token ?? '') ||
-        credentials.threadId !== job.sessionId ||
-        credentials.cwd !== job.repo) throw new Error('Invalid shared owner credentials');
-    const args = nativeTuiArguments(codexEntry, credentials.endpoint, credentials.threadId);
-    const terminal = spawn(process.execPath, args, {
-      cwd: credentials.cwd, stdio: 'inherit', windowsHide: false,
-      env: { ...process.env, [REMOTE_TOKEN_ENV]: credentials.token },
-    });
-    const result = await new Promise((resolve, reject) => {
-      terminal.once('error', reject);
-      terminal.once('close', (code, signal) =>
-        resolve(code ?? (signal ? 1 : 0)));
-    });
-    if (result !== 0) throw new Error('Native Codex TUI exited with code ' + result);
+    const { credentials, lease } = await nativeCredentials(descriptor);
+    try {
+      if (!/^[a-f0-9]{64}$/i.test(credentials.token ?? '') ||
+          credentials.threadId !== job.sessionId ||
+          credentials.cwd !== job.repo) throw new Error('Invalid shared owner credentials');
+      const args = nativeTuiArguments(codexEntry, credentials.endpoint, credentials.threadId);
+      const terminal = spawn(process.execPath, args, {
+        cwd: credentials.cwd, stdio: 'inherit', windowsHide: false,
+        env: { ...process.env, [REMOTE_TOKEN_ENV]: credentials.token },
+      });
+      const result = await new Promise((resolve, reject) => {
+        terminal.once('error', reject);
+        terminal.once('close', (code, signal) =>
+          resolve(code ?? (signal ? 1 : 0)));
+      });
+      if (result !== 0) throw new Error('Native Codex TUI exited with code ' + result);
+    } finally {
+      // The owner tracks this named-pipe lease, not the TUI's WebSocket
+      // activity. The lease ends when the actual terminal process exits.
+      lease.end();
+    }
   } else if (mode === 'watch') {
     await terminalWatch(descriptor);
   } else if (mode === 'status') {

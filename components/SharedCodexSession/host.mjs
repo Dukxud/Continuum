@@ -57,6 +57,8 @@ export class SharedSessionHost extends EventEmitter {
     this.locations = locationFor(appDir, jobName);
     this.secret = randomBytes(32).toString('hex');
     this.sockets = new Set();
+    this.nativeViewers = new Set();
+    this.closing = false;
     this.pending = new Map();
     this.reviewableFileChanges = new Map();
     this.events = [];
@@ -71,7 +73,8 @@ export class SharedSessionHost extends EventEmitter {
   snapshot() {
     return { action: 'snapshot', status: this.status, job: this.jobName,
       pending: [...this.pending.values()].map(({ id, method, params }) => ({ id, method, params })),
-      events: this.events, turnId: this.turnId };
+      events: this.events, turnId: this.turnId,
+      nativeViewers: this.nativeViewers.size };
   }
   broadcast(message) {
     const encoded = JSON.stringify(message) + '\n';
@@ -255,6 +258,37 @@ export class SharedSessionHost extends EventEmitter {
     }
     this.event(message);
   }
+  // Keep the scheduled conversation server alive while an explicitly
+  // attached native TUI remains open. No viewer = short grace; an attached
+  // TUI is bounded to prevent an abandoned terminal pinning the worker.
+  async waitForNativeViewers({ idleMs = 15000, maxMs = 2 * 60 * 60 * 1000 } = {}) {
+    if (!this.remote || this.status !== 'completed' || this.closing) return 'not-eligible';
+    if (!Number.isInteger(idleMs) || !Number.isInteger(maxMs) ||
+        idleMs < 0 || maxMs <= 0) throw new Error('Invalid shared-session lifetime');
+    return new Promise(resolve => {
+      let idleTimer, maxTimer, settled = false;
+      const finish = reason => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(idleTimer);
+        clearTimeout(maxTimer);
+        this.off('native-viewers-changed', update);
+        this.off('shutdown', stop);
+        resolve(reason);
+      };
+      const update = () => {
+        clearTimeout(idleTimer);
+        if (this.nativeViewers.size === 0) {
+          idleTimer = setTimeout(() => finish('idle'), idleMs);
+        }
+      };
+      const stop = () => finish('shutdown');
+      this.on('native-viewers-changed', update);
+      this.on('shutdown', stop);
+      maxTimer = setTimeout(() => finish('maximum'), maxMs);
+      update();
+    });
+  }
   acceptSocket(socket) {
     socket.setEncoding('utf8');
     let authenticated = false, input = '';
@@ -280,8 +314,15 @@ export class SharedSessionHost extends EventEmitter {
         this.command(command, socket);
       }
     });
-    socket.on('close', () => this.sockets.delete(socket));
-    socket.on('error', () => this.sockets.delete(socket));
+    const detach = () => {
+      this.sockets.delete(socket);
+      if (this.nativeViewers.delete(socket)) {
+        this.emit('native-viewers-changed');
+        if (!this.closing) this.broadcast(this.snapshot());
+      }
+    };
+    socket.on('close', detach);
+    socket.on('error', detach);
   }
   async command(command, socket) {
     try {
@@ -294,15 +335,18 @@ export class SharedSessionHost extends EventEmitter {
         if (!this.pending.size) this.status = 'running';
         this.broadcast(this.snapshot());
       } else if (command.action === 'native-attach') {
-        if (!this.remote || !this.remoteEndpoint || !this.turnId || this.completed ||
-            !['running', 'needs-input'].includes(this.status)) {
-          throw new Error('Native TUI attachment requires a running shared owner');
+        if (!this.remote || !this.remoteEndpoint || !this.turnId || this.closing ||
+            !['running', 'needs-input', 'completed'].includes(this.status)) {
+          throw new Error('Native TUI attachment requires an available shared owner');
         }
         // Credentials are returned only over the authenticated local named
         // pipe. They are not persisted in the descriptor or public snapshot.
+        this.nativeViewers.add(socket);
+        this.emit('native-viewers-changed');
         socket.write(JSON.stringify({ action: 'native-credentials',
           endpoint: this.remoteEndpoint, token: this.remoteToken,
           threadId: this.job.sessionId, cwd: this.job.repo }) + '\n');
+        this.broadcast(this.snapshot());
         return;
       } else if (command.action === 'steer') {
         if (this.completed || this.pending.size || !this.turnId || typeof command.text !== 'string' || !command.text.trim() || command.text.length > 4000) throw new Error('Cannot steer this turn');
@@ -326,6 +370,8 @@ export class SharedSessionHost extends EventEmitter {
     this.rejectDone(error);
   }
   async close() {
+    this.closing = true;
+    this.emit('shutdown');
     for (const socket of this.sockets) socket.end();
     this.remoteConnection?.close();
     await new Promise(resolve => this.server?.close(() => resolve()) ?? resolve());

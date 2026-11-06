@@ -304,9 +304,27 @@ try {
             $saved=Get-Content -LiteralPath $job -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
             if([string]$saved.executionMode -cne 'shared'){throw 'Job does not use shared execution.'}
             $script=Join-Path $source 'components/SharedCodexSession/main.mjs'
-            $lines=@(& node.exe $script status $job)
-            if($LASTEXITCODE -ne 0 -or $lines.Count -eq 0){throw 'Shared session is not accessible.'}
-            $result=($lines | Select-Object -Last 1) | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+            $online=$false
+            try {
+                $lines=@(& node.exe $script status $job 2>$null)
+                if($LASTEXITCODE -eq 0 -and $lines.Count -gt 0){
+                    $result=($lines | Select-Object -Last 1) | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+                    $online=$true
+                }
+            }catch { $online=$false }
+            if(-not $online){
+                # Completed jobs lose their transient pipe/descriptor; the
+                # persisted result is authoritative. Never leave a stale
+                # 'running' snapshot onscreen after a successful exit.
+                $resultPath=[IO.Path]::ChangeExtension($job,'.result.json')
+                $outcome=Read-JobOutcome -Path $resultPath
+                if(-not $outcome){throw 'Shared session unavailable; no recorded outcome yet.'}
+                $result=@{
+                    action='snapshot'; status=[string]$outcome.status; offline=$true
+                    pending=@(); events=@(); message=[string]$outcome.message
+                    finishedAt=[string]$outcome.at; nativeViewers=0
+                }
+            }
         }
         'shared-open' {
             $name=[string]$request.name

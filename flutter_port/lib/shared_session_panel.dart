@@ -31,8 +31,14 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
     try {
       final data = await widget.controller.readSharedSession(widget.name);
       if (!mounted) return;
-      setState(() { snapshot = data; problem = null; });
-      if (const ['completed','failed','interrupted'].contains(stringField(data,'status'))) timer?.cancel();
+      final archived = field(data, 'offline') == true;
+      final lastEvents = recordList(field(snapshot, 'events'));
+      setState(() {
+        snapshot = archived && lastEvents.isNotEmpty
+          ? {...data, 'events': lastEvents} : data;
+        problem = null;
+      });
+      if (archived) timer?.cancel();
     } catch (e) {
       if (mounted) setState(() => problem = e.toString());
     } finally { reading = false; }
@@ -174,6 +180,8 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
   @override
   Widget build(BuildContext context) {
     final status = stringField(snapshot,'status');
+    final archived = field(snapshot,'offline') == true;
+    final nativeViewers = field(snapshot,'nativeViewers');
     final requests = recordList(field(snapshot,'pending'));
     final events = recordList(field(snapshot,'events'));
     final text = events.where((e) => stringField(e,'kind') == 'text')
@@ -187,6 +195,14 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
           style: TextStyle(color: status == 'needs-input'
             ? DeckColor.gold : DeckColor.aqua,
             fontSize: 14,fontWeight: FontWeight.w800)),
+        if (archived)
+          const Text('Shared session closed · Recorded result shown',
+            key: Key('shared-owner-closed'),
+            style: TextStyle(color: DeckColor.muted))
+        else if (status == 'completed' && nativeViewers is num && nativeViewers > 0)
+          const Text('Scheduled turn completed · Native terminal remains attached',
+            key: Key('shared-terminal-attached'),
+            style: TextStyle(color: DeckColor.mint)),
         if (problem != null) Text(problem!,
           style: const TextStyle(color: DeckColor.rose)),
         const SizedBox(height: 9),
@@ -194,7 +210,7 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
           child: OutlinedButton.icon(
             key: const Key('shared-open-terminal'),
             icon: const Icon(Icons.terminal_rounded, size: 17),
-            onPressed: openingViewer ? null : _openTerminal,
+            onPressed: openingViewer || archived ? null : _openTerminal,
             label: const Text('Open Codex Terminal'))),
         const SizedBox(height: 12),
         for (final request in requests)

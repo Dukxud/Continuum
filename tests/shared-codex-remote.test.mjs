@@ -144,8 +144,28 @@ test('native credentials are private, require active owner, and never fork the t
   viewer.write(JSON.stringify({ action: 'answer', id: '101',
     result: { answers: { choice: { answers: ['Yes'] } } } }) + '\n');
   assert.equal(await running, 'completed');
+  assert.equal(host.nativeViewers.size, 1);
+  assert.equal(host.snapshot().status, 'completed');
+  const kept = host.waitForNativeViewers({ idleMs: 40, maxMs: 1000 });
+  let released = false;
+  kept.then(() => { released = true; });
+  await sleep(90);
+  assert.equal(released, false, 'Completed turn must not kill an attached terminal');
   viewer.write(JSON.stringify({ action: 'native-attach' }) + '\n');
-  await waitFor(() => events.some(event => event.action === 'error' &&
-    /requires a running shared owner/.test(event.message)));
+  await waitFor(() => events.filter(event => event.action === 'native-credentials').length === 2);
   viewer.end();
+  assert.equal(await kept, 'idle');
+  assert.equal(host.nativeViewers.size, 0);
+});
+test('shared owner closes after a bounded idle grace or maximum lifetime', async () => {
+  const host = new SharedSessionHost({
+    job: { sessionId, repo: process.cwd(), message: 'Continue.' },
+    jobName, appDir: tmpdir(), codexEntry: fakeServer, remote: true,
+  });
+  host.completed = true;
+  host.status = 'completed';
+  assert.equal(await host.waitForNativeViewers({ idleMs: 5, maxMs: 40 }), 'idle');
+  host.nativeViewers.add({});
+  assert.equal(await host.waitForNativeViewers({ idleMs: 5, maxMs: 30 }), 'maximum');
+  host.nativeViewers.clear();
 });

@@ -8,6 +8,7 @@ const job = 'CodexResume-20261105-1737-8fea70e0';
 
 class SharedFixtureAdapter implements SchedulerAdapter {
   int stage = 0, viewerOpens = 0;
+  bool archived = false;
   final List<Map<String, dynamic>> responses = [];
   final List<String> actions = [];
   @override
@@ -15,6 +16,8 @@ class SharedFixtureAdapter implements SchedulerAdapter {
       [Map<String, dynamic> payload = const {}]) async {
     actions.add(action);
     if (action == 'shared-status') {
+      if (archived) return {'status':'completed', 'offline':true,
+        'pending':<Map<String, dynamic>>[], 'events':<Map<String, dynamic>>[]};
       final pending = switch (stage) {
         0 => [
           {'id': '101', 'method': 'item/tool/requestUserInput',
@@ -83,6 +86,15 @@ void main() {
     await tester.tap(find.byKey(const Key('shared-open-terminal')));
     await tester.pump(const Duration(milliseconds: 100));
     expect(adapter.viewerOpens, 1);
+    adapter.archived = true;
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byKey(const Key('shared-owner-closed')), findsOneWidget);
+    expect(find.text('Codex: completed'), findsOneWidget);
+    expect(find.text('Visible Codex stream.'), findsOneWidget);
+    final terminalButton = tester.widget<OutlinedButton>(
+      find.byKey(const Key('shared-open-terminal')));
+    expect(terminalButton.onPressed, isNull);
     expect(adapter.actions.every((action) =>
       const ['shared-status','shared-answer','shared-open'].contains(action)), isTrue);
     await tester.pumpWidget(const SizedBox());
