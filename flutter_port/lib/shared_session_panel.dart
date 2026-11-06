@@ -75,7 +75,7 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
       final command = stringField(params, 'command');
       final network = field(params, 'networkApprovalContext');
       final reviewable = isFileChange ? changes.isNotEmpty
-        : command.isNotEmpty || network is Map;
+        : command.isNotEmpty || network is Map<String, dynamic>;
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(isFileChange ? 'FILE CHANGE APPROVAL' : 'COMMAND APPROVAL',
           style: const TextStyle(
@@ -86,7 +86,7 @@ class _SharedSessionPanelState extends State<SharedSessionPanel> {
         if (command.isNotEmpty)
           SelectableText(command, style: const TextStyle(
             color: DeckColor.text, fontFamily:'Consolas')),
-        if (network is Map)
+        if (network is Map<String, dynamic>)
           Text('Network: ' + stringField(network, 'host') +
             ' (' + stringField(network, 'protocol') + ')',
             style: const TextStyle(color: DeckColor.text)),
