@@ -4,6 +4,7 @@ Import-Module (Join-Path $PSScriptRoot 'components/OneTimeTasks/OneTimeTasks.psm
 Import-Module (Join-Path $PSScriptRoot 'components/GitRepository/GitRepository.psm1') -Force -ErrorAction Stop
 Import-Module (Join-Path $PSScriptRoot 'components/JobOutcomes/JobOutcomes.psm1') -Force -ErrorAction Stop
 . (Join-Path $PSScriptRoot 'CodexQuotaContinuation.ps1')
+. (Join-Path $PSScriptRoot 'CodexTerminalRun.ps1')
 
 function Get-RepositoryBranch {
     param([string]$Path)
@@ -71,6 +72,7 @@ function Get-CodexRuntimeFiles {
     return @(
         'CodexResumeScheduler.ps1','CodexRunEngine.ps1',
         'CodexUsage.js','CodexRunJob.vbs','CodexQuotaContinuation.ps1',
+        'CodexTerminalRun.ps1',
         'components/RuntimeBundle/RuntimeBundle.psm1',
         'components/OneTimeTasks/OneTimeTasks.psm1',
         'components/GitRepository/GitRepository.psm1',
@@ -259,17 +261,7 @@ function Invoke-CodexScheduledJob {
             }
             $argsList+=@([string]$job.sessionId,[string]$job.message)
             Write-Host 'Starting interactive Codex in this terminal. Questions and approvals appear here.' -ForegroundColor Cyan
-            # A nonzero native exit is a result, not a PowerShell
-            # terminating error. Preserve it even with strict wrapper
-            # ErrorActionPreference and report the original exit code.
-            $oldErrorActionPreference=$ErrorActionPreference
-            try {
-                $ErrorActionPreference='Continue'
-                & $codex @argsList
-                $result=$LASTEXITCODE
-            } finally {
-                $ErrorActionPreference=$oldErrorActionPreference
-            }
+            $result=Invoke-CodexTerminal -CliEntry (Get-CodexCliJs) -Arguments $argsList
             Write-Host "Codex terminal exit code: $result" -ForegroundColor $(if($result -eq 0){'Green'}else{'Yellow'})
             if([int]$result -eq 0){
                 # A TUI can exit voluntarily before the user-requested work
