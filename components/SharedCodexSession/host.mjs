@@ -226,7 +226,9 @@ export class SharedSessionHost extends EventEmitter {
         if (this.completed || !this.turnId || typeof command.text !== 'string' || !command.text.trim() || command.text.length > 4000) throw new Error('Cannot steer this turn');
         await this.protocol.request('turn/steer', { threadId: this.job.sessionId, expectedTurnId: this.turnId,
           input: [{ type: 'text', text: command.text }] });
-      } else if (command.action !== 'status') throw new Error('Unknown action');
+      } else if (command.action === 'status') {
+        socket.write(JSON.stringify(this.snapshot()) + '\n');
+      } else throw new Error('Unknown action');
       socket.write(JSON.stringify({ action: 'ack', requestAction: command.action, id: command.id ?? null }) + '\n');
     } catch (error) {
       socket.write(JSON.stringify({ action: 'error', message: error.message.slice(0, 200) }) + '\n');
