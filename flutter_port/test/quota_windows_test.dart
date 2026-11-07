@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:codex_resume_flutter/aero_bar.dart';
 import 'package:codex_resume_flutter/bridge.dart';
+import 'package:codex_resume_flutter/date_labels.dart';
 import 'package:codex_resume_flutter/main.dart';
 import 'package:codex_resume_flutter/scheduler_controller.dart';
 
