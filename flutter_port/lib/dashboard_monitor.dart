@@ -67,7 +67,9 @@ extension _DashboardMonitor on _SchedulerHomeState {
     final accent = weekly ? DeckColor.iris : DeckColor.mint;
     final raw = field(window, 'remainingPercent');
     final remaining = raw is num && raw.isFinite ? raw.toDouble() : null;
-    final reset = dateField(window, 'resetsAt');
+    final resetRaw = field(window, 'resetsAt');
+    final reset = resetRaw is num && resetRaw.isFinite && resetRaw > 0
+      ? DateTime.fromMillisecondsSinceEpoch(resetRaw.toInt() * 1000) : null;
     final title = _quotaWindowLabel(window);
     final note = reset == null ? 'Reset time unavailable'
       : 'Resets ' + formatLocalDateTime(reset);
@@ -114,7 +116,6 @@ extension _DashboardMonitor on _SchedulerHomeState {
       top: const Color(0xff23273e),
       bottom: const Color(0xff171c2e),
       accent: DeckColor.iris,
-      radius: 19,
       padding: const EdgeInsets.all(17),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -166,7 +167,8 @@ extension _DashboardMonitor on _SchedulerHomeState {
           fontSize: 13, fontWeight: FontWeight.w700)),
       const SizedBox(height: 3),
       const Text('Your next launch will appear here.',
-        style: TextStyle(color: DeckColor.muted, fontSize: 11)),
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: DeckColor.muted, fontSize: 11)),
     ]),
   );
 
