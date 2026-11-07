@@ -1,16 +1,31 @@
-# Shared Codex terminal integration (draft)
+# Shared Codex owner and native terminal
 
-## Authority and scope
-A scheduled **Shared session** owns exactly one Codex App Server and starts the saved conversation's scheduled turn. Flutter receives an activity snapshot over the existing authenticated named pipe. A click on **Open Codex Terminal** starts a TUI *client* using `--remote`, `--remote-auth-token-env`, and `resume <same session ID>`. It does not create a new server or fork a thread.
+**Merged, engineering preview; development paused.** PR #18 is part of `main`. See [current state](CURRENT-STATE.md) for baseline and pass/pending evidence. Later icon (#21) and quota (#22) corrections did not change Shared execution.
 
-The server listens **only on 127.0.0.1** with a random capability token. Codex receives only the token SHA-256 verifier as a CLI argument; the TUI receives the token through its child-process environment. The token is neither persisted in the job descriptor nor included in status snapshots. Existing scheduled Background and Native terminal modes are unchanged.
+## Scope and ownership
 
-## Evidence required before acceptance
-- Run the mock protocol regression tests and source/bridge tests. These do **not** run Codex.
-- Confirm Windows Flutter analysis/build and inspect the actual GUI.
-- **Only with explicit owner authorization**, run a live disposable-thread end-to-end check against the installed Codex CLI, then review question/approval ownership and active-turn TUI behavior.
-- Do not merge or release PR #18 before independent review and signed-in Windows acceptance.
+Continuum schedules one App Server owner for the selected saved conversation. Its GUI uses an authenticated local named pipe. **Open Codex Terminal** launches the real Codex TUI as a remote client of that owner's authenticated loopback listener, with the same thread ID. It does not create a second App Server, a copied conversation or a new scheduled turn.
 
-The host retains the authenticated App Server after scheduled-turn completion while a native TUI holds its local lease. No attached TUI triggers a 15-second idle grace; an attached TUI can remain connected for up to two hours before the owner shuts down. The scheduler's session mutex and task execution remain held during this lease to forbid a second writer; the saved `.result.json` is written when the host exits. Flutter reports scheduled-turn completion from the owner while connected and falls back to the verified persisted job outcome after cleanup.
+A Codex process opened independently before Continuum is **not** attachable, mirrorable or transferable in this version. Native terminal mode is different: it launches an ordinary interactive CLI as the execution owner, rather than attaching a client to a Shared owner. Background is noninteractive `exec --json`. Only Background supports optional quota continuation.
 
-Remaining limitations: interactive native rendering and question/approval routing require separate signed-in Windows acceptance. A TUI session still open after the two-hour safety bound will lose its server and should close cleanly. No live Codex CLI is run by mock/CI verification.
+## Local transport and permissions
+
+The server binds to `127.0.0.1`, with a random capability token whose SHA-256 verifier appears in server arguments. The raw remote token is passed through the authenticated pipe and native child's environment, not normal snapshots or arguments. The pipe's separate secret is stored in a transient descriptor; do not publish it. These mechanisms are not isolation from a malicious process running as the same Windows user.
+
+Pending requests are validated for supported method and thread/turn identity. Approvals are explicit, with reviewable command/file context. The scheduler's per-session mutex stays with the owner. Multiple clients do not authorize independently competing execution owners or bypass Codex policy. Cross-surface native approvals remain an acceptance item, not a proven consequence of architecture.
+
+## Actual lifetime
+
+1. The scheduled owner resumes the saved thread and starts the saved instruction.
+2. `turn/completed` settles the scheduled turn and clears pending requests. The live snapshot reports completed/interrupted/failed.
+3. **Successful completion** can retain the server for attached native TUI leases. A 15-second idle grace applies with no leases; a two-hour maximum is measured from entering post-completion retention, not refreshed indefinitely by activity.
+4. The Windows worker and mutex remain active during retention; durable `*.result.json` is written when the host exits. Task Scheduler may therefore say Running while the scheduled turn is already completed.
+5. On cleanup the owner removes its descriptor/socket. Flutter uses the persisted outcome if the owner is no longer available.
+
+**Important limits:** the host's `onAppMessage` returns after `completed` is set. It does not continue mirroring later TUI turns or forwarding their requests. A retained client is not a fully accepted multi-turn monitoring service. The maximum retention timeout can disconnect an open TUI, including later work; clean native exit is unverified. Failure/server-loss handling after first completion also needs further acceptance. No indefinite daemon is promised.
+
+## Evidence and remaining acceptance
+
+The first real disposable task produced `NATIVE TERMINAL TEST COMPLETE`, but its old server died at completion and the TUI reconnected. BP206 recorded completed/exit 0 with no descriptor. This is historical defect evidence, not a passing lifecycle demonstration.
+
+The lease/fallback fix is merged and Windows mock/build CI passed on `6cd11c6`; BP207 launched. No repeat fixed-binary post-completion TUI pass or dual-surface approval pass was supplied before the pause. BP201 backend and BP202 capability passes do not fill these gaps. Follow [Windows acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md) only after renewed explicit authorization for live Codex tests.

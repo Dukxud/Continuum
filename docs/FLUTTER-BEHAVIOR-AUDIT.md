@@ -1,3 +1,7 @@
+ > **Historical Flutter behavior audit:** evidence from the earlier port candidate. For merged `main` and Shared sessions, use [current acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md). Keep original evidence below for traceability.
+
+> **Historical Flutter behavior audit:** evidence from its original development candidate. For merged `main` and Shared sessions, see [current acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md). This file is retained for traceability.
+
 # Flutter ↔ WinForms v1.16 behavioral parity audit
 
 **Baseline:** original WinForms `main`/v1.16 contracts. **Candidate:** PR #17 draft Flutter Windows port. The original PowerShell worker is unchanged. A test passing on a different commit does not certify the current candidate.

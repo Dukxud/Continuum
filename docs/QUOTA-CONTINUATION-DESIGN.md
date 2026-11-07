@@ -1,6 +1,6 @@
 # Opt-in quota continuation — architecture, detailed design, acceptance
 
-Status: implementation candidate for draft PR #17. Owner authorized implementation on 4 Nov 2026. No merge or publication authorization.
+Status: This bounded implementation merged into `main` through PR #17 on 6 Nov 2026. The Flutter preview remains unsigned; native Windows quota-continuation acceptance and production release authorization are separate.
 
 ## Architecture and decision
 

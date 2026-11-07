@@ -1,93 +1,52 @@
-# Flutter Windows Scheduler port — parity candidate
+# Continuum Flutter Windows developer guide
 
-The Flutter interface now uses the **original approved Windows/Aero v1.16 source
-pixels and GL optical program** (adapted to Flutter FragmentProgram coordinates
-and premultiplied alpha), with an original-pixel fallback. It preserves the
-v1.16 barAppearance settings, four independent colors, custom RGB choices,
-liquid material and studio lighting, optical strength/speed, full/compact
-window resizing, completed/history details and the existing secured worker.
-The appearance dialog separates Colors and Optics into two visible tabs.
-Each tab previews changes immediately; edits persist automatically, and
-Done closes the editor without an additional Save action.
+**Current source: `main`; development paused.** The baseline includes Flutter foundation #17, Shared owner #18, accepted native icon #21 and reported quota windows #22. Read [current state](../docs/CURRENT-STATE.md) before resuming. The historical public v1.11.0 release is not this Flutter app.
 
-**Do not merge or publish from this branch.** Code and test coverage have been
-authored and passed in earlier builds, but renewed native visual, sizing,
-accessibility and real scheduling/cancellation acceptance on BLACK-PUDDLE
-are required for this revision. See docs/FLUTTER-PARITY.md.
+## Implemented boundaries
 
-## Scheduled execution: native terminal or background
+Flutter supplies Full/Monitor/Micro windows, pinning, date/time entry, history and appearance. `windows_bridge.ps1` validates JSON and delegates Windows operations; `CodexRunEngine.ps1` and immutable runtime snapshots own unattended execution. The GUI is not a replacement worker. macOS/Linux/web execution remains unimplemented.
 
-New Flutter schedules default to **Native terminal**, which resumes the
-original Codex conversation in a real console with the configured model,
-permissions, reasoning effort and saved instruction. Codex itself owns the
-interactive UI; questions and approvals can be answered there. The existing
-session-level mutex, account/workspace binding, repository branch check and
-quota validation remain in effect. Terminal jobs still use one Windows Task
-Scheduler action and remain Running until the console's Codex process exits.
+Background uses noninteractive execution and optional bounded quota-only continuation. Native terminal launches the ordinary CLI TUI. Shared owns one App Server and allows authenticated native TUI clients; it cannot take over an arbitrary preexisting CLI. Post-completion retention does not make the GUI a continuous multi-turn observer. [Shared details](../docs/SHARED-NATIVE-TUI.md).
 
-Windows must have a signed-in interactive desktop. The scheduled launcher
-opens PowerShell 7 with a visible console, which follows the configured
-Windows default terminal application (including Windows Terminal if selected).
-Closing the Codex TUI exits the run; Windows records **Finished** rather than
-claiming the requested work is verified complete. The conversation's normal
-Codex history is the authoritative source of its responses.
+All modes display actual returned quota windows. The same presentation handles Plus or Pro: singleton Weekly, singleton five-hour, two windows, unfamiliar labels and honest empty/error states. Appearance follows meaning, not list index. No scheduling/account policy changed. [Contract](../docs/QUOTA-PRESENTATION.md).
 
-**Background** preserves the existing noninteractive `codex exec --json`
-worker, machine-readable event stream and bounded quota auto-continuation.
-The auto-continuation switch is unavailable in Native terminal mode. Existing
-scheduled payloads without `executionMode` continue as background jobs.
+## Requirements and bounded local review
 
-This does **not** attach to a running hidden `exec` process or allow two
-independent clients to write the same conversation simultaneously. A thread
-still open in another Codex app must release its writer before the scheduled
-resume can own it. The shared App Server multi-client design remains
-experimental and is not substituted for these safety checks.
+Windows x64, standard PowerShell 7 installation, Node/Git/npm Codex for runtime; Flutter and Visual Studio C++ desktop workload for builds. CI used Flutter 3.47.9 and Node 22. Actual future CLI compatibility must be verified rather than assumed from the earlier 0.166.0 native test.
 
-## Quota auto-resume — optional and bounded
+From a complete checkout with `flutter.bat` on PATH:
 
-The **Auto-resume if usage limits stop Codex** switch in the handoff is off by
-default. When enabled for a **new** scheduled run, the pinned Windows worker may
-register one new continuation at the verified exhausted-model reset + 60 seconds.
-It keeps the session, account, Git repository, branch, model and permissions,
-and refuses automatic continuation on generic errors or missing thread data.
-Each continuation counts toward a hard maximum of **three** follow-ups.
-**Waiting for quota** appears in the pending list and can be cancelled.
-WinForms and existing jobs retain their original one-shot semantics; old
-`autoResume` fields alone do not activate this feature.
+```powershell
+node --test tests/shared-codex-session.test.mjs tests/shared-codex-remote.test.mjs
+if($LASTEXITCODE -ne 0){throw 'Mock tests failed'}
+pwsh -NoProfile -STA -File .\flutter_port\Run-WindowsReview.ps1 -TestsOnly
+if($LASTEXITCODE -ne 0){throw 'Windows/Flutter checks failed'}
+```
 
-This is a Windows Task Scheduler feature, not a Codex CLI flag. It requires an
-interactive signed-in Windows desktop at execution time. It does not retry
-indefinitely or guarantee quota becomes available. See
-[`docs/QUOTA-CONTINUATION-DESIGN.md`](../docs/QUOTA-CONTINUATION-DESIGN.md).
+Without `-TestsOnly`, the review script also launches the debug GUI. It checks source/bridge, generates the runner, installs the pinned icon, resolves dependencies, analyzes and tests once. Mock checks do not run real Codex tasks; startup GUI metadata/usage queries are distinct from a model turn.
 
-## Run (Windows review)
+## Build and exact output
 
-1. Install Flutter stable (3.47+), Visual Studio C++ desktop toolchain,
-   PowerShell 7, Node, Git and npm Codex CLI.
-2. Clone/fast-forward branch feat/flutter-windows-review-v0.
-3. Run from the checkout:
+```powershell
+pwsh -NoProfile -STA -File .\flutter_port\Build-WindowsPreview.ps1 -OutputDirectory "$HOME\Downloads\Continuum-Main"
+if($LASTEXITCODE -ne 0){throw 'Build failed'}
+$p=Join-Path $HOME 'Downloads\Continuum-Main\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe'
+if(!(Test-Path -LiteralPath $p -PathType Leaf)){throw 'Executable missing'}
+Start-Process -FilePath $p -WorkingDirectory (Split-Path -Parent $p)
+```
 
-    pwsh -NoProfile -STA -File .\flutter_port\Run-WindowsReview.ps1
+This outputs a complete folder and ZIP, not a signed installer. It refuses existing destinations; choose a unique output for another review. The package retains Flutter runtime, workers, bridge, components and `SHA256SUMS.txt`; every manifest entry is checked after extracting the produced ZIP. `-PackageVerifiedBuild` is reserved for isolated Actions builds.
 
-The bounded command runs a PowerShell source/asset integrity check, Flutter
-dependency resolution, Dart analyzer and Flutter tests **once**, then starts
-the native Windows desktop GUI. A failed check stops launch; no CI loop.
+The latest already-built preview is **BP211**, not a newly compiled documentation version:
 
-## Standalone unsigned local engineering preview
+```text
+%USERPROFILE%\Downloads\Continuum-BP211-QuotaFix\Unpacked\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe
+```
 
-    pwsh -NoProfile -STA -File .\flutter_port\Build-WindowsPreview.ps1
+## Native icon and test entrypoints
 
-The script builds an unsigned release-mode Flutter executable and copies the
-**original pinned worker sources and required components** beside the executable.
-The archive is written under Downloads. It does not publish a GitHub release,
-disable antivirus or change existing scheduled jobs.
+Generated `windows/runner` files are not the branding authority. After `flutter create`, `scripts/Install-WindowsIcon.ps1` copies checked-in `branding/continuum.ico` and validates the resource reference. Both local launch/build paths and Flutter preflight CI apply it before compilation. `tests/flutter-windows-icon.test.ps1` verifies the generated resource and compiled EXE; actual Micro title-bar acceptance was supplied for BP210.
 
-## Platform boundary
+`test/quota_windows_test.dart` covers returned-window rendering with in-memory adapters; `test/window_mode_test.dart` and `test/widget_test.dart` retain cross-view/error coverage. No live task is needed for the quota visual check. Node Shared protocol tests use a fake App Server. See [acceptance ledger](../docs/CONTINUUM-WINDOWS-ACCEPTANCE.md) for what is still pending rather than treating a green build as universal acceptance.
 
-Flutter UI, appearance model and optical renderer are cross-platform.
-The Windows bridge still uses Task Scheduler, Windows PowerShell paths and
-Codex's npm entrypoint. macOS/Linux/web workers are **not implemented**;
-neither a Flutter build nor Windows parity establishes those capabilities.
-
-Read and follow the acceptance matrix before treating the port as complete:
-docs/FLUTTER-PARITY.md.
+Every future candidate must include a copy-paste download/open command, exact path/SHA and stated test scope. No merge, live Codex invocation or release without renewed authorization. [Release policy](../docs/RELEASE-POLICY.md).

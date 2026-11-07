@@ -1,9 +1,14 @@
 # Release and preview policy
 
-- Production release publication is disabled until explicit authorization and trusted publisher signing exist. The consolidated PR deletes the release job; the main branch workflow is manual-dispatch only, making its older push-only release job unreachable.
-- The workflow is not automatically triggered by pushes, pull requests or merges. It can be invoked manually only if the user later authorizes it.
-- Preview packaging remains available through scripts/Package-CodexScheduler.ps1, scripts/Package-AeroComponent.ps1 and scripts/Package-ReusableComponents.ps1 using their Preview switches. Preview archives must disclose that they are unsigned.
-- SHA-256 manifests verify package content; they are not publisher signatures.
-- A production release requires a trusted signing certificate in the release environment, a timestamp service, signature validation, direct Windows acceptance, antivirus checks, and explicit publication authorization. Nothing automatically creates a release.
-- Do not disable Bitdefender or broadly exclude program files to make a preview work.
-- Weight Trajectory may adopt the selective window, progress, and fallback modules. It must not adopt SettingsStore for durable measurements; that module has no revision or transaction contract and treats corrupt JSON as absent.
+**Paused on 6 Nov 2026.** The owner authorized the quota merge and documentation closeout, not public publication. [CURRENT-STATE.md](CURRENT-STATE.md) records the exact baseline.
+
+- The latest published release checked at closeout is [v1.11.0](https://github.com/Dukxud/codex-resume-scheduler/releases/tag/v1.11.0), the older WinForms ZIP. It is not the current Flutter Continuum executable.
+- BP211 is the latest recorded unsigned application preview. Its Windows checks passed, but a preview archive, source merge, icon and checksum manifest do not establish publisher authenticity or every native test.
+- `.github/workflows/flutter-port-preflight.yml` runs for matching pull requests to `main`; the Shared protocol workflow has its own feature-branch push/manual triggers. An arbitrary `main` push is not a promise of a fresh executable. No workflow activity here is permission to publish a release.
+- `Build-WindowsPreview.ps1` builds/verifies a complete Flutter release-mode ZIP/folder, installs the pinned icon after runner generation, preserves worker files, and refuses existing destinations. CI prevalidated-package mode is restricted to Actions.
+- Artifact retention is finite. BP211's recorded artifact expiry is 14 Nov 2026 at 02:13 UTC. Source/build instructions must remain usable after a preview link expires. Do not repurpose the historical release as a download for the current app.
+- Production publication requires renewed owner authorization, consistent version numbers, trusted signing/timestamping, signature checks, antivirus review, native acceptance, release notes, accessible complete artifacts and a rollback plan. Current `VERSION`, pubspec and folder labels are development identifiers, not a new public release.
+- Never disable antivirus/SmartScreen globally or create broad exclusions to make an unsigned preview run. SHA-256 checks prove content integrity, not trust in a publisher.
+- Screenshots must show real, accurately captioned behavior. Historical failures and pre-quota-fix images cannot advertise BP211 success. [Screenshot rules](SCREENSHOTS.md).
+
+Distribution work and promotion are deferred. [Readiness assessment](DISTRIBUTION-READINESS.md) is a recorded backlog, not an active launch instruction.

@@ -1,105 +1,53 @@
-# Architecture — Codex Resume Scheduler v1.16.0
+# Continuum architecture
 
-## Design boundaries
+**Current authority:** merged `main`; [pause/baseline record](CURRENT-STATE.md). The older WinForms architecture is preserved separately in [history](history/ARCHITECTURE-WINFORMS.md).
 
-There are two layers:
+## Runtime boundaries
 
-**Reusable infrastructure** (each folder imports independently, no Codex imports):
-- components/AeroProgress: offline WebView2 renderer with a small explicit state contract; host owns fallback and persistence.
-- components/Countdown: pure time formatting and elapsed fraction.
-- components/SettingsStore: atomic JSON read/write; does not define settings schema.
-- components/RuntimeBundle: immutable content-addressed worker file copies and fingerprint verification.
-- components/OneTimeTasks: platform task registration, validation, rollback and cancellation; executable and arguments are caller-owned.
-- components/WindowShell: general-purpose WinForms window, labels and buttons.
-- components/ProgressHost: renderer-neutral fallback, positioning and paired-control disposal.
-- components/FlowingProgress: independently reusable WPF glossy progress bar with caller-provided colors and state; CodexFlowingBar is only a theme adapter.
-- components/GitRepository: independent read-only Git root and branch checks.
-- components/JobOutcomes: durable state distinction between completed, deferred, blocked, failed and cancelled, built on SettingsStore.
+```text
+Flutter desktop UI
+  -> WindowsSchedulerAdapter (JSON subprocess boundary)
+  -> flutter_port/windows_bridge.ps1
+  -> Windows Task Scheduler + immutable worker snapshot
+  -> CodexRunEngine.ps1 (identity/repository/model/quota/mutex checks)
+       Background: codex exec --json
+       Native: ordinary Codex CLI TUI
+       Shared: one App Server + authenticated local clients
+```
 
-**Application-specific adapters**:
-- CodexResumeScheduler.ps1 — thin entrypoint: worker mode or GUI mode.
-- CodexRunEngine.ps1 — Codex model/catalog validation, one-shot CLI session continuation, quota preflight, and pinned runtime contract.
-- CodexData.ps1 — local session, Git, pending task and UI-settings facade.
-- CodexUsage.js — official App Server protocol reads for account identity, model catalog, and quota preflight.
-- CodexUiForms.ps1 — WinForms layout through reusable WindowShell primitives.
-- CodexUiSelection.ps1 — conversation selection and repository evidence decisions.
-- CodexUiPending.ps1 — scheduled-run queue presentation and indexing.
-- CodexUiUsage.ps1 — short-lived quota-process and snapshot presentation.
-- CodexUiHistory.ps1 — user-visible persisted run outcomes.
-- CodexJobStore.ps1 — read-only payload/history discovery that excludes result records from repository searches.
-- CodexUiState.ps1 — explicit, separately owned selection, usage, preferences, dashboard and asynchronous-dispatch contexts; reusable modules do not import this.
-- CodexUiRefresh.ps1 — coalesced background-operation dispatcher, delegating to the selection, pending and usage controllers.
-- CodexUiActions.ps1 — user actions, autosave and task creation.
-- CodexUiLifecycle.ps1 — window startup/shutdown and resource cleanup.
-- CodexDashboard.ps1 — standard/compact presentation and countdown display.
-- CodexAeroBar.ps1 — scheduler-specific colors, WebView2/WPF fallback and disposal.
-- CodexBarAppearance.ps1 — transactional appearance editor.
-- CodexFlowingBar.ps1 — Codex-specific color/theme adapter to the independent native WPF FlowingProgress module.
+| Layer | Source | Responsibility |
+| --- | --- | --- |
+| Application/window | `flutter_port/lib/main.dart`, `desktop_window.dart` | Full/Monitor/Micro, native window size/pin/close coordination |
+| State/adapter | `scheduler_controller.dart`, `bridge.dart` | Refresh, draft state, JSON calls; not a duplicate unattended worker |
+| Quota display | `dashboard_monitor.dart`, `dashboard_frame.dart`, `dashboard_micro.dart` | Actual window labels/counts and values, neutral empty states, shared Full/Monitor rendering |
+| Windows boundary | `flutter_port/windows_bridge.ps1` | Validate request, persist/register/cancel/query jobs, shared status and terminal actions |
+| Metadata/usage | `CodexUsage.js`, session/repository readers | Codex-supported account/model/rate/thread metadata; no prompt just to refresh quota |
+| Worker | `CodexRunEngine.ps1`, `CodexQuotaContinuation.ps1`, `CodexTerminalRun.ps1` | Pinned execution checks, original conversation, bounded retry, durable result |
+| Shared session | `components/SharedCodexSession/{main,host,remote,client,protocol}.mjs` | One App Server, pipe authentication, remote TUI credentials, requests and scheduled-turn lifecycle |
+| Generic services | `components/RuntimeBundle`, `OneTimeTasks`, `GitRepository`, `JobOutcomes`, `SettingsStore` | Independently scoped persistence/validation/infrastructure |
 
-## Contract and data flow
+## Quota data is not position or subscription tier
 
-1. **UI launch**: Start-Codex-Scheduler.vbs starts CodexResumeScheduler.ps1 with no terminal. The entrypoint loads app-specific adapters and then the GUI. No scheduled worker code requires a WinForms window.
-2. **Discovery**: CodexUiRefresh owns one refresh coordinator for sessions, Windows tasks and Codex quota. It asynchronously dispatches separate readers and coalesces duplicates; task-state checks run every two seconds while full refreshes run every minute, after focus resumes, or after scheduling. CodexUsage.js communicates through the documented App Server handshake. UI state is updated on the WinForms thread.
-3. **Scheduling**: CodexUiActions validates model, reasoning effort, Git root, branch, access and requested time. Every scheduled run requires a trustworthy selected-workspace identity. It calls RuntimeBundle to snapshot its exact worker dependencies, writes task metadata containing that fingerprint, and uses OneTimeTasks to register and re-read the task definition.
-4. **Worker launch**: Task Scheduler invokes the exact saved CodexRunJob.vbs inside the fingerprinted runtime, which launches the thin entrypoint in job mode. The worker checks the saved fingerprint **before** executing Codex and then verifies the repository, branch, model and effort.
-5. **Codex execution**: The worker rechecks the canonical workspace identity and quota, launches the saved session at most once, and writes a transcript plus JSONL events. Only successful CLI execution returns 0; blocked or failed runs return nonzero.
-6. **One-shot contract**: New workers never schedule retries. Previously scheduled tasks keep their own pinned runtime and may retain older retry behavior; historical deferred outcomes remain readable.
-7. **Rendering**: AeroProgress owns the WebView2 view; CodexAeroBar is the host adapter that translates quota/countdown colors and recovers a failed view with WPF. The dashboard positions the *visible surface* on every scroll, resize, refresh and countdown tick, then destroys the view and fallback together.
+The usage reader selects a model-attributed bucket, normalizes primary/secondary windows and labels their reported duration. The presentation uses the returned list directly. Weekly can be the only or first window. No `Plus`/`Pro` special case was introduced; the same code renders a singleton or pair. This does not change permissions, quota enforcement or continuation eligibility. [Exact contract](QUOTA-PRESENTATION.md).
 
-## Reuse contract
+## Execution and persistence
 
-Other projects import modules from components/ directly. They should not dot-source the Codex UI adapters or depend on their global variables. Calling applications supply paths, task names, timestamps, state, and any domain validation. A standalone ZIP contains all public components and excludes Codex code entirely. See components/README.md for examples.
+The bridge registers one-time Windows tasks. Jobs retain their original immutable content-addressed runtime; upgrades do not rewrite existing jobs. The worker validates the pinned runtime, Git root/branch, selected workspace/model/effort, available quota and per-conversation scheduler mutex before execution. The mutex prevents competing scheduler workers, not every independently launched Codex process.
 
-The copied runtime is content-addressed to prevent accidental later updates. It is **not immutable to a malicious same-user process**: task metadata and runtime copies both live under the user profile. Module signatures, external packaging integrity and local OS protections remain separate security concerns.
+Local state lives under `%LOCALAPPDATA%\CodexResumeScheduler`: settings, saved job JSON, runtime snapshots, result records and references to transcripts. `*.result.json` distinguishes completed, finished, failed, blocked, deferred and cancelled. Settings and logs may contain private data. Closing the UI or pausing development does not cancel registered tasks.
 
-## Verification boundaries
+Only Background mode supports explicit, off-by-default quota-only continuation, capped at three follow-ups with verified reset/account/model evidence. Native and Shared do not silently inherit it. [Design](QUOTA-CONTINUATION-DESIGN.md).
 
-Static tests cover protocol normalization, ambiguous quotas, malformed settings, single-execution behavior, module contracts and manifest integrity. Windows integration tests launch the VBS entrypoint, WinForms/WPF and WebView2 controls, verify screenshots/animation and check the actual worker's exit code. They do not prove live Codex CLI execution, Task Scheduler reliability on BLACK-PUDDLE, account switching, or antivirus outcomes; those require end-to-end validation on the target device.
+## Shared owner lifetime
 
-## Upgrade behavior
+Continuum starts the owner for the saved conversation. GUI clients use its authenticated named pipe; a user-requested native TUI is a remote client of the same authenticated loopback App Server. This is not attachment to an arbitrary already-running CLI.
 
-New tasks use a separate fingerprinted runtime folder. Older tasks retain their original Windows Task Scheduler action and code copy; there is no automatic rewrite. Cancel and reschedule tasks to opt into the pinned worker. Existing source-based previews may use a different unsigned launcher, and successful CI is not a publisher signature.
+After the scheduled turn completes successfully, native TUI leases can retain the server. No lease triggers a 15-second grace; retention is capped at two hours. The worker/mutex remains held, and durable job result is written when the host exits. Flutter reads the live scheduled-turn status or falls back to the durable result after cleanup.
 
-## Adversarial clean-code pass
+**Important limit:** `onAppMessage` stops processing after the scheduled turn is completed. Retaining a TUI is not full multi-turn GUI mirroring. Future-turn approvals, server loss after completion and cap expiry during later work require review/native tests. [Shared contract](SHARED-NATIVE-TUI.md).
 
-The standalone worker no longer imports CodexData or references UI globals; its Git and account checks are explicit imports. The UI has a declared state owner grouped by responsibility rather than dozens of unowned script variables. ProgressHost owns the primary/fallback lifecycle, and the dashboard allocates one bar per **visible row**, never per queued task. `account/read.workspaceRouting.chatgptAccountId` provides experimental, workspace-specific identity if a rate-limit account ID is absent. Both paths use the same canonical hash, and contradictory IDs fail closed. Email-only identity is never accepted; two workspaces sharing an email must not be conflated.
+## Build and native icon
 
-Historical retry records remain `deferred`, not `completed`; current jobs do not create deferred follow-up tasks. Removing an upcoming task unregisters it and records `cancelled`, while logs are retained for audit. Existing work may still be interrupted by Windows sign-out or sleeping, and real hardware/antivirus behavior remains outside CI.
+`Build-WindowsPreview.ps1` and `Run-WindowsReview.ps1` generate the Windows runner, then install the checked-in `flutter_port/branding/continuum.ico` via `scripts/Install-WindowsIcon.ps1` before compilation. The release package includes runtime, workers, bridge and manifest, not just the EXE. The icon has native Micro screenshot acceptance in BP210. Its former warning-triangle substitution was not diagnosed by the equal extracted EXE hashes.
 
-## v1.16 adversarial acceptance
-
-All scheduled runs bind to a hashed backend-selected workspace ID (experimental workspaceRouting or rate-limit accountId), checked again just before execution. Email-only, missing and contradictory IDs always fail closed. No raw workspace identifiers or emails are written to job metadata.
-
-Run-history files (`*.result.json`) are parsed independently of pending job payloads (`*.json`); the former never displace repository evidence. Deferred outcomes retain the next scheduled task name. The UI displays completion, failure, blocking, deferral and cancellation statuses, including malformed records. Countdown updates use a prebuilt index rather than scanning the entire pending queue for each row.
-
-The WebView2 module loads its native SDK by explicit path, leaves process `PATH` untouched, and retries dependency checks after failures. ProgressHost owns fallback controls without claiming caller `Control.Tag`.
-
-The second-app test exercises all ten component imports, while separate acceptance cases invoke generic scheduling operations and test real, packaged WebGL2 rendering with no Codex code. CI cannot establish real account operations, Bitdefender response or Windows Task Scheduler behavior on BLACK-PUDDLE.
-
-## Application-state responsibility contracts
-
-`CodexUiState.ps1` constructs the application-only context. The context is deliberately **not** a reusable module. It carries only state needed to coordinate application-specific controllers; consumers of the ten `components/` modules never import it.
-
-- **Selection** owns conversations, repository alternatives, model catalog, efforts, and the single Schedule-button eligibility policy. Eligibility requires a supported model/effort, a matching quota snapshot received within 120 seconds with no in-progress or queued quota refresh, and a verified workspace identity. Usage reports freshness to the selection controller; it never independently enables the button. An empty catalog or failed usage read blocks scheduling.
-- **Usage** owns the short-lived query process, quota snapshots, and refresh state, through `CodexUiUsage.ps1`.
-- **Async** owns coalesced background jobs and queued requests. `CodexUiRefresh.ps1` is the only user-facing refresh coordinator; scoped task/model changes delegate to asynchronous readers without duplicate timers or direct UI calls.
-- **Dashboard** owns visual controls, the pending run snapshot and its keyed index. `CodexUiPending.ps1` publishes the index and `CodexDashboard.ps1` renders only visible progress bars.
-- **Preferences** owns saved drafts and appearance configuration; event actions and lifecycle compose these controllers, rather than becoming reusable infrastructure.
-
-Source-level dependency checks and isolated model-controller test sources document the intended boundaries. Shared WinForms control objects in the application-specific presentation remain an intentional Windows desktop orchestration detail, **not** an exported component contract.
-
-One-time task creation normalizes explicitly UTC timestamps to local Windows trigger times, rejects ambiguous/nonexistent daylight-saving local timestamps, and records real outcomes. Countdown arithmetic uses UTC instants even when timestamps are shown in local time.
-
-## Current adversarial source-level corrections
-
-Browse invalidation now targets the Async controller's work queue. The native WPF fallback path registers owned bars and supports in-place palette changes through a named template fill, while the reusable FlowingProgress module stores values without modifying caller Tag data. CodexData now receives the application directory explicitly, and scheduling acknowledges validated registration independently of later preference or refresh errors.
-
-Historical source-only reviews are archived in ADVERSARIAL-SOURCE-REVIEW.md. Current acceptance is tracked separately: both manual GitHub Actions and BLACK-PUDDLE execute the same complete test inventory through `scripts/Invoke-LocalAcceptance.ps1`.
-
-## Adopter-interface hardening and release boundary
-
-AeroProgress does not use adopter-owned WinForms Control.Tag. It owns asynchronous renderer readiness, failure, target progress, and color privately with a weak-key control-lifetime mapping. Get-AeroProgressViewStatus exposes a read-only snapshot; Set-AeroProgressViewState remains the state-update API. The Codex adapter owns its separate quota/time metadata and checks the renderer's status through its exported API before recovering to WPF. Other applications can use their own Tag values.
-
-The SettingsStore component is a single-writer preferences helper, intentionally not a database. Corrupt and missing JSON are indistinguishable to its read API; it offers no transactional revision control. The adopting Weight Trajectory application must keep measurement persistence independent.
-
-PR #16 consolidates the older stacked PRs. Release publishing is removed from the candidate workflow, and a manual-only trigger on main disables the older push-only release logic until the merge. Signing and real Windows acceptance remain separate gates. See WINDOWS-ACCEPTANCE.md and RELEASE-POLICY.md. No CI validation was used for this source-level hardening.
+Flutter UI portability is not worker portability: macOS/Linux/web task execution is unimplemented. This is an unsigned Windows engineering preview, not a production release. [Security](SECURITY-AND-PRIVACY.md) and [release policy](RELEASE-POLICY.md).
