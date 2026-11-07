@@ -89,7 +89,6 @@ extension _DashboardFrame on _SchedulerHomeState {
   Widget _compactDeck() {
     final state = controller!;
     final runs = state.upcoming;
-    final windows = state.quotaWindows;
     return DeckAtmosphere(child: SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(18, 17, 18, 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -124,17 +123,7 @@ extension _DashboardFrame on _SchedulerHomeState {
               color: DeckColor.subtle, fontSize: 10)),
         ]),
         const SizedBox(height: 9),
-        SizedBox(height: 133, child: _capacityCard(
-          window: windows.isNotEmpty ? windows.first : null,
-          label: 'Five-hour', kind: 'quota', accent: DeckColor.mint,
-          top: const Color(0xff17443f), bottom: const Color(0xff172a3a),
-          error: state.error)),
-        const SizedBox(height: 11),
-        SizedBox(height: 133, child: _capacityCard(
-          window: windows.length > 1 ? windows[1] : null,
-          label: 'Weekly', kind: 'weekly', accent: DeckColor.iris,
-          top: const Color(0xff382956), bottom: const Color(0xff242440),
-          error: state.error)),
+        ..._capacityCards(state, spacing: 11),
         if (runs.isNotEmpty) ...[
           const SizedBox(height: 17),
           const DeckOverline('NEXT IN FLIGHT', color: DeckColor.gold),
