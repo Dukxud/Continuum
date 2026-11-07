@@ -1,36 +1,24 @@
-# Distribution readiness and adoption (6 Nov 2026)
+# Distribution and adoption readiness
 
-## Current factual state
+**Dated assessment, 6 Nov 2026; deferred during the project pause.** [CURRENT-STATE.md](CURRENT-STATE.md) governs restart. No release, marketing, telemetry or outreach is authorized by this document.
 
-- Repository visibility: **public** at [Dukxud/codex-resume-scheduler](https://github.com/Dukxud/codex-resume-scheduler).
-- The repository was created **27 Oct 2026**, less than two weeks before this review. Its public metadata had **no topics, no homepage, zero stars and zero forks** when inspected on 6 Nov 2026; GitHub's repository description still led with the older "usage resets" scheduler framing, not Flutter/Shared native TUI.
-- `main` contains merged Flutter Continuum foundation and Shared native TUI integration (PRs #17 and #18).
-- The [latest public GitHub Release](https://github.com/Dukxud/codex-resume-scheduler/releases/latest), **v1.11.0**, is the **older PowerShell/WinForms ZIP**, not the Flutter desktop app. Its release asset is a ZIP, not a signed Continuum installer.
-- The current Flutter product has a Windows CI **unsigned preview** and a source build script. CI artifacts have limited retention and are not beginner-friendly install downloads.
-- Until this documentation pass, the root README led visitors directly to the legacy release, said "no executable is supplied", and mainly described WinForms. There was no real screenshot gallery in the repository.
-- The last published release assets displayed low download counts (single digits per asset, as observed 6 Nov 2026). **Download counts do not equal distinct installs or users**, include repeat/self-downloads, and do not establish zero users. This project has no reported in-app adoption telemetry.
+## Observed evidence, not a user count
 
-**Conclusion:** Public source availability is **not** equivalent to discoverable, low-friction product distribution. A person seeking Continuum today would have to understand Flutter/PowerShell/Node prerequisites, select an unsigned build, and trust a developer-preview install. A lack of known users under those conditions is unsurprising; attributing it to product quality would be speculation.
+The repository is public and was created on 27 Oct 2026. At the earlier 6 Nov documentation audit it had no topics/homepage and zero stars/forks. Release asset counters were single-digit; the latest v1.11.0 ZIP showed three downloads at closeout. These are dated GitHub observations, not unique-user or active-installation counts. Self/repeat downloads are possible. The repository does not establish that nobody has used the product.
 
-## Audience and value proposition
+The latest public release is the earlier WinForms application. Current Continuum Flutter requires a source toolchain or an expiring unsigned engineering artifact. The prior README led visitors to the old release and said no EXE was supplied; the updated docs now distinguish the products and provide the executable path. Lack of known adoption under that installation/discovery friction is not evidence of product quality in either direction.
 
-Target: **Windows users of npm Codex CLI** who want to choose an existing conversation, safely schedule the next instruction, see quota context, and optionally interact with the same conversation through a native TUI plus a monitoring window. Differentiators: **three execution modes**, one owner for Shared, Task Scheduler without a persistent GUI service, pinned worker integrity, and deliberately bounded quota continuation.
+## Current value and boundaries
 
-Do **not** market as: automatic quota bypass, a multi-user cloud product, official OpenAI/Codex, "attaches to any already-running Codex process", general background auto-agent, or a stable cross-platform release.
+Continuum schedules saved Codex conversations on Windows with three execution modes, retained results, model-specific quota context and optional Shared native TUI clients. Plus and Pro share response-driven quota presentation; no plan-specific bypass exists. It is an independent community project, not an official OpenAI product, cloud executor, unlimited-usage service, cross-platform scheduler or arbitrary live-terminal attachment tool.
 
-## Public launch blockers (ordered)
+## Deferred launch sequence
 
-1. **Native acceptance:** Retest fixed Shared TUI lifetime after scheduled-turn completion; dual-surface approvals/questions and native lifecycle, with sanitized screenshots.
-2. **Package trust:** Trusted code signing, timestamp, AV/SmartScreen validation. SHA-256 manifests are integrity checks, not trust signatures.
-3. **Distributable build:** An accessible, versioned Windows installer or ZIP with predictable binary path and full pinned runtime. No surprise GitHub artifact expiry, no confusing historical release as "latest" for new users.
-4. **First-use experience:** Install/readme screenshots, concise 60-second scenario, stable default working directory, error reporting and a direct issue-report path.
-5. **Product support:** Compatibility table for supported Codex CLI version(s), reproducible known limitations, changelog, bug/feature labels, release notes and a rollback path.
-6. **Discoverability:** Clear public repo name/description/topics/homepage, screenshot hero, link to releases, user-focused demo and targeted feedback requests. Do not purchase promotion or claim adoption on unverified metrics.
+1. Complete outstanding native quota and Shared lifecycle/approval acceptance. Merge authorization alone does not supply those results.
+2. Resolve versioning, sign and timestamp complete Windows packages, validate antivirus behavior and build provenance.
+3. Provide a stable, authorized public download and simple install/open flow instead of temporary CI links.
+4. Capture clean current screenshots and a focused first-use example; preserve accurate history of defects.
+5. Provide compatibility/known-limit notes, reproducible issue reporting and rollback instructions.
+6. With explicit launch approval, update discoverability metadata and invite a small external feedback group.
 
-## What to measure *without* invasive telemetry
-
-GitHub clone/page/release download metrics (where available), unique external bug reports, successful setup reports, reproducible acceptance logs and voluntary opt-in feedback. These are imperfect indicators. Do not equate release downloads to unique active installations. Ask trial users whether they could install, schedule once, open native terminal, and recover from a failed run.
-
-## Launch policy
-
-This file is a **readiness assessment**, not authorization to publish a production release, change repository marketing metadata, instrument users, create a public signed installer, or run Codex. See [Release policy](RELEASE-POLICY.md).
+Measure voluntary setup reports, reproducible external issues and available GitHub traffic/download indicators without pretending they equal unique active users. No invasive telemetry is needed for this pause. [Release policy](RELEASE-POLICY.md).

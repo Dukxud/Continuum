@@ -1,41 +1,30 @@
-# Contributing to Continuum
+# Contributing and restart discipline
 
-## Project status
+**Project paused by the owner.** Start with [CURRENT-STATE.md](CURRENT-STATE.md); do not continue feature work, run model turns, merge another PR or publish automatically. `main` is authoritative, including the accepted icon and quota correction.
 
-`main` is the merged Flutter Continuum baseline (PR #17 foundation, PR #18 Shared native TUI). The historical WinForms implementation and its independently reusable PowerShell modules remain in the repository; the old [v1.11 release](https://github.com/Dukxud/codex-resume-scheduler/releases/latest) is **not** the current Flutter binary.
+## Scope and ownership
 
-Work on an isolated branch with a narrow PR. **Never merge without the maintainer's explicit authorization.** Do not publish a release or change code-signing expectations as part of a documentation/feature PR.
+Keep changes narrow and reviewable. Flutter owns presentation/windowing; the JSON bridge and pinned worker own Windows scheduling/authorization/outcomes. Shared has one execution owner with authenticated clients; do not introduce a second writer. Plus/Pro labels come from returned window data, not guesses about tier or array position. Keep generic components separate from application orchestration. Do not erase historical evidence or represent a merge as a native pass.
 
-## Development safety
+## Verification when work is authorized again
 
-- Source formatting, Node mock protocol tests, PowerShell syntax/bridge tests, Flutter analysis/widget tests and Windows **builds** are permitted by the standard development gate.
-- Do **not** invoke live Codex turns or approvals as an automatic test. A test requiring actual Codex must state the task, expected cost/permissions, and ask the operator to authorize it.
-- Do not replay a real saved conversation, grant YOLO, or alter an existing Windows Task Scheduler task just to make tests green.
-- No infinite CI loop. Bound test retries and report failure IDs. Native acceptance on BLACK-PUDDLE precedes certification of actual Windows behavior.
-
-## Local checks (PowerShell 7, checkout on Windows)
+From a complete checkout in PowerShell 7:
 
 ```powershell
 node --test tests/shared-codex-session.test.mjs tests/shared-codex-remote.test.mjs
-pwsh -NoProfile -File .\tests\flutter-port-source.test.ps1
-pwsh -NoProfile -STA -File .\tests\flutter-port-bridge.test.ps1
+if($LASTEXITCODE -ne 0){throw 'Shared mock tests failed'}
 pwsh -NoProfile -STA -File .\flutter_port\Run-WindowsReview.ps1 -TestsOnly
+if($LASTEXITCODE -ne 0){throw 'Windows/Flutter checks failed'}
 ```
 
-For full reproducible source-level validation of legacy WinForms modules, consult [historical Windows acceptance](WINDOWS-ACCEPTANCE.md); it is **not** a substitute for current Flutter-native acceptance.
+The review script runs source/bridge checks, runner generation with pinned icon, dependencies, analysis and tests once. The package builder adds release compilation and integrity verification. Never turn a failing gate into an unbounded retry/poll loop. Inspect actual failed evidence, fix its cause and record a bounded retest.
 
-## Architecture constraints
+Node mocks and in-memory Flutter quota fixtures do not launch live Codex turns. Actual account/CLI interactions require explicit operator authorization. Do not replay private work, schedule jobs, or enable YOLO as incidental verification. On-device acceptance is a separate [checklist](CONTINUUM-WINDOWS-ACCEPTANCE.md).
 
-- Flutter owns presentation/windowing; Windows PowerShell bridge validates inputs and orchestrates Windows Task Scheduler.
-- Pinned PowerShell worker owns unattended execution and durable outcomes; no GUI-owned timer replaces Windows Task Scheduler.
-- Shared mode owns **one** App Server; TUI windows are authenticated viewers, never an independent writer. Pre-turn approvals, permission escalation and cross-thread requests must fail closed.
-- Keep modules small, separable and meaningful. Do not introduce duplicated workers, globals or magic retries.
-- Keep code-level claims aligned with implementation; distinguish **build/mocks** from **real Codex Windows acceptance**.
+## Delivery and documentation
 
-## Docs and screenshot contribution
+Every reviewable Windows build must include the exact artifact/run/SHA, a copy-paste download/open command, the full executable path and what that command will execute. Preserve previous preview folders. Do not clone new source then call an old EXE a new build. Provide expected observations and distinguish missing evidence from failures.
 
-Document exact tested commit, required OS/CLI version, access, expected vs observed behavior, and a non-sensitive screenshot. Use the [screenshot guide](SCREENSHOTS.md) and [capture script](../scripts/Capture-ContinuumScreenshot.ps1). Screenshots **must be reviewed/redacted before uploading**; they often contain session IDs, file paths, usage percentages, private prompts or secrets. Never advertise a historical pre-fix capture as current passing behavior.
+Update current state, affected contracts and QA evidence with each accepted change; historical reviews remain labeled as historical. Screenshots must be real, privacy-reviewed and captioned by build/outcome. The optional [capture helper](../scripts/Capture-ContinuumScreenshot.ps1) saves private local files and is not automatically run/uploaded. Its native capture behavior still needs operator validation.
 
-## Submit feedback
-
-Use [Issues](https://github.com/Dukxud/codex-resume-scheduler/issues) with reproducible steps, a pinned SHA, source vs package distinction, and sanitized evidence. Include no user secrets or raw terminal session files.
+Open issues with sanitized reproducible evidence, not tokens, raw session IDs or private transcripts. No merge without explicit authorization; no publication as a side effect of cleanup.

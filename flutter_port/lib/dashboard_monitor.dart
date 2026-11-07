@@ -1,9 +1,18 @@
 part of 'main.dart';
 
+// CodexUsage derives these labels from the reported window duration. Array
+// position and subscription tier never establish a window's meaning.
+String _quotaWindowLabel(Map<String, dynamic> window) {
+  final label = stringField(window, 'label').trim();
+  return label.isEmpty ? 'Usage' : label;
+}
+
+String _quotaWindowKind(Map<String, dynamic> window) =>
+  _quotaWindowLabel(window).toLowerCase() == 'weekly' ? 'weekly' : 'quota';
+
 /// Quotas and queued work have their own visual language and actions.
 extension _DashboardMonitor on _SchedulerHomeState {
   Widget _monitorColumn(SchedulerController state) {
-    final windows = state.quotaWindows;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
         const DeckBeacon(color: DeckColor.mint),
@@ -17,57 +26,66 @@ extension _DashboardMonitor on _SchedulerHomeState {
               color: DeckColor.aqua)),
       ]),
       const SizedBox(height: 12),
-      SizedBox(height: 133, child: _capacityCard(
-        window: windows.isNotEmpty ? windows[0] : null,
-        label: 'Five-hour', kind: 'quota',
-        accent: DeckColor.mint,
-        top: const Color(0xff17443f),
-        bottom: const Color(0xff172a3a),
-        error: state.error,
-      )),
-      const SizedBox(height: 13),
-      SizedBox(height: 133, child: _capacityCard(
-        window: windows.length > 1 ? windows[1] : null,
-        label: 'Weekly', kind: 'weekly',
-        accent: DeckColor.iris,
-        top: const Color(0xff382956),
-        bottom: const Color(0xff242440),
-        error: state.error,
-      )),
+      ..._capacityCards(state),
       const SizedBox(height: 17),
       Expanded(child: _queueCard(state)),
     ]);
   }
 
-  Widget _capacityCard({
-    required Map<String, dynamic>? window,
-    required String label,
-    required String kind,
-    required Color accent,
-    required Color top,
-    required Color bottom,
-    required String? error,
-  }) {
+  // Full and Monitor use the same list. An absent secondary window is not a
+  // second empty card; zero returned windows is a neutral status, not a plan.
+  List<Widget> _capacityCards(SchedulerController state, {double spacing = 13}) {
+    final windows = state.quotaWindows;
+    if (windows.isEmpty) return [_quotaEmptyNotice(state)];
+    return [
+      for (var i = 0; i < windows.length; i++) ...[
+        if (i > 0) SizedBox(height: spacing),
+        SizedBox(key: Key('capacity-window-$i'), height: 133,
+          child: _capacityCard(windows[i], state)),
+      ],
+    ];
+  }
+
+  Widget _quotaEmptyNotice(SchedulerController state) {
+    final message = state.readingUsage ? 'Reading usage…'
+      : state.error?.startsWith('Usage unavailable:') == true
+        ? 'Usage unavailable · automatic retry'
+        : state.quota == null ? 'Usage unavailable'
+        : 'No usage windows reported';
+    return Padding(
+      key: const Key('quota-empty-state'),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Text(message, textAlign: TextAlign.center,
+        maxLines: 2, overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: DeckColor.muted, fontSize: 10.5)),
+    );
+  }
+
+  Widget _capacityCard(Map<String, dynamic> window, SchedulerController state) {
+    final kind = _quotaWindowKind(window);
+    final weekly = kind == 'weekly';
+    final accent = weekly ? DeckColor.iris : DeckColor.mint;
     final raw = field(window, 'remainingPercent');
-    final remaining = raw is num ? raw.toDouble() : null;
+    final remaining = raw is num && raw.isFinite ? raw.toDouble() : null;
     final resetRaw = field(window, 'resetsAt');
-    final reset = resetRaw is num && resetRaw > 0
+    final reset = resetRaw is num && resetRaw.isFinite && resetRaw > 0
       ? DateTime.fromMillisecondsSinceEpoch(resetRaw.toInt() * 1000) : null;
-    final title = stringField(window, 'label').isNotEmpty
-      ? stringField(window, 'label') : label;
-    final note = window == null && error?.startsWith('Usage unavailable:') == true
-      ? 'Usage unavailable · automatic retry'
-      : reset == null ? 'Reset time unavailable'
+    final title = _quotaWindowLabel(window);
+    final note = reset == null ? 'Reset time unavailable'
       : 'Resets ' + formatLocalDateTime(reset);
     return DeckSurface(
-      top: top, bottom: bottom, accent: accent,
+      top: weekly ? const Color(0xff382956) : const Color(0xff17443f),
+      bottom: weekly ? const Color(0xff242440) : const Color(0xff172a3a),
+      accent: accent,
       radius: 19,
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 13),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-          Expanded(child: Text(title.toUpperCase(),
-            style: TextStyle(color: accent, fontSize: 11,
-              fontWeight: FontWeight.w800, letterSpacing: 1.35))),
+          Expanded(child: Tooltip(message: title,
+            child: Text(title.toUpperCase(), maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: accent, fontSize: 11,
+                fontWeight: FontWeight.w800, letterSpacing: 1.35)))),
           Text(remaining == null ? '—' : remaining.toStringAsFixed(1) + '%',
             style: const TextStyle(fontWeight: FontWeight.w900,
               color: DeckColor.text, fontSize: 34, height: 1)),
@@ -77,7 +95,7 @@ extension _DashboardMonitor on _SchedulerHomeState {
           style: TextStyle(color: DeckColor.muted, fontSize: 9,
             letterSpacing: 1.6, fontWeight: FontWeight.w700)),
         const Spacer(),
-        AeroLiquidBar(amount: remaining, appearance: controller!.appearance,
+        AeroLiquidBar(amount: remaining, appearance: state.appearance,
           kind: kind, height: 16),
         const SizedBox(height: 9),
         Text(note, maxLines: 1, overflow: TextOverflow.ellipsis,
@@ -150,7 +168,7 @@ extension _DashboardMonitor on _SchedulerHomeState {
       const SizedBox(height: 3),
       const Text('Your next launch will appear here.',
         textAlign: TextAlign.center,
-        style: TextStyle(color: DeckColor.muted, fontSize: 11)),
+        style: const TextStyle(color: DeckColor.muted, fontSize: 11)),
     ]),
   );
 

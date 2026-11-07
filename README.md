@@ -1,91 +1,65 @@
 # Continuum — Codex Resume Scheduler
 
-**Schedule an existing Codex conversation to resume later, monitor its activity, and optionally open its native terminal.** A Windows desktop utility powered by Windows Task Scheduler, built with Flutter.
+Schedule a saved Codex conversation on Windows, monitor its usage and job status, and optionally open the real Codex terminal on a Shared execution owner.
 
-**Status: open-source engineering preview, not a signed public release.** The current code lives on [main](https://github.com/Dukxud/codex-resume-scheduler/tree/main). This is an independent community project, **not an OpenAI product**.
+**Engineering preview. Development is paused at the owner's request.** `main` is the retained baseline, with the native icon fix and response-driven quota display merged. Start with **[current state and restart handoff](docs/CURRENT-STATE.md)** for commits, verification boundaries and the exact executable location. This is an independent community project, not an OpenAI product.
 
-> **Download distinction:** The [latest GitHub Release](https://github.com/Dukxud/codex-resume-scheduler/releases/latest) is the **older PowerShell/WinForms application (v1.11.0)**. It is **not** the current Continuum Flutter executable. For Continuum, build from `main` as shown below. Prebuilt CI artifacts are unsigned, short-lived engineering previews and must not be presented as signed installers.
+## What is included
 
-## What you can do
+Full, Monitor and Micro windows; native Always on Top; customizable Aero-inspired bars; manual scheduling and saved drafts; pinned worker/runtime integrity; account/model/repository checks; history/results; and three execution modes:
 
-- Resume a saved Codex CLI conversation at a chosen local time, in its Git checkout, with selected model, reasoning effort, and permissions.
-- See model-specific usage windows and reset information from Codex's App Server. The app does **not** promise that a displayed reset means access is restored.
-- Choose **Background**, **Native terminal**, or **Shared session** execution (see comparison below).
-- Monitor scheduled jobs and inspect retained results; prevent competing *scheduler-owned* executions against the same Codex session.
-- Use Full, Monitor, or Micro windows, optional Always on Top, and customizable Aero-inspired bars.
-- Optionally allow bounded, verified **quota-only** continuation for new **Background** jobs. No general-purpose infinite retry loop.
+| Mode | Execution owner / interaction | Quota-only continuation |
+| --- | --- | --- |
+| Background | Pinned noninteractive worker; structured logs/results | Optional, off by default, up to three eligible follow-ups |
+| Native terminal | Ordinary Codex CLI TUI owns the interactive run | No |
+| Shared session | One App Server; Continuum panel plus optional native remote TUI client | No |
 
-## Screenshots
+Shared attaches only to a session **started by Continuum**, not any independently running Codex process. Successful scheduled completion can retain an attached TUI with a 15-second no-viewer grace and two-hour cap. Later TUI turns are not continuously mirrored by the current host. Retained live attachment and simultaneous approvals still have pending native tests. [Full Shared contract](docs/SHARED-NATIVE-TUI.md).
 
-The [screenshot gallery and capture protocol](docs/SCREENSHOTS.md) includes **real Windows evidence**, explicitly tagged by build/date and outcome. The existing November 6 capture documents the **original shared-terminal lifecycle defect**, **not** an accepted release screenshot. Fresh, privacy-reviewed hero screenshots are still needed before marketing or a public release.
+## Plus and Pro: same display implementation
 
-## Three execution modes
+Continuum renders the usage windows Codex actually returns for the selected account/model. A five-hour and Weekly response gives two rows; Weekly alone gives one WEEKLY row. Unknown/blank data is not an invented plan limit or unlimited usage. Labels, remaining percentages and resets stay together in Full, Monitor and Micro. **There is no Pro-only patch or subscription-tier switch.** [Quota contract and evidence](docs/QUOTA-PRESENTATION.md).
 
-| Mode | Who owns execution? | What you see | On closing the terminal | Quota-only auto-continuation |
-| --- | --- | --- | --- | --- |
-| **Background** | Pinned scheduled noninteractive worker | Logs and saved results | Not applicable | **Optional**, off by default |
-| **Native terminal** | Codex CLI in a real terminal | Real Codex TUI with native interaction | Native session ends; outcome is recorded as **Finished**, not proof of task success | No |
-| **Shared session** | One scheduled Codex App Server | Continuum live panel **and** optional **Open Codex Terminal** TUI client | Detaches the viewer; execution owner can remain | No |
+## Open the latest recorded preview
 
-**Shared is not "attach to any Codex process".** It only attaches to shared sessions *started by Continuum*. If Codex is already running independently, do not attempt to have Continuum take over its active turn. The single-conversation safety boundary remains in effect. [Details and limitations](docs/SHARED-NATIVE-TUI.md).
-
-The Shared owner retains the server after scheduled-turn completion while an attached terminal remains open, with a 15-second no-viewer idle grace and a two-hour maximum attachment lifetime. A GUI snapshot falls back to the persisted result after owner shutdown. This behavior has mock/CI coverage; signed-in Windows acceptance of the latest lifecycle fix and simultaneous approvals is **not yet complete**.
-
-## Install and open the current Continuum preview (Windows)
-
-**Requirements:** Windows 10/11 x64 and a signed-in desktop; [PowerShell 7](https://learn.microsoft.com/powershell/); [Node.js](https://nodejs.org/); [Git](https://git-scm.com/); [Codex CLI installed with npm](https://github.com/openai/codex) and signed in. **Building** also requires [Flutter stable](https://docs.flutter.dev/get-started/install/windows/desktop) and the Visual Studio **Desktop development with C++** workload. An installation of the Codex CLI does not confer any particular model access.
-
-In PowerShell 7:
+BP211 includes both the accepted icon and quota correction. After following its download/extraction instructions, reopen it with PowerShell 7:
 
 ```powershell
-git clone --branch main --single-branch https://github.com/Dukxud/codex-resume-scheduler.git "$HOME\source\continuum"
-cd "$HOME\source\continuum"
+$p=Join-Path $HOME 'Downloads\Continuum-BP211-QuotaFix\Unpacked\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe'
+if(!(Test-Path -LiteralPath $p -PathType Leaf)){throw 'BP211 not found; use the source build instructions below.'}
+Start-Process -FilePath $p -WorkingDirectory (Split-Path -Parent $p)
+```
+
+The path is literal and version-specific; merging source/docs does not update an installed EXE. Keep its DLLs, `data`, bridge and workers beside it. Opening the app can query Codex metadata/usage but does not schedule a model turn. [Artifact/run/hash and expiry](docs/CURRENT-STATE.md).
+
+**Download distinction:** [v1.11.0](https://github.com/Dukxud/codex-resume-scheduler/releases/tag/v1.11.0), still the latest published release at closeout, is the **older WinForms ZIP**, not current Flutter Continuum. CI previews are unsigned and expire. No new public production release is authorized during the pause.
+
+## Build from source when needed
+
+Runtime prerequisites: Windows x64 and signed-in desktop, PowerShell 7 in its standard installation, Node, Git and npm Codex installed/signed in. Building additionally needs Flutter and Visual Studio's Desktop development with C++ workload. The pinned CI baseline uses Flutter 3.47.9, Node 22 and Windows 2022; this is build evidence, not a promise every future CLI/SDK version is compatible.
+
+From PowerShell 7, with `flutter.bat` on PATH:
+
+```powershell
+$ErrorActionPreference='Stop'
+$repo=Join-Path $HOME 'source\continuum'
+if(Test-Path -LiteralPath $repo){throw 'Checkout already exists; inspect it before updating, or choose another path.'}
+git clone --branch main --single-branch https://github.com/Dukxud/codex-resume-scheduler.git $repo
+if($LASTEXITCODE -ne 0){throw 'Clone failed'}
+Set-Location -LiteralPath $repo
 pwsh -NoProfile -STA -File .\flutter_port\Build-WindowsPreview.ps1 -OutputDirectory "$HOME\Downloads\Continuum-Main"
-& "$HOME\Downloads\Continuum-Main\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe"
+if($LASTEXITCODE -ne 0){throw 'Build failed; no preview launched'}
+$p=Join-Path $HOME 'Downloads\Continuum-Main\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe'
+if(!(Test-Path -LiteralPath $p -PathType Leaf)){throw 'Built executable missing'}
+Start-Process -FilePath $p -WorkingDirectory (Split-Path -Parent $p)
 ```
 
-**Exact executable after that build:** `%USERPROFILE%\Downloads\Continuum-Main\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe`. Keep the accompanying `data`, DLLs, worker modules, and scripts beside it. Do **not** move the EXE by itself. The build refuses to overwrite an existing review package; choose another output directory when rebuilding.
+The builder refuses existing output packages; choose a fresh output directory for a new build. A source clone alone is not a compiled preview. [Developer commands](flutter_port/README.md).
 
-For a one-command **source-level development review** (tests then desktop launch), see [Flutter development instructions](flutter_port/README.md). To review CI binaries, download the artifact for the **exact tested commit** from [GitHub Actions](https://github.com/Dukxud/codex-resume-scheduler/actions); artifacts expire and are **not** an official release.
+## Documentation and evidence
 
-## First scheduled run
+[Documentation index](docs/README.md) · [User guide](docs/USER-GUIDE.md) · [Architecture](docs/ARCHITECTURE.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Security](docs/SECURITY-AND-PRIVACY.md) · [Windows acceptance](docs/CONTINUUM-WINDOWS-ACCEPTANCE.md) · [Screenshots](docs/SCREENSHOTS.md) · [Contributing](docs/CONTRIBUTING.md) · [Release policy](docs/RELEASE-POLICY.md).
 
-1. Sign in to Codex CLI and ensure a saved conversation exists. Launch Continuum.
-2. Choose the **conversation**, verify the detected **Git repository**, and select the model, effort and access.
-3. Set the date and time, enter a concrete instruction, and choose an **execution mode**.
-4. Click **Schedule once**. Windows must be awake, online, and signed in when the job is due.
-5. For **Shared session**, open its running card and click **Open Codex Terminal** to attach a real TUI client. For **Native terminal**, Codex opens its own console.
+BP210's title-bar icon was visually accepted. BP211 passed Windows CI and all 47 package checksums; its live quota-display screenshot was not provided before pause. Original Shared task completion passed but exposed a disconnect defect; the fixed retained-terminal/dual-surface behavior still needs native acceptance. Merging at the owner's direction does not manufacture those missing results. Historical screenshots and reviews remain explicitly historical.
 
-**Safety:** Start with a disposable conversation and **Read-only** access. Never use unrestricted/YOLO access on untrusted work. A registered Windows task is not evidence that Codex completed its turn. [User guide](docs/USER-GUIDE.md) · [Security](docs/SECURITY-AND-PRIVACY.md) · [Troubleshooting](docs/TROUBLESHOOTING.md).
-
-## Documentation
-
-| Read this | Purpose |
-| --- | --- |
-| [Documentation index](docs/README.md) | Navigation, scope, historical references |
-| [User guide](docs/USER-GUIDE.md) | Scheduling, modes, monitoring, windows, quota and history |
-| [Shared session implementation](docs/SHARED-NATIVE-TUI.md) | Owner/viewer lifecycle, authority, limits and remaining acceptance |
-| [Architecture](docs/ARCHITECTURE.md) | Current Flutter/bridge/worker shape and legacy PowerShell modules |
-| [Windows acceptance](docs/CONTINUUM-WINDOWS-ACCEPTANCE.md) | Native test gate and exact expected behavior |
-| [Screenshots](docs/SCREENSHOTS.md) | Real evidence and capture checklist |
-| [Release policy](docs/RELEASE-POLICY.md) | Preview vs signed distribution |
-| [Contributing](docs/CONTRIBUTING.md) | Safe local tests and PR expectations |
-| [Reusable components](components/README.md) | Separately imported PowerShell modules |
-| [Older WinForms README](docs/LEGACY-WINFORMS-README.md) | Preserved historical documentation only |
-
-## Developer verification
-
-```powershell
-node --test tests/shared-codex-session.test.mjs tests/shared-codex-remote.test.mjs
-pwsh -NoProfile -File .\tests\flutter-port-source.test.ps1
-pwsh -NoProfile -STA -File .\tests\flutter-port-bridge.test.ps1
-pwsh -NoProfile -STA -File .\flutter_port\Run-WindowsReview.ps1 -TestsOnly
-```
-
-These checks verify protocol mocks, source, bridge, and Flutter tests. **They do not prove live Codex TUI attachment or target-machine acceptance.** Do not run live Codex integration tests without the operator's explicit authorization. The main branch was formed by merging [#17](https://github.com/Dukxud/codex-resume-scheduler/pull/17) and [#18](https://github.com/Dukxud/codex-resume-scheduler/pull/18) on November 6, 2026. The exact merge baseline was `15b32f74b0ea243e1e0bfa833ff33aa073c59089`.
-
-## Public availability and feedback
-
-This is a **public source repository**, not a polished installer. The current Flutter build requires a development toolchain or manual handling of an expiring unsigned CI artifact. [Report reproducible bugs or request features via GitHub Issues](https://github.com/Dukxud/codex-resume-scheduler/issues). Attach a sanitized screenshot, Windows version, exact commit, execution mode and observed result; **never** publish tokens, full terminal transcripts, repository secrets or session IDs.
-
-**License:** [MIT](LICENSE).
+Closing the GUI or pausing project development **does not cancel scheduled Windows tasks**. Do not disable antivirus, run unrestricted access, execute Codex, publish or expand scope as a side effect of this handoff. [MIT license](LICENSE).

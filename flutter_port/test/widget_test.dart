@@ -582,7 +582,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('usage failures show actionable feedback inside both cards',
+  testWidgets('usage failures show one actionable state without synthetic cards',
       (tester) async {
     tester.view.physicalSize = const Size(1240, 850);
     tester.view.devicePixelRatio = 1.0;
@@ -593,7 +593,9 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: SchedulerHome(
       adapter: StubAdapter(failUsage: true))));
     await tester.pump(const Duration(milliseconds: 150));
-    expect(find.text('Usage unavailable · automatic retry'), findsNWidgets(2));
+    expect(find.text('Usage unavailable · automatic retry'), findsOneWidget);
+    expect(find.text('5-HOUR'), findsNothing);
+    expect(find.text('WEEKLY'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

@@ -1,31 +1,27 @@
-# Continuum security and privacy
+# Security and privacy
 
-## Trust model
+**Scope:** current Windows Flutter preview, including Shared sessions, pinned icon and reported quota windows. Development is paused; see [CURRENT-STATE.md](CURRENT-STATE.md). Historical WinForms analysis remains in [SECURITY-REVIEW.md](SECURITY-REVIEW.md).
 
-Continuum is a locally running Windows Flutter interface over a PowerShell JSON bridge, scheduled pinned worker, and your already installed npm Codex CLI. **There is no Continuum cloud account or telemetry service in this repository.** Codex itself communicates with OpenAI according to its own account and configuration; Continuum does not mean "offline Codex."
+## Local trust and execution
 
-- Job settings and instruction text are written under `%LOCALAPPDATA%\CodexResumeScheduler`; **do not put secrets in prompts, paths or issue screenshots**.
-- Scheduled workers use immutable SHA-256-verified runtime snapshots; hashes detect unexpected file changes but **are not code-signing or protection from a malicious Windows account owner**.
-- The scheduler prevents duplicate **scheduler-owned** writers using a per-conversation Windows mutex. It cannot reliably detect or take over every separate interactive Codex process.
-- Workspace/account identity and model availability are verified before unattended execution; missing or contradictory evidence blocks execution.
-- **Read-only** limits intended write access; **Workspace-write** allows changes within the configured sandbox; **YOLO** disables sandboxing and approvals, potentially affecting files outside the checkout. Use a disposable Git repository for initial tests.
+Flutter delegates to the PowerShell JSON bridge and pinned scheduled worker. Codex uses the operator's installed CLI/account; a local scheduler does not make Codex offline. The application does not introduce a hosted Continuum account or an adoption telemetry service.
 
-## Shared native terminal
+Job instructions/preferences/results and runtime snapshots live under `%LOCALAPPDATA%\CodexResumeScheduler`; job JSON identifies transcript paths. These files may contain private prompts, paths or command output. Runtime SHA-256 checks detect changes but are not publisher signatures or protection against the same Windows user deliberately modifying both metadata and files.
 
-The Shared host starts a single App Server bound to `127.0.0.1`. The connection uses a random capability token; a SHA-256 verifier is supplied to the server. Continuum's named-pipe protocol requires its own per-job secret. Native TUI credentials are sent only over the authenticated named-pipe connection, not written into public status snapshots or CLI arguments. Secrets can still be accessible to sufficiently privileged local processes.
+The worker verifies workspace identity, repository/branch, model/effort, quota and a per-conversation scheduler mutex. The mutex cannot detect/control every unrelated CLI instance. Do not schedule a thread already actively owned elsewhere. Read-only/workspace-write/unrestricted modes retain their actual Codex permission boundaries; unrestricted/YOLO can affect files outside the checkout and must never be used merely to bypass a failing test.
 
-A native TUI is a **client of the existing owner**, not a second executor. It does not grant an independent unattended permission mode or a way to bypass Codex approval policy. Authorization and approval-handling behavior must be validated against the installed Codex version, not merely inferred from mocks.
+## Shared credentials and lifecycle
 
-The server remains available while a TUI lease is attached (max two hours after scheduled-turn completion). No viewer triggers 15 seconds of grace. This is bounded housekeeping, **not** a promise of indefinite background uptime.
+The server binds to loopback with a random capability token; only its SHA-256 verifier goes into server arguments. Raw token transfer uses the authenticated named pipe and native child's environment, not public snapshots. The pipe has its own secret in the transient `.shared.json` descriptor. Do not publish that file. Local privileged processes may still access credentials.
 
-## Binary provenance
+Supported approval methods and thread/turn identity are checked. Mock rejection tests are not proof that concurrent native/GUI questions and approvals work in practice. Post-completion retention applies to successful scheduled turns, with 15-second no-viewer grace and a two-hour cap; it is not an indefinite daemon. The host stops event processing after first completion, so later-turn mirroring/approval behavior and timeout during later work need separate review.
 
-- Current Continuum Flutter packages are **unsigned engineering previews**. A SHA-256 manifest checks content integrity **only**. It does not authenticate the publisher.
-- The latest published release currently corresponds to **legacy v1.11.0 WinForms**, not the merged Flutter baseline.
-- Do not recommend disabling antivirus or making broad exclusions to install a preview.
-- A public production build needs authorized code signing, timestamping, antivirus/SmartScreen review, native QA and a release process. [Release policy](RELEASE-POLICY.md).
-- The WebView2 and WPF security discussions in [historical security review](SECURITY-REVIEW.md) apply to the legacy renderer; the Flutter port uses its own assets/shader and Windows bridge.
+## Quota and binary presentation are not permissions
 
-## Reporting security issues
+PR #22 renders actual returned windows for either Plus or Pro. It does not alter authorization, model access, sandbox, quota checks or retries, and must not be used to infer unlimited usage. PR #21's branded icon is a visual identity, not a certificate or antivirus verdict.
 
-Avoid uploading `auth.json`, raw Codex session IDs, full transcripts, personal local paths or secrets. Provide a sanitized sample and the pinned commit. Use GitHub repository issue channels for nonsensitive bugs; do not include exploit details that would expose another user.
+## Distribution/reporting
+
+The current Flutter package is an unsigned engineering preview. `SHA256SUMS.txt` validates contents only. Public v1.11.0 is legacy WinForms. Signing, timestamping, antivirus review, native acceptance and publication authorization remain separate [release gates](RELEASE-POLICY.md).
+
+Use sanitized issue reports. Never attach `auth.json`, raw shared descriptors, tokens, session files or full private transcripts. The screenshot helper writes locally for review; it does not automatically redact or upload. No security software changes, scheduled-task cancellation or live Codex run is implied by this documentation closeout.

@@ -60,11 +60,11 @@ extension _DashboardMicro on _SchedulerHomeState {
             radius: 12, accent: DeckColor.aqua,
             padding: const EdgeInsets.fromLTRB(10, 4, 10, 4),
             child: Column(children: [
-              _microCapacity('5-HOUR', windows.isNotEmpty ? windows[0] : null,
-                'quota', DeckColor.mint, state),
-              const SizedBox(height: 4),
-              _microCapacity('WEEKLY', windows.length > 1 ? windows[1] : null,
-                'weekly', DeckColor.iris, state),
+              if (windows.isEmpty) _quotaEmptyNotice(state),
+              for (var i = 0; i < windows.length; i++) ...[
+                if (i > 0) const SizedBox(height: 4),
+                _microCapacity(windows[i], i, state),
+              ],
             ]),
           ),
           const SizedBox(height: 5),
@@ -96,8 +96,11 @@ extension _DashboardMicro on _SchedulerHomeState {
     ));
   }
 
-  Widget _microCapacity(String label, Map<String, dynamic>? window,
-      String kind, Color accent, SchedulerController state) {
+  Widget _microCapacity(Map<String, dynamic> window, int index,
+      SchedulerController state) {
+    final label = _quotaWindowLabel(window).toUpperCase();
+    final kind = _quotaWindowKind(window);
+    final accent = kind == 'weekly' ? DeckColor.iris : DeckColor.mint;
     final value = field(window, 'remainingPercent');
     final remaining = value is num && value.isFinite
       ? value.toDouble() : null;
@@ -109,11 +112,15 @@ extension _DashboardMicro on _SchedulerHomeState {
       ? 'RESET TIME UNAVAILABLE'
       : due ? 'RESETS ${formatDayMonth(resetAt)} · ${formatLocalClock(resetAt)}'
         : 'RESET DUE · AWAITING UPDATE';
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    return Column(key: Key('micro-window-$index'),
+      crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
-        SizedBox(width: 56, child: Text(label, maxLines: 1,
-          style: TextStyle(color: accent, fontSize: 9.5,
-            fontWeight: FontWeight.w800, letterSpacing: .5))),
+        SizedBox(width: 56, child: Tooltip(message: label,
+          child: FittedBox(fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(label, maxLines: 1,
+              style: TextStyle(color: accent, fontSize: 9.5,
+                fontWeight: FontWeight.w800, letterSpacing: .5))))),
         const SizedBox(width: 7),
         Expanded(child: exhausted
           ? Container(

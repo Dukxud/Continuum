@@ -83,6 +83,10 @@ jobs:
         working-directory: flutter_port
         run: flutter create --platforms=windows --project-name codex_resume_flutter .
 
+      - name: Pin Continuum native Windows icon
+        shell: pwsh
+        run: pwsh -NoProfile -File ./flutter_port/scripts/Install-WindowsIcon.ps1
+
       - name: Resolve dependencies
         shell: pwsh
         working-directory: flutter_port
@@ -120,6 +124,10 @@ jobs:
         shell: pwsh
         working-directory: flutter_port
         run: flutter build windows --release
+
+      - name: Verify compiled Continuum Windows icon
+        shell: pwsh
+        run: pwsh -NoProfile -File ./tests/flutter-windows-icon.test.ps1 -ExecutablePath ./flutter_port/build/windows/x64/runner/Release/codex_resume_flutter.exe
 
       - name: Package verified unsigned Windows preview
         shell: pwsh

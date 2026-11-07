@@ -1,66 +1,49 @@
-# Continuum user guide (Windows Flutter preview)
+# Continuum user guide
 
-## Before you schedule
+**Windows engineering preview; project paused.** [Current state and exact executable](CURRENT-STATE.md) are the starting point. The latest application preview is BP211. The public v1.11.0 release is legacy WinForms, not Continuum Flutter.
 
-1. Install Node.js, Git, PowerShell 7 and npm Codex CLI; sign in through Codex.
-2. Make sure there is a saved Codex conversation and a local Git checkout.
-3. Obtain and launch the **current Flutter preview** using the exact [root README build instructions](../README.md#install-and-open-the-current-continuum-preview-windows). The [public Release download](https://github.com/Dukxud/codex-resume-scheduler/releases/latest) is the older WinForms generation.
-4. Start with a **disposable conversation** and **Read-only** access until you know which execution mode you want.
+## Open and prepare
 
-Continuum is a **local scheduler**, not a hosted Codex account, a subscription bypass or a background cloud agent. It uses Windows Task Scheduler. The scheduled device must be available at execution time.
+Use the [root build/open instructions](../README.md) or the BP211 path in the handoff. Keep the complete package beside `codex_resume_flutter.exe`. Running it requires Windows x64, a signed-in desktop, PowerShell 7, Node, Git and npm Codex with a usable account. Building also requires Flutter and Visual Studio C++ tools.
 
-## Main window
+Start with a disposable saved Codex conversation and Git checkout. The app reads metadata and usage on startup; no model turn is submitted merely by opening the GUI. Do not schedule an independently active conversation for a second writer.
 
-- **Choose your thread:** Select a saved conversation. The app attempts a read-only repository lookup and allows an override. Check the Git root/branch before scheduling; a conversation can reference another checkout.
-- **Capacity / Live:** Usage is read from Codex App Server for the available model. Percentages and resets are informational and may be unavailable, stale, or ambiguous. Model and effort choices depend on the live catalog.
-- **Set the moment:** Pick local date/time, enter an instruction, choose access and execution mode, then **Schedule once**. Controls support manual time entry.
-- **Upcoming / Recent:** Upcoming shows pending/running tasks; Recent provides outcomes and logs. A countdown reaching zero is **not** proof the Codex turn ran.
-- **View / pin:** Switch Full, Monitor and Micro; optional Always on Top is a window setting, not an external PowerToys dependency. Appearance choices are separate and persist without a second save dialog.
+## Main workflow
 
-## Execution mode comparison
+1. **Choose your thread:** select a saved conversation; check the detected Git root and branch. Use Browse to correct the checkout rather than trusting ambiguous evidence.
+2. Choose a catalog-supported **model**, reasoning effort and access. Read-only is appropriate for initial tests. Workspace-write permits intended changes; unrestricted/YOLO disables important safeguards and requires explicit confirmation.
+3. In **Set the moment**, enter the local date/time and a concrete instruction. The time editor accepts typed input. Choose **Run in**, then **Schedule once**.
+4. Keep Windows awake, online and signed in when the task is due. A countdown reaching zero is not evidence Codex started.
+5. Click a running card for live activity, or use History for retained results. A scheduled task's result is not the same thing as a launched preview's result.
 
-| Mode | When to use it | Interaction | Completion meaning |
+## Execution modes
+
+| Mode | Execution owner | User interaction | Quota-only continuation |
 | --- | --- | --- | --- |
-| **Background** | Noninteractive continuation, logs, bounded quota retry | No live TUI; inspect history/log | Structured worker result reflects the verified exit/turn status |
-| **Native terminal** | You want Codex's ordinary interactive console to own the run | Native Codex questions/approvals in terminal | **Finished** means the terminal process exited; inspect the conversation for work completion |
-| **Shared session** | You want Continuum live monitoring plus an optional native terminal client | One App Server owner, optional TUI via **Open Codex Terminal**, pending requests in Continuum | Scheduled turn can report **Completed** while attached viewer keeps owner online for a bounded time |
+| Background | Pinned noninteractive worker | Logs and saved structured results | Optional, off by default, at most three eligible follow-ups |
+| Native terminal | Codex CLI in its terminal | Native TUI; terminal exit is `finished`, not work-success proof | No |
+| Shared session | One scheduled App Server | Continuum panel and optional native remote TUI client | No |
 
-A shared session **must be started by Continuum**. It does not discover, mirror or supplant a process already open in an unrelated Codex terminal. In particular, do not schedule a second writer against an actively used conversation. [Shared implementation](SHARED-NATIVE-TUI.md).
+For Shared, schedule a new Shared job, open its running card, then choose **Open Codex Terminal** while its owner is accessible. The client uses the original conversation; it cannot attach to arbitrary preexisting CLI processes. Successful scheduled completion may retain the owner while a client stays open, with a 15-second no-client grace and two-hour cap. The GUI's completed status concerns the scheduled turn, not arbitrary later TUI turns. See [Shared limits](SHARED-NATIVE-TUI.md).
 
-### Shared session step-by-step
+## Usage display — both Plus and Pro
 
-1. Schedule a new **Shared session** in a disposable conversation. Set Read-only unless you have an explicit need for write access.
-2. Wait for Windows Task Scheduler to start the job. Click its **running** card to open **Live activity**.
-3. Click **Open Codex Terminal** *while the owner is accessible*. This starts a **TUI client**, not a second App Server, not a second scheduled turn and not a fork.
-4. When the scheduled turn finishes, the host records **Completed**. With an attached terminal it can remain online; when no viewers are attached it has a 15-second grace. A two-hour maximum bounds a forgotten client. When the owner closes, the GUI uses the saved `.result.json` instead of a stale Running snapshot.
-5. Exit the native terminal when done; check **Recent runs** and conversation history to confirm what happened.
+All three views use the actual windows Codex reports for the selected model, **not a subscription name or list position**. Five-hour plus Weekly yields two correctly labeled rows; Weekly alone yields one WEEKLY row; other reported durations retain their labels. No missing second row is fabricated. Empty data is not unlimited usage. A failed read reports unavailable; a later successful read restores returned data.
 
-**Known QA boundary (6 Nov 2026):** The first native session test completed the intended 90-second command but exposed a server shutdown/reconnect defect. A lifecycle fix was merged with mocked/Windows build verification; a **repeat live acceptance and simultaneous approval/question test remain unverified**. See [acceptance gate](CONTINUUM-WINDOWS-ACCEPTANCE.md).
+Each label remains with its own remaining percentage/reset. Weekly styling follows that window even when it is first or alone. Micro retains exhaustion countdowns. Changing plan or switching view does not require a different app build. This is display support for both account types, not a guarantee of any plan's current limits. [Quota contract](QUOTA-PRESENTATION.md).
 
-### Background and quota-only continuation
+## Views, appearance and icon
 
-For **new Background** schedules, an off-by-default switch allows up to **three** quota-only follow-up tasks, and **only** if the worker observes an eligible, verified model-specific rate limit with a supported future reset. A generic error, unverified workspace, ambiguous reset, active writer, missing conversation or unrelated exception is **not** eligible. A deferred parent is **not** a successful completed turn. Automatic quota continuation is **not supported for Native or Shared**. [Policy details](QUOTA-CONTINUATION-DESIGN.md).
+View selects Full, Monitor or Micro. Pin controls native Always on Top. Appearance previews and persists color/optical choices without a second Save action. The Continuum icon is now pinned in Windows builds and was visually accepted in BP210 Micro. The quota patch removes absent rows but leaves native window dimensions unchanged; it is not an automatic window-shrinking feature.
 
-## Model, access and identity
+## Persistence and safety
 
-Models/efforts come from Codex, not from a hard-coded model whitelist. Access choices are **Read-only**, **Workspace-write**, and **unrestricted/YOLO**. YOLO may operate beyond the chosen repository without sandboxing or approval. Never enable it simply to make a test pass.
+Preferences, job files and pinned runtime snapshots are local under `%LOCALAPPDATA%\CodexResumeScheduler`. Job JSON supplies its transcript path; `*.result.json` supplies the outcome. Prompts and logs can contain private information. Do not upload raw `.shared.json`, transcripts or credentials.
 
-Before execution, a pinned worker checks account/workspace identity, repository, branch, runtime integrity, and applicable quota; if it cannot verify necessary facts, it blocks the job rather than guessing.
+Existing scheduled jobs retain their original runtime when the GUI is upgraded. Closing the GUI or pausing development does not cancel them. Cancellation of a future task is not termination of an already-running Codex process. Worker identity, branch, model and mutex checks remain authoritative.
 
-## Persistence and shutdown
+Quota-only continuation applies only to new opted-in Background tasks with eligible verified exhaustion/reset evidence, matching workspace/model and a readable original thread. It never treats a generic error as permission to retry. A deferred parent is not completed. [Detailed policy](QUOTA-CONTINUATION-DESIGN.md).
 
-- Scheduling writes local Windows tasks, job JSON and immutable runtime snapshots under `%LOCALAPPDATA%\CodexResumeScheduler`.
-- Recent outcome records use `*.result.json`; logs and Codex conversation files may contain private content.
-- Closing the GUI does **not** cancel already registered scheduled jobs.
-- In Native mode the terminal is the live interaction owner. In Shared mode the **server** is the scheduled owner; the attached TUI is a client. During an attached viewer lease, the Windows task/mutex can remain active even after the scheduled turn reports Completed.
-- Cancellation of a not-yet-started task is **not** equivalent to terminating a running Codex process. Verify actual state.
+## Acceptance boundary
 
-## Common questions
-
-**Can it connect to Codex I opened before launching Continuum?** No. The current Shared feature attaches only to a Shared job launched by Continuum.
-
-**What if the weekly limit is low?** Usage cards report Codex-provided state. They cannot grant more capacity. Only bounded Background continuation can automatically reschedule on an eligible verified reset.
-
-**Where is the EXE?** For the documented local build: `%USERPROFILE%\Downloads\Continuum-Main\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe`. Keep the whole extracted folder intact.
-
-**What if a terminal says "Reconnecting to server"?** Inspect whether the Shared owner is still online and whether its task has completed. The original lifecycle bug is documented; the latest fix needs a new manual acceptance test. [Troubleshooting](TROUBLESHOOTING.md).
+BP211 CI and package integrity passed; no post-fix live quota screenshot was supplied before pause. The Shared retention fix and simultaneous native/GUI approvals still require their separate tests. The owner authorized merging, not a declaration that every native scenario passed. Nothing further is required from the operator during the pause. [Future test checklist](CONTINUUM-WINDOWS-ACCEPTANCE.md).
