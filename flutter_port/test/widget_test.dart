@@ -662,7 +662,7 @@ void main() {
     expect(find.text('1 ACTIVE'), findsOneWidget);
     await tester.tap(find.text('Scheduled item 1'));
     await tester.pump();
-    expect(find.byKey(const Key('cancel-selected')), findsNothing);
+    expect(find.byKey(const Key('live-activity-dialog')), findsNothing);
     expect(find.text('Cancel selected'), findsOneWidget);
     await tester.tap(find.text('Cancel selected'));
     await tester.pump(const Duration(milliseconds: 150));
