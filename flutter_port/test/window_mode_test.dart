@@ -169,7 +169,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Micro restores saved topmost and shows live quota without scheduling',
+  testWidgets('Micro restores topmost and reports absent quota without scheduling',
       (tester) async {
     tester.view.physicalSize = const Size(392, 212);
     tester.view.devicePixelRatio = 1;
@@ -186,8 +186,9 @@ void main() {
     expect(host.modes, contains('micro:empty:quota:0'));
     expect(host.topmostCalls, [true]);
     expect(find.text('Micro monitor'), findsOneWidget);
-    expect(find.text('5-HOUR'), findsOneWidget);
-    expect(find.text('WEEKLY'), findsOneWidget);
+    expect(find.text('5-HOUR'), findsNothing);
+    expect(find.text('WEEKLY'), findsNothing);
+    expect(find.text('No usage windows reported'), findsOneWidget);
     expect(find.text('NO RUNS IN FLIGHT'), findsOneWidget);
     expect(find.text('Schedule once'), findsNothing);
     expect(find.text('Cancel selected'), findsNothing);
