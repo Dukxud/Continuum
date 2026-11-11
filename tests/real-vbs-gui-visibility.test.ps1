@@ -2,8 +2,8 @@
 # A running pwsh process is NOT sufficient; a hidden form caused the v1.10 regression.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$launcher = Join-Path $root 'Start-Codex-Scheduler.vbs'
-$before = @(Get-Process pwsh -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
+$launcher = Join-Path $root 'legacy/winforms/Start-Codex-Scheduler.vbs'
+$app = Join-Path $root 'legacy/winforms/CodexResumeScheduler.ps1'
 $testProfile=Join-Path ([IO.Path]::GetTempPath()) ('scheduler-vbs-test-'+[guid]::NewGuid().ToString('N'))
 [void](New-Item -ItemType Directory -Path $testProfile -Force)
 $startupLog=Join-Path $testProfile 'CodexResumeScheduler\gui-startup.log'
@@ -19,14 +19,16 @@ try {
     $start.UseShellExecute=$false
     $start.Environment['LOCALAPPDATA']=$testProfile
     $hostProcess=[Diagnostics.Process]::Start($start)
+    $launcherProcessId = $hostProcess.Id
     try {
         if (-not $hostProcess.WaitForExit(5000)) { throw 'VBS entrypoint did not return promptly.' }
         if ($hostProcess.ExitCode -ne 0) { throw "VBS entrypoint failed: $($hostProcess.ExitCode)" }
     } finally { $hostProcess.Dispose() }
     $found = $null
     for ($i = 0; $i -lt 80; $i++) {
-        $processes = @(Get-Process pwsh -ErrorAction SilentlyContinue |
-            Where-Object { $_.Id -notin $before })
+        $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $launcherProcessId" |
+            Where-Object { $_.Name -ieq 'pwsh.exe' -and ([string]$_.CommandLine).Contains($app) })
+        $processes = @($children | ForEach-Object { Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue })
         foreach ($p in $processes) {
             if ($started -notcontains $p.Id) { $started += $p.Id }
             $p.Refresh()
@@ -46,7 +48,10 @@ try {
     Write-Host "Visible application window from the real VBS launcher: $($found.MainWindowTitle)"
 } finally {
     foreach ($processId in $started) {
-        Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+        $child = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction SilentlyContinue
+        if ($child.ParentProcessId -eq $launcherProcessId -and ([string]$child.CommandLine).Contains($app)) {
+            Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+        }
     }
     if(Test-Path -LiteralPath $testProfile){Remove-Item -LiteralPath $testProfile -Recurse -Force -ErrorAction SilentlyContinue}
 }

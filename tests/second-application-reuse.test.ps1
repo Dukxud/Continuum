@@ -8,7 +8,7 @@ try {
     $app=Join-Path $temp 'UnrelatedDesktopApp'
     [void](New-Item -ItemType Directory -Path $app -Force)
     Copy-Item -LiteralPath (Join-Path $root 'components') -Destination $app -Recurse
-    if(Test-Path (Join-Path $app 'CodexRunEngine.ps1')){throw 'Independent application must not contain Codex code.'}
+    if(Test-Path (Join-Path $app 'src/backend/CodexRunEngine.ps1')){throw 'Independent application must not contain Codex code.'}
     foreach($name in @('Countdown','SettingsStore','RuntimeBundle','GitRepository','OneTimeTasks','JobOutcomes','WindowShell','ProgressHost','FlowingProgress','AeroProgress')){
         Import-Module (Join-Path $app "components/$name/$name.psd1") -Force -ErrorAction Stop
     }

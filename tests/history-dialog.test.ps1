@@ -4,8 +4,8 @@ $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
 Add-Type -AssemblyName System.Drawing -ErrorAction Stop
 $root=Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexJobStore.ps1')
-. (Join-Path $root 'CodexUiHistory.ps1')
+. (Join-Path $root 'src/backend/CodexJobStore.ps1')
+. (Join-Path $root 'legacy/winforms/CodexUiHistory.ps1')
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('history-dialog-' + [guid]::NewGuid().ToString('N'))
 [void](New-Item -Path $temp -ItemType Directory -Force)
 $owner=[System.Windows.Forms.Form]::new()

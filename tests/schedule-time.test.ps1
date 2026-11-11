@@ -1,7 +1,7 @@
 # Local time helpers: a near-term default must not drift after manual edits.
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexScheduleTime.ps1')
+. (Join-Path $root 'legacy/winforms/CodexScheduleTime.ps1')
 function Require($ok,[string]$message){if(-not $ok){throw $message}}
 $now=[datetime]'2026-11-02T17:50:15'
 $default=Get-CodexSuggestedRunTime -Now $now
@@ -20,9 +20,9 @@ Require ((Step-CodexScheduledRunTime -Time $expired -Direction 1 -Now ([datetime
 Require ((Step-CodexScheduledRunTime -Time ([datetime]'2026-11-02T17:51:00') -Direction 1 -Now ([datetime]'2026-11-02T17:50:45')) -eq [datetime]'2026-11-02T17:52:00') 'Plus must clamp a newly invalid value to the nearest allowed value.'
 Require ((Step-CodexScheduledRunTime -Time ([datetime]'2026-11-02T17:52:00') -Direction 1 -Now ([datetime]'2026-11-02T17:50:45')) -eq [datetime]'2026-11-02T17:53:00') 'Plus must still increment valid times normally.'
 Require ((Get-CodexEarliestRunTime -Now ([datetime]'2026-12-31T23:59:50')) -eq [datetime]'2027-01-01T00:01:00') 'Minimum must cross year boundary without choosing an invalid minute.'
-$actions=Get-Content -LiteralPath (Join-Path $root 'CodexUiActions.ps1') -Raw
-$forms=Get-Content -LiteralPath (Join-Path $root 'CodexUiForms.ps1') -Raw
-$lifecycle=Get-Content -LiteralPath (Join-Path $root 'CodexUiLifecycle.ps1') -Raw
+$actions=Get-Content -LiteralPath (Join-Path $root 'legacy/winforms/CodexUiActions.ps1') -Raw
+$forms=Get-Content -LiteralPath (Join-Path $root 'legacy/winforms/CodexUiForms.ps1') -Raw
+$lifecycle=Get-Content -LiteralPath (Join-Path $root 'legacy/winforms/CodexUiLifecycle.ps1') -Raw
 foreach($fragment in @('scheduleTimeEdited','scheduleTimeUpdating','Refresh-SuggestedRunTime','minusTime.Add_Click','plusTime.Add_Click')){
     Require ($actions.Contains($fragment)) "Time control wiring missing: $fragment"
 }

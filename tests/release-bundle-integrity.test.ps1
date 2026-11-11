@@ -35,15 +35,15 @@ try {
     if($actualFiles.Count -ne $checked){throw 'Extra files not inventoried in checksum manifest.'}
     if(-not (Test-Path (Join-Path $base 'UNSIGNED-REVIEW-ONLY.txt'))){throw 'Unsigned preview not labeled.'}
     if($zip -eq $one){
-      foreach($file in @('CodexResumeScheduler.ps1','CodexRunJob.vbs','CodexUiState.ps1','CodexUiHistory.ps1','CodexJobStore.ps1',
-        'CodexUiSelection.ps1','CodexUiPending.ps1','CodexUiUsage.ps1','CodexUiPixelTheme.ps1','CodexQuotaContinuation.ps1','CodexTerminalRun.ps1','components/AeroProgress/AeroProgress.psm1','tools/Get-SchedulerSecurityDiagnostics.ps1','docs/SECURITY-REVIEW.md','docs/ARCHITECTURE.md')){
+      foreach($file in @('src/backend/Invoke-CodexJob.ps1','legacy/winforms/Start-Codex-Scheduler.vbs','legacy/winforms/CodexResumeScheduler.ps1','src/backend/CodexRunJob.vbs','legacy/winforms/CodexUiState.ps1','legacy/winforms/CodexUiHistory.ps1','src/backend/CodexJobStore.ps1',
+        'legacy/winforms/CodexUiSelection.ps1','legacy/winforms/CodexUiPending.ps1','legacy/winforms/CodexUiUsage.ps1','legacy/winforms/CodexUiPixelTheme.ps1','src/backend/CodexQuotaContinuation.ps1','src/backend/CodexTerminalRun.ps1','components/AeroProgress/AeroProgress.psm1','tools/Get-SchedulerSecurityDiagnostics.ps1','docs/SECURITY-REVIEW.md','docs/ARCHITECTURE.md')){
         if(-not (Test-Path -LiteralPath (Join-Path $base $file))){throw "Missing scheduler release component: $file"}
       }
     }elseif($zip -eq $two){
       foreach($file in @('AeroProgress.psm1','AeroProgress.psd1','AeroBar.html','AeroWebView2/WebView2Loader.dll')){
         if(-not (Test-Path -LiteralPath (Join-Path $base $file))){throw "Missing reusable component: $file"}
       }
-      if(Test-Path (Join-Path $base 'CodexResumeScheduler.ps1')){throw 'Reusable component includes scheduler core.'}
+      if(Test-Path (Join-Path $base 'legacy/winforms/CodexResumeScheduler.ps1')){throw 'Reusable component includes scheduler core.'}
     }else{
       foreach($file in @(
         'components/README.md','components/AeroProgress/AeroProgress.psm1',
@@ -55,7 +55,7 @@ try {
         'components/AeroProgress/AeroWebView2/WebView2Loader.dll','components/AeroProgress/AeroBar.html')){
         if(-not (Test-Path -LiteralPath (Join-Path $base $file))){throw "Missing reusable module artifact: $file"}
       }
-      if(Test-Path (Join-Path $base 'CodexResumeScheduler.ps1')){throw 'Reusable kit must not contain Codex or UI runtime.'}
+      if(Test-Path (Join-Path $base 'legacy/winforms/CodexResumeScheduler.ps1')){throw 'Reusable kit must not contain Codex or UI runtime.'}
     }
     Write-Host "$([IO.Path]::GetFileName($zip)): $checked files independently verified."
   }

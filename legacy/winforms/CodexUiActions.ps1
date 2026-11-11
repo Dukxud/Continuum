@@ -185,7 +185,7 @@ $schedule.Add_Click({
         [void](New-Item -Path $appDir -ItemType Directory -Force)
         # Copy a self-contained, content-addressed runtime once. Future schedules
         # never overwrite the files used by an already registered task.
-        $runtime = Publish-ImmutableRuntime -SourceDirectory $PSScriptRoot -DestinationDirectory (Join-Path $appDir 'runtimes') -RelativeFiles (Get-CodexRuntimeFiles)
+        $runtime = Publish-ImmutableRuntime -SourceDirectory ([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))) -DestinationDirectory (Join-Path $appDir 'runtimes') -RelativeFiles (Get-CodexRuntimeFiles)
         $name = 'CodexResume-' + $when.ToString('yyyyMMdd-HHmm') + '-' + ([guid]::NewGuid().ToString('N').Substring(0,8))
         $jobFilePath = Join-Path $appDir ($name + '.json')
         $log = Join-Path $appDir ($name + '.log')
@@ -196,7 +196,7 @@ $schedule.Add_Click({
             accountId=$accountId
             runtimeFingerprint=$runtime.Fingerprint; log=$log
         } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $jobFilePath -Encoding utf8
-        $installedRunner = Join-Path $runtime.Directory 'CodexRunJob.vbs'
+        $installedRunner = Join-Path $runtime.Directory 'src/backend/CodexRunJob.vbs'
         $runnerArguments = Get-CodexTaskArguments $installedRunner $jobFilePath
         try {
             [void](Register-OneTimeTask -Name $name -At $when -Executable (Join-Path $env:WINDIR 'System32\wscript.exe') -Arguments $runnerArguments -WorkingDirectory $root -Description "Codex session $sessionId ($branch)")

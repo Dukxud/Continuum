@@ -20,19 +20,21 @@ $folder=Join-Path $tempRoot $name
 if(Test-Path $folder){Remove-Item -LiteralPath $folder -Recurse -Force}
 [void](New-Item -ItemType Directory -Path $folder -Force)
 $files=@(
- 'CodexResumeScheduler.ps1','CodexRunEngine.ps1','CodexUiForms.ps1',
- 'CodexUiRefresh.ps1','CodexUiSelection.ps1','CodexUiPending.ps1','CodexUiUsage.ps1',
- 'CodexUiActions.ps1','CodexUiLifecycle.ps1','CodexUiState.ps1',
- 'CodexUiHistory.ps1','CodexJobStore.ps1',
- 'CodexDashboard.ps1','CodexScheduleTime.ps1','CodexFlowingBar.ps1',
- 'CodexAeroBar.ps1','CodexBarAppearance.ps1','CodexUiPixelTheme.ps1','CodexData.ps1',
- 'CodexSessionRepository.ps1','CodexUsage.js','CodexQuotaContinuation.ps1','CodexTerminalRun.ps1','Start-Codex-Scheduler.vbs',
- 'Start-Codex-Scheduler.cmd','CodexRunJob.vbs','README.md','LICENSE','VERSION'
+ 'legacy/winforms/CodexResumeScheduler.ps1','src/backend/Invoke-CodexJob.ps1','src/backend/CodexRunEngine.ps1','legacy/winforms/CodexUiForms.ps1',
+ 'legacy/winforms/CodexUiRefresh.ps1','legacy/winforms/CodexUiSelection.ps1','legacy/winforms/CodexUiPending.ps1','legacy/winforms/CodexUiUsage.ps1',
+ 'legacy/winforms/CodexUiActions.ps1','legacy/winforms/CodexUiLifecycle.ps1','legacy/winforms/CodexUiState.ps1',
+ 'legacy/winforms/CodexUiHistory.ps1','src/backend/CodexJobStore.ps1',
+ 'legacy/winforms/CodexDashboard.ps1','legacy/winforms/CodexScheduleTime.ps1','legacy/winforms/CodexFlowingBar.ps1',
+ 'legacy/winforms/CodexAeroBar.ps1','legacy/winforms/CodexBarAppearance.ps1','legacy/winforms/CodexUiPixelTheme.ps1','src/backend/CodexData.ps1',
+ 'src/backend/CodexSessionRepository.ps1','src/backend/CodexUsage.js','src/backend/CodexQuotaContinuation.ps1','src/backend/CodexTerminalRun.ps1','legacy/winforms/Start-Codex-Scheduler.vbs',
+ 'legacy/winforms/Start-Codex-Scheduler.cmd','src/backend/CodexRunJob.vbs','README.md','LICENSE','VERSION'
 )
 foreach($file in $files){
     $src=Join-Path $root $file
     if(-not (Test-Path -LiteralPath $src -PathType Leaf)){throw "Release file missing: $file"}
-    Copy-Item -LiteralPath $src -Destination $folder
+    $target=Join-Path $folder $file
+    [void](New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force)
+    Copy-Item -LiteralPath $src -Destination $target
 }
 foreach($dir in @('assets','AeroWebView2','components')){
     $src=Join-Path $root $dir
@@ -47,7 +49,7 @@ Copy-Item -LiteralPath (Join-Path $root 'docs/ARCHITECTURE.md') -Destination (Jo
 Copy-Item -LiteralPath (Join-Path $root 'scripts/Get-SchedulerSecurityDiagnostics.ps1') -Destination (Join-Path $folder 'tools/Get-SchedulerSecurityDiagnostics.ps1')
 # A signed release MUST NOT ask PowerShell to bypass signature checks.
 if(-not $Preview){
-    foreach($launcher in @('Start-Codex-Scheduler.vbs','CodexRunJob.vbs')){
+    foreach($launcher in @('legacy/winforms/Start-Codex-Scheduler.vbs','src/backend/CodexRunJob.vbs')){
         $target=Join-Path $folder $launcher
         $contents=[IO.File]::ReadAllText($target)
         if(-not $contents.Contains(' -ExecutionPolicy Bypass')){throw "Release launcher contract changed: $launcher"}

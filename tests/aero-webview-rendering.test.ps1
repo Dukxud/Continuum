@@ -4,8 +4,8 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexFlowingBar.ps1')
-. (Join-Path $root 'CodexAeroBar.ps1')
+. (Join-Path $root 'legacy/winforms/CodexFlowingBar.ps1')
+. (Join-Path $root 'legacy/winforms/CodexAeroBar.ps1')
 
 function Require($ok,[string]$what) { if (-not $ok) { throw $what } }
 function PumpUntil([scriptblock]$condition,[int]$seconds=25) {

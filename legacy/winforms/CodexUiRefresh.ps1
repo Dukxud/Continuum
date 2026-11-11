@@ -3,12 +3,12 @@ function Start-DataRead {
     param([ValidateSet('sessions','pending','selection')][string]$Kind, $Session = $null)
     if ($script:ui.Async.dataJobs[$Kind]) { $script:ui.Async.dataQueued[$Kind] = $true; return }
     try {
-        $sourceFolder = $PSScriptRoot
+        $sourceFolder = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
         $localAppDir = $appDir
         $job = Start-ThreadJob -ArgumentList @($sourceFolder,$localAppDir,$Kind,$Session) -ScriptBlock {
             param($Folder,$LocalAppDir,$Operation,$SelectedSession)
             $ErrorActionPreference = 'Stop'
-            . (Join-Path $Folder 'CodexData.ps1')
+            . (Join-Path $Folder 'src/backend/CodexData.ps1')
             switch ($Operation) {
                 'sessions'  { Get-RecentCliSessions }
                 'pending'   { Get-UpcomingCodexTasks -AppDirectory $LocalAppDir }

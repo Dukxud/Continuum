@@ -1,7 +1,7 @@
 # Runs on windows-latest via GitHub Actions. Exercises the actual app function
 # without launching the Windows Forms interface.
 $ErrorActionPreference = 'Stop'
-$source = Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexData.ps1'
+$source = Join-Path (Split-Path -Parent $PSScriptRoot) 'src/backend/CodexData.ps1'
 $tokens = $null
 $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($source, [ref]$tokens, [ref]$errors)
@@ -9,7 +9,7 @@ if ($errors) { throw ($errors.Message -join '; ') }
 $function = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Find-SessionRepository' }, $true))
 if ($function.Count -ne 1) { throw 'Expected exactly one session repository selector.' }
 Invoke-Expression $function[0].Extent.Text
-. (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexJobStore.ps1')
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'src/backend/CodexJobStore.ps1')
 
 $script:roots = @{ 'C:\original' = 'C:/original'; 'C:\actual' = 'C:/actual'; 'C:/original' = 'C:/original' }
 function Get-RepositoryRoot {

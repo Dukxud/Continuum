@@ -1,7 +1,7 @@
 # Evidence reader tests are entirely local and never invoke the Codex CLI.
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexJobStore.ps1')
+. (Join-Path $root 'src/backend/CodexJobStore.ps1')
 function Require($ok,[string]$why){if(-not $ok){throw $why}}
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('codex-evidence-' + [guid]::NewGuid().ToString('N'))
 [void](New-Item -ItemType Directory -Path $temp -Force)

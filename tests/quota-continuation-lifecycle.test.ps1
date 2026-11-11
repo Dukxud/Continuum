@@ -2,7 +2,7 @@
 # Uses a fake Codex App Server and an in-memory Task Scheduler; no real jobs.
 $ErrorActionPreference='Stop'
 $source=Split-Path -Parent $PSScriptRoot
-. (Join-Path $source 'CodexRunEngine.ps1')
+. (Join-Path $source 'src/backend/CodexRunEngine.ps1')
 function Require($ok,[string]$why){if(-not $ok){throw $why}}
 
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('quota-lifecycle-'+[guid]::NewGuid().ToString('N'))

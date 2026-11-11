@@ -69,9 +69,10 @@ The [maintainer handoff](docs/CURRENT-STATE.md) retains exact builds, verificati
 | [tests/](tests) | PowerShell and Node regression and integration tests |
 | [scripts/](scripts) | Packaging, diagnostics, signing, and acceptance tools |
 | [docs/](docs) | Setup, usage, architecture, and verification records |
-| Root `Codex*.ps1` / `CodexUsage.js` | Scheduling backend, metadata readers, and retained WinForms frontend |
+| [src/backend/](src/backend/) | Active scheduling backend, metadata readers, and scheduled-job entry point |
+| [legacy/winforms/](legacy/winforms/) | Retained PowerShell/WinForms interface and its launchers |
 
-The root script layout is shared by the worker snapshot and packaging tools. The Flutter frontend uses that backend directly.
+The Flutter frontend uses the backend in `src/backend/`. Preview packages and new worker snapshots preserve that layout; existing scheduled jobs retain their original saved runtimes.
 
 ## Contributing and license
 

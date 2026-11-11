@@ -1,8 +1,8 @@
 # Codex-specific worker and CLI adapter. No GUI dependencies.
-Import-Module (Join-Path $PSScriptRoot 'components/RuntimeBundle/RuntimeBundle.psm1') -Force -ErrorAction Stop
-Import-Module (Join-Path $PSScriptRoot 'components/OneTimeTasks/OneTimeTasks.psm1') -Force -ErrorAction Stop
-Import-Module (Join-Path $PSScriptRoot 'components/GitRepository/GitRepository.psm1') -Force -ErrorAction Stop
-Import-Module (Join-Path $PSScriptRoot 'components/JobOutcomes/JobOutcomes.psm1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/RuntimeBundle/RuntimeBundle.psm1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/OneTimeTasks/OneTimeTasks.psm1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/GitRepository/GitRepository.psm1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/JobOutcomes/JobOutcomes.psm1') -Force -ErrorAction Stop
 . (Join-Path $PSScriptRoot 'CodexQuotaContinuation.ps1')
 . (Join-Path $PSScriptRoot 'CodexTerminalRun.ps1')
 
@@ -70,9 +70,9 @@ function Read-CodexModelCatalog {
 
 function Get-CodexRuntimeFiles {
     return @(
-        'CodexResumeScheduler.ps1','CodexRunEngine.ps1',
-        'CodexUsage.js','CodexRunJob.vbs','CodexQuotaContinuation.ps1',
-        'CodexTerminalRun.ps1',
+        'src/backend/Invoke-CodexJob.ps1','src/backend/CodexRunEngine.ps1',
+        'src/backend/CodexUsage.js','src/backend/CodexRunJob.vbs','src/backend/CodexQuotaContinuation.ps1',
+        'src/backend/CodexTerminalRun.ps1',
         'components/SharedCodexSession/protocol.mjs',
         'components/SharedCodexSession/host.mjs',
         'components/SharedCodexSession/remote.mjs',

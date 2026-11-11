@@ -1,6 +1,6 @@
 # Codex-specific quota continuations. No UI, timers, or uncontrolled retries.
 # The calling pinned worker owns execution, workspace verification and outcomes.
-Import-Module (Join-Path $PSScriptRoot 'components/SettingsStore/SettingsStore.psm1') -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/SettingsStore/SettingsStore.psm1') -ErrorAction Stop
 
 function Test-CodexContinuationPolicy {
     param($Job)
@@ -120,7 +120,7 @@ function Get-RegisteredCodexQuotaContinuation {
             throw 'Windows trigger does not match saved plan.'
         }
         $action=@($task.Actions)
-        $expectedRunner=Join-Path $RuntimeDirectory 'CodexRunJob.vbs'
+        $expectedRunner=Join-Path $RuntimeDirectory 'src/backend/CodexRunJob.vbs'
         $expectedArguments=Get-CodexTaskArguments -Runner $expectedRunner -JobFile (Join-Path $Directory ($name+'.json'))
         if($action.Count -ne 1 -or
            [string]$action[0].Execute -ine (Join-Path $env:WINDIR 'System32\wscript.exe') -or
@@ -177,7 +177,7 @@ function Register-CodexQuotaContinuation {
     $plan=[ordered]@{schema=1;parentJob=$parent;nextJob=$name;when=$When.ToString('o')}
     SettingsStore\Write-JsonSettings -Path $planPath -Value $plan
     SettingsStore\Write-JsonSettings -Path $nextJobPath -Value $child
-    $runner=Join-Path $RuntimeDirectory 'CodexRunJob.vbs'
+    $runner=Join-Path $RuntimeDirectory 'src/backend/CodexRunJob.vbs'
     $arguments=Get-CodexTaskArguments -Runner $runner -JobFile $nextJobPath
     [void](Register-OneTimeTask -Name $name -At $When -Executable (Join-Path $env:WINDIR 'System32\wscript.exe') -Arguments $arguments -WorkingDirectory ([string]$Job.repo) -Description "Codex quota continuation $nextAttempt of 3 ($parent)")
     return [pscustomobject]@{Name=$name;When=$When}

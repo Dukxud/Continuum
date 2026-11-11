@@ -6,10 +6,10 @@ $bridge=Join-Path $folder 'windows_bridge.ps1'
 # A frontend can fail at startup because it dot-sources the backend. Parse
 # the entire load chain before the costly Flutter install, not just the bridge.
 foreach($relative in @(
-    'flutter_port/windows_bridge.ps1','CodexRunEngine.ps1',
-    'CodexQuotaContinuation.ps1','CodexTerminalRun.ps1','CodexData.ps1','CodexSessionRepository.ps1',
-    'CodexRunActivity.ps1',
-    'CodexResumeScheduler.ps1','components/JobOutcomes/JobOutcomes.psm1'
+    'flutter_port/windows_bridge.ps1','src/backend/CodexRunEngine.ps1',
+    'src/backend/CodexQuotaContinuation.ps1','src/backend/CodexTerminalRun.ps1','src/backend/CodexData.ps1','src/backend/CodexSessionRepository.ps1',
+    'src/backend/CodexRunActivity.ps1',
+    'src/backend/Invoke-CodexJob.ps1','components/JobOutcomes/JobOutcomes.psm1'
 )){
     $file=Join-Path $root $relative
     $tokens=$null;$errors=$null

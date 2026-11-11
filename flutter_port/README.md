@@ -4,7 +4,7 @@
 
 ## Implemented boundaries
 
-Flutter supplies Full/Monitor/Micro windows, pinning, date/time entry, history and appearance. `windows_bridge.ps1` validates JSON and delegates Windows operations; `CodexRunEngine.ps1` and immutable runtime snapshots own unattended execution. The GUI is not a replacement worker. macOS/Linux/web execution remains unimplemented.
+Flutter supplies Full/Monitor/Micro windows, pinning, date/time entry, history and appearance. `windows_bridge.ps1` validates JSON and delegates Windows operations; `src/backend/CodexRunEngine.ps1` and immutable runtime snapshots own unattended execution. The GUI is not a replacement worker. macOS/Linux/web execution remains unimplemented.
 
 Background uses noninteractive execution and optional bounded quota-only continuation. Native terminal launches the ordinary CLI TUI. Shared owns one App Server and allows authenticated native TUI clients; it cannot take over an arbitrary preexisting CLI. Post-completion retention does not make the GUI a continuous multi-turn observer. [Shared details](../docs/SHARED-NATIVE-TUI.md).
 

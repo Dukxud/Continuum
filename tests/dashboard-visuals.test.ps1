@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-. (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexFlowingBar.ps1')
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'legacy/winforms/CodexFlowingBar.ps1')
 function Require($Condition,[string]$Message) { if (-not $Condition) { throw $Message } }
 
 function Get-RenderedPixels($progress) {

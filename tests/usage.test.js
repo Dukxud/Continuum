@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test');const assert=require('node:assert/strict');const path=require('node:path');
-const {summarizeRateLimits,describeWindow,normalizeModels,readCodexState,identifyAccount}=require('../CodexUsage.js');
+const {summarizeRateLimits,describeWindow,normalizeModels,readCodexState,identifyAccount}=require('../src/backend/CodexUsage.js');
 const now=1793000000;const win=(used,delta,duration=300)=>({usedPercent:used,resetsAt:now+delta,windowDurationMins:duration});
 const bucket=(used,delta,model,duration=300)=>({normalModelSlug:model,primary:win(used,delta,duration)});
 test('multiple active 5-hour and weekly windows use last blocking reset',()=>{

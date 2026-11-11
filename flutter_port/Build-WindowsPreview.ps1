@@ -58,12 +58,14 @@ foreach($required in @('flutter_windows.dll','data')){
 try{
     [void](New-Item -ItemType Directory -Path $destination -Force)
     Copy-Item -Path (Join-Path $release '*') -Destination $destination -Recurse -Force -ErrorAction Stop
-    $mustCopy=@('CodexResumeScheduler.ps1','CodexRunEngine.ps1','CodexData.ps1',
-        'CodexJobStore.ps1','CodexSessionRepository.ps1','CodexRunActivity.ps1','CodexUsage.js','CodexQuotaContinuation.ps1','CodexTerminalRun.ps1','CodexRunJob.vbs')
+    $mustCopy=@('src/backend/Invoke-CodexJob.ps1','src/backend/CodexRunEngine.ps1','src/backend/CodexData.ps1',
+        'src/backend/CodexJobStore.ps1','src/backend/CodexSessionRepository.ps1','src/backend/CodexRunActivity.ps1','src/backend/CodexUsage.js','src/backend/CodexQuotaContinuation.ps1','src/backend/CodexTerminalRun.ps1','src/backend/CodexRunJob.vbs')
     foreach($relative in $mustCopy){
         $from=Join-Path $root $relative
         if(-not (Test-Path -LiteralPath $from -PathType Leaf)){throw "Required worker file missing: $relative"}
-        Copy-Item -LiteralPath $from -Destination (Join-Path $destination $relative) -ErrorAction Stop
+        $target=Join-Path $destination $relative
+        [void](New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force)
+        Copy-Item -LiteralPath $from -Destination $target -ErrorAction Stop
     }
     $componentNames=@('RuntimeBundle','OneTimeTasks','GitRepository','JobOutcomes','SettingsStore','SharedCodexSession')
     foreach($component in $componentNames){

@@ -2,6 +2,12 @@
 
 **Status: paused at the owner's request, 6 Nov 2026 (America/Chicago).** No feature expansion, live Codex testing, release publication, or automatic follow-up is authorized by this pause. The repository remains usable; this does not archive GitHub or cancel existing Windows tasks.
 
+## Repository maintenance — 11 Nov 2026
+
+The owner authorized a repository presentation and source-organization cleanup. PR #23 refreshed the landing page and organized documentation. The source layout now separates active workers and readers under `src/backend/` from the original frontend under `legacy/winforms/`. The worker entry point is `src/backend/Invoke-CodexJob.ps1`; package and snapshot manifests retain the same nested layout. Existing installed previews and scheduled runtime copies are not moved or rewritten by this source change. Feature development and production releases remain paused.
+
+The artifact and native-acceptance records below describe their original builds.
+
 ## Resume here
 
 Read this file first, then [the user guide](USER-GUIDE.md), [architecture](ARCHITECTURE.md), [quota presentation](QUOTA-PRESENTATION.md), and [Windows acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md). Current source authority is `main`; dated historical reviews are not instructions to reopen or re-merge earlier PRs.

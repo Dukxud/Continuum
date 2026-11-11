@@ -4,12 +4,12 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexData.ps1')
-. (Join-Path $root 'CodexUiState.ps1')
+. (Join-Path $root 'src/backend/CodexData.ps1')
+. (Join-Path $root 'legacy/winforms/CodexUiState.ps1')
 $script:ui = New-CodexUiState
-. (Join-Path $root 'CodexFlowingBar.ps1')
-. (Join-Path $root 'CodexAeroBar.ps1')
-. (Join-Path $root 'CodexBarAppearance.ps1')
+. (Join-Path $root 'legacy/winforms/CodexFlowingBar.ps1')
+. (Join-Path $root 'legacy/winforms/CodexAeroBar.ps1')
+. (Join-Path $root 'legacy/winforms/CodexBarAppearance.ps1')
 function Require($ok,[string]$message) { if (-not $ok) { throw $message } }
 
 $script:saves = 0

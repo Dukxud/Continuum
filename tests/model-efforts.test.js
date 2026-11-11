@@ -1,7 +1,7 @@
 "use strict";
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {normalizeModels,readCodexState}=require('../CodexUsage.js');
+const {normalizeModels,readCodexState}=require('../src/backend/CodexUsage.js');
 const path=require('node:path');
 test('per-model efforts are not merged, and Ultra is excluded from ordinary reasoning tiers',()=>{
   const list=normalizeModels([{data:[

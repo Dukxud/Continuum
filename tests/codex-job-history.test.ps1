@@ -1,7 +1,7 @@
 # Adversarial history and saved-payload separation without Windows Forms.
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexJobStore.ps1')
+. (Join-Path $root 'src/backend/CodexJobStore.ps1')
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('codex-history-' + [guid]::NewGuid().ToString('N'))
 [void](New-Item -ItemType Directory -Path $temp -Force)
 try {

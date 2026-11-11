@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexData.ps1')
+. (Join-Path $root 'src/backend/CodexData.ps1')
 function Require($Condition, $Message) { if (-not $Condition) { throw $Message } }
 $folder = Join-Path ([IO.Path]::GetTempPath()) ('codex-draft-' + [guid]::NewGuid().ToString('N'))
 try {
@@ -33,7 +33,7 @@ try {
     $legacy = Read-CodexUiSettings $folder
     Require ($legacy.lastAccess -eq 'yolo') 'Legacy settings should remain readable.'
 
-    $gui = @('CodexResumeScheduler.ps1','CodexUiState.ps1','CodexUiForms.ps1','CodexUiActions.ps1','CodexUiLifecycle.ps1','CodexUiRefresh.ps1') | ForEach-Object { Get-Content -LiteralPath (Join-Path $root $_) -Raw } | Out-String
+    $gui = @('legacy/winforms/CodexResumeScheduler.ps1','legacy/winforms/CodexUiState.ps1','legacy/winforms/CodexUiForms.ps1','legacy/winforms/CodexUiActions.ps1','legacy/winforms/CodexUiLifecycle.ps1','legacy/winforms/CodexUiRefresh.ps1') | ForEach-Object { Get-Content -LiteralPath (Join-Path $root $_) -Raw } | Out-String
     foreach ($feature in @('Save-CurrentFormState','settingsTimer.Add_Tick','form.Add_FormClosing',
                            'whenBox.Add_ValueChanged','repoBox.Add_TextChanged','messageBox.Add_TextChanged',
                            'accessBox.Add_SelectedIndexChanged',

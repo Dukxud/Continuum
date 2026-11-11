@@ -1,7 +1,7 @@
 # Local synthetic rollouts: check resumable session eligibility without contacting Codex.
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexData.ps1')
+. (Join-Path $root 'src/backend/CodexData.ps1')
 function Require($test,[string]$message){if(-not $test){throw $message}}
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('codex-resumable-sources-' + [guid]::NewGuid().ToString('N'))
 $originalHome=$env:CODEX_HOME

@@ -8,7 +8,7 @@ const root=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const modules=['AeroProgress','Countdown','SettingsStore','RuntimeBundle','OneTimeTasks',
   'GitRepository','JobOutcomes','WindowShell','ProgressHost','FlowingProgress'];
-const ui=['CodexUiForms.ps1','CodexUiSelection.ps1','CodexUiPending.ps1','CodexUiUsage.ps1','CodexUiRefresh.ps1','CodexUiActions.ps1','CodexUiLifecycle.ps1','CodexDashboard.ps1'];
+const ui=['legacy/winforms/CodexUiForms.ps1','legacy/winforms/CodexUiSelection.ps1','legacy/winforms/CodexUiPending.ps1','legacy/winforms/CodexUiUsage.ps1','legacy/winforms/CodexUiRefresh.ps1','legacy/winforms/CodexUiActions.ps1','legacy/winforms/CodexUiLifecycle.ps1','legacy/winforms/CodexDashboard.ps1'];
 test('every independently importable component is explicitly manifested and Codex-free',()=>{
  for(const name of modules){
    const source=read('components/'+name+'/'+name+'.psm1');
@@ -21,15 +21,14 @@ test('every independently importable component is explicitly manifested and Code
  }
 });
 test('worker loads no GUI, CodexData or ambient session globals',()=>{
- const worker=read('CodexRunEngine.ps1');
- const main=read('CodexResumeScheduler.ps1');
+ const worker=read('src/backend/CodexRunEngine.ps1');
+ const main=read('src/backend/Invoke-CodexJob.ps1');
  assert.doesNotMatch(worker,/CodexUi|CodexDashboard|System\.Windows\.Forms|\$sessionIdPattern|Get-RepositoryRoot\b/);
  assert.match(worker,/Get-GitRepositoryRoot/);
  assert.match(worker,/Import-Module.+GitRepository/);
  assert.match(worker,/Import-Module.+JobOutcomes/);
- const run=main.indexOf('if ($RunJob) {');
- const uiImport=main.indexOf("'CodexUiState.ps1'");
- assert.ok(run>=0 && uiImport>run,'worker must exit before any UI module loads');
+ assert.doesNotMatch(main,/CodexUi|System\.Windows\.Forms|legacy[\/]/);
+ assert.match(main,/Invoke-CodexScheduledJob/);
 });
 test('UI state ownership is explicit and cross-file categories are declared',()=>{
  const groups=new Set(['Selection','Usage','Preferences','Dashboard','Async']);
@@ -48,9 +47,9 @@ test('UI state ownership is explicit and cross-file categories are declared',()=
  }
 });
 test('appearance draft is owned by the Preferences context',()=>{
- const state=read('CodexUiState.ps1');
- const editor=read('CodexBarAppearance.ps1');
- const actions=read('CodexUiActions.ps1');
+ const state=read('legacy/winforms/CodexUiState.ps1');
+ const editor=read('legacy/winforms/CodexBarAppearance.ps1');
+ const actions=read('legacy/winforms/CodexUiActions.ps1');
  assert.match(state,/appearanceBeforeDraft=\$null/);
  assert.match(editor,/\$script:ui\.Preferences\.appearanceBeforeDraft = \$previous/);
  assert.match(actions,/\$appearanceForStorage = if \(\$script:ui\.Preferences\.appearanceBeforeDraft\)/);
@@ -59,19 +58,19 @@ test('appearance draft is owned by the Preferences context',()=>{
  }
 });
 test('scheduled runtime snapshot excludes every GUI module',()=>{
- const worker=read('CodexRunEngine.ps1');
+ const worker=read('src/backend/CodexRunEngine.ps1');
  const runtime=worker.match(/function Get-CodexRuntimeFiles\s*\{([\s\S]*?)\n\}/)?.[1];
  assert.ok(runtime,'runtime dependency manifest missing');
- for(const file of ['CodexResumeScheduler.ps1','CodexRunEngine.ps1','CodexUsage.js',
+ for(const file of ['src/backend/Invoke-CodexJob.ps1','src/backend/CodexRunEngine.ps1','src/backend/CodexUsage.js',
                      'components/RuntimeBundle/RuntimeBundle.psm1','components/GitRepository/GitRepository.psm1',
                      'components/JobOutcomes/JobOutcomes.psm1','components/SettingsStore/SettingsStore.psm1']){
    assert.ok(runtime.includes("'"+file+"'"),'worker missing '+file);
  }
- assert.doesNotMatch(runtime,/CodexUiForms|CodexUiState|CodexDashboard|CodexData|AeroBar\.html/);
+ assert.doesNotMatch(runtime,/legacy|CodexUiForms|CodexUiState|CodexDashboard|CodexData|AeroBar\.html/);
 });
 
 test('pending jobs never mix with result histories and countdowns do not scan pending list for every row',()=>{
- const data=read('CodexData.ps1'),store=read('CodexJobStore.ps1'),dash=read('CodexDashboard.ps1');
+ const data=read('src/backend/CodexData.ps1'),store=read('src/backend/CodexJobStore.ps1'),dash=read('legacy/winforms/CodexDashboard.ps1');
  assert.match(data,/Get-CodexJobPayloadFiles/);
  assert.match(store,/\.result\\\.json/);
  assert.match(store,/Get-CodexRunHistory/);
@@ -79,16 +78,16 @@ test('pending jobs never mix with result histories and countdowns do not scan pe
  assert.doesNotMatch(dash,/pendingSnapshot\s*\|\s*Where-Object/);
 });
 test('run history remains user-visible without retry scheduling',()=>{
- assert.match(read('CodexUiForms.ps1'),/\$recentResults = Add-Button/);
- assert.match(read('CodexUiActions.ps1'),/Show-CodexRunHistoryDialog/);
- assert.doesNotMatch(read('CodexRunEngine.ps1'),/Schedule-LimitRetry|CodexRetry/);
+ assert.match(read('legacy/winforms/CodexUiForms.ps1'),/\$recentResults = Add-Button/);
+ assert.match(read('legacy/winforms/CodexUiActions.ps1'),/Show-CodexRunHistoryDialog/);
+ assert.doesNotMatch(read('src/backend/CodexRunEngine.ps1'),/Schedule-LimitRetry|CodexRetry/);
  // Historic deferred results remain readable after removing retry authoring.
- assert.match(read('CodexJobStore.ps1'),/Get-CodexRunHistory/);
+ assert.match(read('src/backend/CodexJobStore.ps1'),/Get-CodexRunHistory/);
 });
 
 test('cancellation rechecks authoritative Windows state before unregistering',()=>{
  const generic=read('components/OneTimeTasks/OneTimeTasks.psm1');
- const ui=read('CodexUiActions.ps1');
+ const ui=read('legacy/winforms/CodexUiActions.ps1');
  assert.match(generic,/function Remove-OneTimeTask/);
  assert.match(generic,/\[switch\]\$OnlyBeforeStart/);
  assert.match(generic,/Get-ScheduledTask -TaskName \$Name/);
@@ -108,9 +107,9 @@ test('WinForms acceptance cannot silently ignore UI-thread exceptions',()=>{
  }
 });
 test('model catalog and async jobs have single state-owning controllers',()=>{
- const selection=read('CodexUiSelection.ps1');
- const usage=read('CodexUiUsage.ps1');
- const asyncDispatcher=read('CodexUiRefresh.ps1');
+ const selection=read('legacy/winforms/CodexUiSelection.ps1');
+ const usage=read('legacy/winforms/CodexUiUsage.ps1');
+ const asyncDispatcher=read('legacy/winforms/CodexUiRefresh.ps1');
  assert.match(selection,/function Apply-CodexModelCatalog/);
  assert.match(usage,/Apply-CodexModelCatalog -Snapshot \$Snapshot/);
  assert.doesNotMatch(usage,/\$script:ui\.Selection\.[a-zA-Z]+\s*=/,'usage controller must not mutate selection-owned state');
@@ -119,10 +118,10 @@ test('model catalog and async jobs have single state-owning controllers',()=>{
 });
 
 test('one scheduling-eligibility owner enforces fresh model and workspace authority',()=>{
- const selection=read('CodexUiSelection.ps1');
- const usage=read('CodexUiUsage.ps1');
- const dashboard=read('CodexDashboard.ps1');
- const actions=read('CodexUiActions.ps1');
+ const selection=read('legacy/winforms/CodexUiSelection.ps1');
+ const usage=read('legacy/winforms/CodexUiUsage.ps1');
+ const dashboard=read('legacy/winforms/CodexDashboard.ps1');
+ const actions=read('legacy/winforms/CodexUiActions.ps1');
  assert.match(selection,/function Update-SchedulingEligibility/);
  assert.match(selection,/usageReadFailed/);
  assert.match(selection,/usageSnapshotReceivedAt/);
@@ -132,7 +131,7 @@ test('one scheduling-eligibility owner enforces fresh model and workspace author
  assert.match(selection,/Test-CanonicalWorkspaceIdentity/);
  assert.match(usage,/Update-SchedulingEligibility/);
  assert.match(usage,/usageSnapshotReceivedAt = Get-Date/);
- assert.match(read('CodexUiLifecycle.ps1'),/Update-SchedulingEligibility/);
+ assert.match(read('legacy/winforms/CodexUiLifecycle.ps1'),/Update-SchedulingEligibility/);
  assert.match(usage,/\$script:ui\.Usage\.usageSnapshot = \$null/);
  assert.doesNotMatch(usage,/\$schedule\.Enabled\s*=/);
  assert.doesNotMatch(actions,/\$schedule\.Enabled\s*=/);
@@ -162,7 +161,7 @@ test('manual CI uses the complete local acceptance inventory without retries',()
 });
 
 test('transcript cleanup cannot override the worker exit status',()=>{
- const worker=read('CodexRunEngine.ps1');
+ const worker=read('src/backend/CodexRunEngine.ps1');
  assert.match(worker,/try \{ Stop-Transcript -ErrorAction Stop \| Out-Null \}/);
  assert.match(worker,/catch \{ Write-Warning "Worker transcript could not be closed:/);
  assert.match(worker,/catch \{ Write-Warning "Worker session lock could not be released:/);
@@ -179,7 +178,7 @@ test('acceptance entrypoint must contain one complete script body',()=>{
 });
 
 test('all scheduled executions must bind to a verified selected workspace',()=>{
- const ui=read('CodexUiActions.ps1'), worker=read('CodexRunEngine.ps1');
+ const ui=read('legacy/winforms/CodexUiActions.ps1'), worker=read('src/backend/CodexRunEngine.ps1');
  assert.match(ui,/Test-CanonicalWorkspaceIdentity \$accountId/);
  assert.match(ui,/accountId=\$accountId/);
  assert.match(worker,/function Test-CanonicalWorkspaceIdentity/);

@@ -1,7 +1,7 @@
 if (-not $IsWindows) { throw 'This application requires Windows and PowerShell 7.' }
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-Import-Module (Join-Path $PSScriptRoot 'components/WindowShell/WindowShell.psm1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/WindowShell/WindowShell.psm1') -Force -ErrorAction Stop
 [System.Windows.Forms.Application]::EnableVisualStyles()
 # WScript launches PowerShell with its console hidden. The first window show
 # request inherits that startup setting, so explicitly show the Forms window.

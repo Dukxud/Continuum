@@ -549,7 +549,8 @@ void main() {
     final sep = Platform.pathSeparator;
     Directory createSource(String name) {
       final dir = Directory('${sandbox.path}$sep$name')..createSync();
-      File('${dir.path}${sep}CodexRunEngine.ps1').createSync();
+      File('${dir.path}${sep}src${sep}backend${sep}CodexRunEngine.ps1')
+        .createSync(recursive:true);
       File('${dir.path}${sep}flutter_port${sep}windows_bridge.ps1')
         .createSync(recursive:true);
       return dir;
