@@ -2,6 +2,20 @@
 
 **Current baseline and pause:** [CURRENT-STATE.md](CURRENT-STATE.md). This gate describes future verification, not an instruction to resume work now or reopen already merged PRs. Merge authorization is distinct from a recorded native pass.
 
+## Repository maintenance verification — 11 Nov 2026
+
+[PR #24](https://github.com/Dukxud/codex-resume-scheduler/pull/24) moved the active backend and legacy UI into separate directories and updated runtime snapshots, packaging, and imports. The verified head was `e998e489af688567081209f6b30a18459fd0cb1e`; merge `f72617dd1bbb50722e22780c6f77e740f6d5eae3` has the same source tree.
+
+| Check | Result / boundary |
+| --- | --- |
+| Local automated checks | 76 Node tests, 40 PowerShell test files, and 104 Flutter tests passed; Flutter analysis had no errors or warnings |
+| Hosted Windows build | [Run 43091625553](https://github.com/Dukxud/codex-resume-scheduler/actions/runs/43091625553) passed debug/release compilation, compiled icon verification, and package integrity |
+| Downloaded artifact | All 47 manifest entries independently verified; packaged JSON bridge and runtime snapshot checks passed outside the checkout with an isolated profile |
+| Local build environment | Runner generation stopped at Flutter's symlink prerequisite; the hosted Windows build passed |
+| Native application behavior | No new live Codex or GUI acceptance for this refactor; quota display, Shared retention, and approval scenarios remain open |
+
+The [preview record](CURRENT-STATE.md#source-layout-preview--11-nov-2026) provides the artifact, checksums, expiry, and copy-paste download and launch commands. The earlier evidence below remains tied to its original builds.
+
 ## Evidence ledger at pause (6 Nov 2026, Chicago)
 
 | Feature / layer | Evidence | Result / boundary |

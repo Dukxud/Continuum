@@ -12,8 +12,11 @@ This guide builds the current Flutter version of Continuum from source on Window
 | Codex CLI | npm installation, signed in to the account you intend to use |
 | Flutter | `flutter.bat` available on `PATH`; Windows preflight pins Flutter 3.47.9 |
 | Visual Studio | Desktop development with C++ workload and Windows build tools |
+| Windows build permissions | Symbolic-link support for Flutter plugins; enable [Developer Mode](https://learn.microsoft.com/en-us/windows/advanced-settings/developer-mode) on the build machine if Flutter requests it |
 
 The pinned versions describe the recorded build environment. Compatibility with a different Codex CLI or SDK version should be checked before scheduling work. See the [developer guide](../flutter_port/README.md) for the verification commands.
+
+Before building, run `flutter doctor -v` and resolve any Windows toolchain errors. See [troubleshooting](TROUBLESHOOTING.md#build-prerequisites) if runner generation reports that symlink support is missing.
 
 ## Build the preview
 

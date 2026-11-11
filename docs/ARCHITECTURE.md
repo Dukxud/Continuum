@@ -55,6 +55,6 @@ After the scheduled turn completes successfully, native TUI leases can retain th
 
 ## Build and native icon
 
-`Build-WindowsPreview.ps1` and `Run-WindowsReview.ps1` generate the Windows runner, then install the checked-in `flutter_port/branding/continuum.ico` via `scripts/Install-WindowsIcon.ps1` before compilation. The release package includes runtime, workers, bridge and manifest, not just the EXE. The icon has native Micro screenshot acceptance in BP210. Its former warning-triangle substitution was not diagnosed by the equal extracted EXE hashes.
+`flutter_port/Build-WindowsPreview.ps1` and `flutter_port/Run-WindowsReview.ps1` generate the Windows runner, then install the checked-in `flutter_port/branding/continuum.ico` via `flutter_port/scripts/Install-WindowsIcon.ps1` before compilation. The release package includes the Flutter runtime, backend, bridge, required components, and checksum manifest. See [Windows acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md) for build and native icon verification.
 
 Flutter UI portability is not worker portability: macOS/Linux/web task execution is unimplemented. This is an unsigned Windows engineering preview, not a production release. [Security](SECURITY-AND-PRIVACY.md) and [release policy](RELEASE-POLICY.md).

@@ -1,6 +1,6 @@
 # Continuum Flutter Windows developer guide
 
-**Current source: `main`; development paused.** The baseline includes Flutter foundation #17, Shared owner #18, accepted native icon #21 and reported quota windows #22. Read [current state](../docs/CURRENT-STATE.md) before resuming. The historical public v1.11.0 release is not this Flutter app.
+This directory contains Continuum's Flutter desktop interface, Windows JSON bridge, tests, and preview builder. The active backend is in [src/backend/](../src/backend/); the older interface is in [legacy/winforms/](../legacy/winforms/). Feature development is paused. See [current state](../docs/CURRENT-STATE.md) for recorded builds and outstanding verification.
 
 ## Implemented boundaries
 
@@ -10,9 +10,9 @@ Background uses noninteractive execution and optional bounded quota-only continu
 
 All modes display actual returned quota windows. The same presentation handles Plus or Pro: singleton Weekly, singleton five-hour, two windows, unfamiliar labels and honest empty/error states. Appearance follows meaning, not list index. No scheduling/account policy changed. [Contract](../docs/QUOTA-PRESENTATION.md).
 
-## Requirements and bounded local review
+## Requirements and local checks
 
-Windows x64, standard PowerShell 7 installation, Node/Git/npm Codex for runtime; Flutter and Visual Studio C++ desktop workload for builds. CI used Flutter 3.47.9 and Node 22. Actual future CLI compatibility must be verified rather than assumed from the earlier 0.166.0 native test.
+Use Windows x64, a standard PowerShell 7 installation, Node.js, Git, and npm Codex for runtime. Builds also require Flutter, Visual Studio's C++ desktop workload, and Windows symbolic-link support for plugins. See [Getting started](../docs/GETTING-STARTED.md#prerequisites) for prerequisites and [troubleshooting](../docs/TROUBLESHOOTING.md#build-prerequisites) for setup failures. Windows preflight pins Flutter 3.47.9; the Node workflows pin Node 22. The recorded native CLI capability check used 0.166.0; compatibility with other CLI versions requires verification.
 
 From a complete checkout with `flutter.bat` on PATH:
 
@@ -37,11 +37,7 @@ Start-Process -FilePath $p -WorkingDirectory (Split-Path -Parent $p)
 
 This outputs a complete folder and ZIP, not a signed installer. It refuses existing destinations; choose a unique output for another review. The package retains Flutter runtime, workers, bridge, components and `SHA256SUMS.txt`; every manifest entry is checked after extracting the produced ZIP. `-PackageVerifiedBuild` is reserved for isolated Actions builds.
 
-The latest already-built preview is **BP211**, not a newly compiled documentation version:
-
-```text
-%USERPROFILE%\Downloads\Continuum-BP211-QuotaFix\Unpacked\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe
-```
+The [source-layout preview record](../docs/CURRENT-STATE.md#source-layout-preview--11-nov-2026) contains the verified PR #24 artifact, source SHA, checksums, download command, and exact executable path. CI downloads expire; the command above builds a fresh package from your checkout.
 
 ## Native icon and test entrypoints
 
@@ -49,4 +45,4 @@ Generated `windows/runner` files are not the branding authority. After `flutter 
 
 `test/quota_windows_test.dart` covers returned-window rendering with in-memory adapters; `test/window_mode_test.dart` and `test/widget_test.dart` retain cross-view/error coverage. No live task is needed for the quota visual check. Node Shared protocol tests use a fake App Server. See [acceptance ledger](../docs/CONTINUUM-WINDOWS-ACCEPTANCE.md) for what is still pending rather than treating a green build as universal acceptance.
 
-Every future candidate must include a copy-paste download/open command, exact path/SHA and stated test scope. No merge, live Codex invocation or release without renewed authorization. [Release policy](../docs/RELEASE-POLICY.md).
+Include the exact source SHA, package checksum, download or launch command, and verification scope with each review build. See [contributing](../docs/CONTRIBUTING.md) for review expectations and [release policy](../docs/RELEASE-POLICY.md) for publication requirements.

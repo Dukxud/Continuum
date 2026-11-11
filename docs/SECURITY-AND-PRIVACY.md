@@ -1,10 +1,10 @@
 # Security and privacy
 
-**Scope:** current Windows Flutter preview, including Shared sessions, pinned icon and reported quota windows. Development is paused; see [CURRENT-STATE.md](CURRENT-STATE.md). Historical WinForms analysis remains in [SECURITY-REVIEW.md](SECURITY-REVIEW.md).
+This guide covers execution permissions, local data, Shared credentials, and distribution of the current Windows Flutter preview. Historical WinForms analysis remains in [SECURITY-REVIEW.md](SECURITY-REVIEW.md).
 
 ## Local trust and execution
 
-Flutter delegates to the PowerShell JSON bridge and pinned scheduled worker. Codex uses the operator's installed CLI/account; a local scheduler does not make Codex offline. The application does not introduce a hosted Continuum account or an adoption telemetry service.
+Flutter delegates to the PowerShell JSON bridge and pinned scheduled worker. Codex uses the operator's installed CLI and account and connects to its service. Continuum does not add a hosted account or an application telemetry service.
 
 Job instructions/preferences/results and runtime snapshots live under `%LOCALAPPDATA%\CodexResumeScheduler`; job JSON identifies transcript paths. These files may contain private prompts, paths or command output. Runtime SHA-256 checks detect changes but are not publisher signatures or protection against the same Windows user deliberately modifying both metadata and files.
 
@@ -24,4 +24,4 @@ PR #22 renders actual returned windows for either Plus or Pro. It does not alter
 
 The current Flutter package is an unsigned engineering preview. `SHA256SUMS.txt` validates contents only. Public v1.11.0 is legacy WinForms. Signing, timestamping, antivirus review, native acceptance and publication authorization remain separate [release gates](RELEASE-POLICY.md).
 
-Use sanitized issue reports. Never attach `auth.json`, raw shared descriptors, tokens, session files or full private transcripts. The screenshot helper writes locally for review; it does not automatically redact or upload. No security software changes, scheduled-task cancellation or live Codex run is implied by this documentation closeout.
+Use sanitized issue reports. Never attach `auth.json`, raw shared descriptors, tokens, session files, or full private transcripts. The screenshot helper writes locally for review; it does not automatically redact or upload.
