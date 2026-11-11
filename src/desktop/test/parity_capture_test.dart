@@ -2,6 +2,8 @@
 library;
 
 import 'package:codex_resume_flutter/scheduler_home.dart';
+import 'package:codex_resume_flutter/app.dart';
+import 'package:codex_resume_flutter/aero_bar.dart';
 
 import 'dart:io';
 
@@ -12,12 +14,17 @@ import 'package:codex_resume_flutter/aero_appearance.dart';
 import 'package:codex_resume_flutter/appearance_dialog.dart';
 import 'package:codex_resume_flutter/bridge.dart';
 
-// Review captures are generated only in a separate CI step with
-// --update-goldens. They are NOT approved visual reference goldens:
+// Review captures are generated explicitly with --tags visual-capture
+// --update-goldens. All adapter data is synthetic; no Windows bridge is started. They are NOT approved visual reference goldens:
 // the widget-test renderer does not reproduce live Windows GPU compositing.
 class _SnapshotAdapter implements SchedulerAdapter {
-  _SnapshotAdapter({required this.compact, required this.showUpcoming});
+  _SnapshotAdapter({
+    required this.compact,
+    required this.showUpcoming,
+    this.micro = false,
+  });
   final bool compact;
+  final bool micro;
   final bool showUpcoming;
 
   @override
@@ -29,23 +36,23 @@ class _SnapshotAdapter implements SchedulerAdapter {
     if (action == 'load') {
       return {
         'sessions': [
-          {
-            'Id': id,
-            'Display': 'Git: BP105-Scheduler-QA | 3 Nov 13:18 | 11111111',
-          },
+          {'Id': id, 'Display': 'Continuum | Review the scheduling workflow'},
         ],
         'pending': showUpcoming ? [_run()] : [],
         'history': [],
         'settings': {
           'compactMode': compact,
+          'microMode': micro,
           'barAppearance': const AeroAppearance(aero: false).toJson(),
           'draft': {
             'sessionId': id,
             'model': 'gpt-6.1-sol',
             'effort': 'low',
-            'repo': r'C:\Users\Example\source\BP105-Scheduler-QA',
-            'message': 'Resume.',
+            'repo': r'C:\projects\continuum',
+            'message':
+                'Review the scheduling workflow and summarize the next steps.',
             'access': 'read-only',
+            'executionMode': 'background',
           },
         },
         'logDirectory': r'C:\Users\Example\AppData\Local\CodexResumeScheduler',
@@ -67,9 +74,32 @@ class _SnapshotAdapter implements SchedulerAdapter {
           },
         ],
         'windows': [
-          {'label': '5-hour', 'remainingPercent': 71.0},
-          {'label': 'Weekly', 'remainingPercent': 45.0},
+          {
+            'label': '5-hour',
+            'remainingPercent': 71.0,
+            'resetsAt':
+                DateTime.now()
+                    .add(const Duration(hours: 3))
+                    .millisecondsSinceEpoch ~/
+                1000,
+          },
+          {
+            'label': 'Weekly',
+            'remainingPercent': 45.0,
+            'resetsAt':
+                DateTime.now()
+                    .add(const Duration(days: 3))
+                    .millisecondsSinceEpoch ~/
+                1000,
+          },
         ],
+      };
+    }
+    if (action == 'select') {
+      return {
+        'sessionId': id,
+        'model': 'gpt-6.1-sol',
+        'found': {'Root': r'C:\projects\continuum', 'AlternativeRoots': []},
       };
     }
     if (action == 'pending') {
@@ -84,13 +114,14 @@ class _SnapshotAdapter implements SchedulerAdapter {
   Map<String, dynamic> _run() {
     final when = DateTime.now().add(const Duration(hours: 2));
     return {
-      'Name': 'CodexResume-20261103-2100-abcd1234',
+      'Name': 'CodexResume-20261111-2100-abcd1234',
       'When': when.toIso8601String(),
       'Status': 'Scheduled',
       'CreatedAt': DateTime.now().millisecondsSinceEpoch ~/ 1000,
       'Model': 'gpt-6.1-sol',
-      'Description': 'gpt-6.1-sol / low / read-only | Resume.',
-      'Repo': r'C:\Users\Example\source\BP105-Scheduler-QA',
+      'Description':
+          'gpt-6.1-sol / low / read-only | Review the scheduling workflow.',
+      'Repo': r'C:\projects\continuum',
       'Session': '11111111-1111-1111-1111-111111111111',
     };
   }
@@ -115,6 +146,19 @@ Future<void> _loadWindowsTestFonts() async {
   }
 }
 
+// Read the production app configuration so capture styling follows the app.
+Widget _captureApp(Widget home) => Builder(
+  builder: (context) {
+    final app = const SchedulerApp().build(context) as MaterialApp;
+    return MaterialApp(
+      theme: app.theme,
+      localizationsDelegates: app.localizationsDelegates,
+      supportedLocales: app.supportedLocales,
+      home: home,
+    );
+  },
+);
+
 void main() {
   setUpAll(_loadWindowsTestFonts);
 
@@ -124,6 +168,7 @@ void main() {
     required Size size,
     required bool compact,
     bool showUpcoming = false,
+    bool micro = false,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
@@ -132,19 +177,22 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
     await tester.pumpWidget(
-      MaterialApp(
-        theme: ThemeData(fontFamily: 'Segoe UI'),
-        home: RepaintBoundary(
+      _captureApp(
+        RepaintBoundary(
           key: const Key('capture'),
           child: SchedulerHome(
             adapter: _SnapshotAdapter(
               compact: compact,
               showUpcoming: showUpcoming,
+              micro: micro,
             ),
           ),
         ),
       ),
     );
+    await tester.runAsync(() async {
+      await AeroAssets.sprites();
+    });
     await tester.pump(const Duration(milliseconds: 200));
     expect(tester.takeException(), isNull);
     await expectLater(
@@ -191,6 +239,16 @@ void main() {
     );
   });
 
+  testWidgets('micro quota layout', (tester) async {
+    await capture(
+      tester,
+      name: 'micro',
+      size: const Size(392, 212),
+      compact: true,
+      micro: true,
+    );
+  });
+
   testWidgets('appearance editor controls', (tester) async {
     tester.view.physicalSize = const Size(900, 700);
     tester.view.devicePixelRatio = 1.0;
@@ -199,9 +257,8 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
     await tester.pumpWidget(
-      MaterialApp(
-        theme: ThemeData(fontFamily: 'Segoe UI'),
-        home: Scaffold(
+      _captureApp(
+        Scaffold(
           body: RepaintBoundary(
             key: const Key('capture'),
             child: AeroAppearanceEditor(
@@ -212,11 +269,22 @@ void main() {
         ),
       ),
     );
+    await tester.runAsync(() async {
+      await AeroAssets.sprites();
+    });
     await tester.pump(const Duration(milliseconds: 200));
     expect(tester.takeException(), isNull);
     await expectLater(
       find.byKey(const Key('capture')),
-      matchesGoldenFile('captures/appearance.png'),
+      matchesGoldenFile('captures/appearance-colors.png'),
+    );
+    await tester.tap(find.text('Optics'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(tester.takeException(), isNull);
+    await expectLater(
+      find.byKey(const Key('capture')),
+      matchesGoldenFile('captures/appearance-optics.png'),
     );
   });
 }
