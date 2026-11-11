@@ -1,14 +1,29 @@
 # Release and preview policy
 
-**Paused on 6 Nov 2026.** The owner authorized the quota merge and documentation closeout, not public publication. [CURRENT-STATE.md](CURRENT-STATE.md) records the exact baseline.
+Continuum's Flutter application is an unsigned Windows engineering preview. Feature development and production publication are paused; repository maintenance continues within the owner's authorized scope. [Current state](CURRENT-STATE.md) records builds and outstanding verification.
 
-- The latest published release checked at closeout is [v1.11.0](https://github.com/Dukxud/codex-resume-scheduler/releases/tag/v1.11.0), the older WinForms ZIP. It is not the current Flutter Continuum executable.
-- BP211 is the latest recorded unsigned application preview. Its Windows checks passed, but a preview archive, source merge, icon and checksum manifest do not establish publisher authenticity or every native test.
-- `.github/workflows/flutter-port-preflight.yml` runs for matching pull requests to `main`; the Shared protocol workflow has its own feature-branch push/manual triggers. An arbitrary `main` push is not a promise of a fresh executable. No workflow activity here is permission to publish a release.
-- `Build-WindowsPreview.ps1` builds/verifies a complete Flutter release-mode ZIP/folder, installs the pinned icon after runner generation, preserves worker files, and refuses existing destinations. CI prevalidated-package mode is restricted to Actions.
-- Artifact retention is finite. BP211's recorded artifact expiry is 14 Nov 2026 at 02:13 UTC. Source/build instructions must remain usable after a preview link expires. Do not repurpose the historical release as a download for the current app.
-- Production publication requires renewed owner authorization, consistent version numbers, trusted signing/timestamping, signature checks, antivirus review, native acceptance, release notes, accessible complete artifacts and a rollback plan. Current `VERSION`, pubspec and folder labels are development identifiers, not a new public release.
-- Never disable antivirus/SmartScreen globally or create broad exclusions to make an unsigned preview run. SHA-256 checks prove content integrity, not trust in a publisher.
-- Screenshots must show real, accurately captioned behavior. Historical failures and pre-quota-fix images cannot advertise BP211 success. [Screenshot rules](SCREENSHOTS.md).
+## Available builds
 
-Distribution work and promotion are deferred. [Readiness assessment](history/DISTRIBUTION-READINESS.md) is a recorded backlog, not an active launch instruction.
+- The latest public release checked on 11 Nov 2026 is [v1.11.0](https://github.com/Dukxud/codex-resume-scheduler/releases/tag/v1.11.0), the older WinForms application.
+- The [PR #24 preview record](CURRENT-STATE.md#source-layout-preview--11-nov-2026) identifies the verified Flutter package, source SHA, checksums, download command, and expiry. CI artifacts are temporary review downloads.
+- [Getting started](GETTING-STARTED.md) provides the durable source-build path. Existing installations are not updated by source merges.
+
+## Preview packaging
+
+`flutter_port/Build-WindowsPreview.ps1` builds and verifies a complete release-mode folder and ZIP. It installs the checked-in icon after runner generation and includes the backend, bridge, required components, Flutter runtime, and checksum manifest. Existing package destinations are preserved. Prevalidated-package mode is restricted to GitHub Actions.
+
+The Flutter preflight workflow runs for matching pull requests to `main`. Shared protocol checks have separate feature-branch and manual triggers. A push to `main` does not automatically produce a new executable or publish a release.
+
+Package hashes establish content integrity. Publisher authenticity, native application behavior, and signing require separate verification. Unsigned previews do not require broad antivirus or SmartScreen exclusions.
+
+## Production release requirements
+
+Publication requires maintainer authorization and completion of the following:
+
+1. Reconcile `VERSION`, Flutter package metadata, and archive labels into one release version.
+2. Complete the outstanding [native acceptance scenarios](CONTINUUM-WINDOWS-ACCEPTANCE.md).
+3. Sign and timestamp distributed executables and verify their signatures; complete antivirus review.
+4. Provide release notes, complete downloadable artifacts, checksums, and a rollback plan.
+5. Use current, accurately captioned [product screenshots](SCREENSHOTS.md).
+
+The [historical readiness assessment](history/DISTRIBUTION-READINESS.md) retains earlier findings. Build and package checks alone do not close these release requirements.

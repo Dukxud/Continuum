@@ -4,31 +4,78 @@
 
 ## Repository maintenance — 11 Nov 2026
 
-The owner authorized a repository presentation and source-organization cleanup. PR #23 refreshed the landing page and organized documentation. The source layout now separates active workers and readers under `src/backend/` from the original frontend under `legacy/winforms/`. The worker entry point is `src/backend/Invoke-CodexJob.ps1`; package and snapshot manifests retain the same nested layout. Existing installed previews and scheduled runtime copies are not moved or rewritten by this source change. Feature development and production releases remain paused.
+The owner authorized a repository presentation and source-organization cleanup. [PR #23](https://github.com/Dukxud/codex-resume-scheduler/pull/23) refreshed the landing page and organized documentation. [PR #24](https://github.com/Dukxud/codex-resume-scheduler/pull/24) merged the source layout at `f72617dd1bbb50722e22780c6f77e740f6d5eae3`, separating active workers and readers under `src/backend/` from the original frontend under `legacy/winforms/`. The worker entry point is `src/backend/Invoke-CodexJob.ps1`; package and snapshot manifests retain the same nested layout. Existing installed previews and scheduled runtime copies are not moved or rewritten by this source change. Feature development and production releases remain paused.
 
-The artifact and native-acceptance records below describe their original builds.
+## Source-layout preview — 11 Nov 2026
+
+This is the most recent verified application package recorded here. It includes the source-layout cleanup as well as the earlier icon and quota corrections. The older BP211 record below preserves the preview available at the 6 Nov pause.
+
+| Item | Recorded result |
+| --- | --- |
+| Built source | `e998e489af688567081209f6b30a18459fd0cb1e`; the PR #24 merge has the same source tree |
+| Local automated checks | 76 Node tests, 40 PowerShell test files, and 104 Flutter tests passed; Flutter analysis had no errors or warnings |
+| Hosted Windows verification | [Run 43091625553](https://github.com/Dukxud/codex-resume-scheduler/actions/runs/43091625553) passed source/bridge/worker checks, Flutter analysis/tests, debug and release compilation, native icon checks, and packaging |
+| Downloaded package | All 47 manifest entries independently verified; packaged bridge and runtime snapshot checks passed outside the source checkout with an isolated profile |
+| Native acceptance | No new live Codex task or product GUI acceptance was performed for the source-layout change; the open scenarios below remain pending |
+
+The [unsigned Windows artifact](https://github.com/Dukxud/codex-resume-scheduler/actions/runs/43091625553/artifacts/13888139672) is named `flutter-windows-unsigned-e998e489af688567081209f6b30a18459fd0cb1e` (ID `13888139672`). Its recorded expiry is **18 Nov 2026, 20:01 UTC**. The GitHub artifact archive SHA-256 is `9ae45761a5255a99cb7cba72db20ae08d61c2830429148d8b1db3d3ff7020943`; the inner application ZIP SHA-256 is `bb388608d7d9ed2e8e652616ff60046d1a87529a4c89a235d7bc1ab626f9f70e`.
+
+Until expiry, download with an authenticated GitHub CLI from PowerShell 7. This verifies and extracts the package without launching it:
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$continuumDownload = Join-Path $HOME 'Downloads\Continuum-SourceLayout-PR24'
+if (Test-Path -LiteralPath $continuumDownload) {
+    throw 'Download directory already exists. Choose a fresh path or use the existing verified package.'
+}
+gh run download 43091625553 -R Dukxud/codex-resume-scheduler `
+    -n flutter-windows-unsigned-e998e489af688567081209f6b30a18459fd0cb1e `
+    -D $continuumDownload
+if ($LASTEXITCODE -ne 0) { throw 'Download failed. Check GitHub authentication and artifact expiry.' }
+$continuumArchive = Join-Path $continuumDownload 'CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW.zip'
+if ((Get-FileHash -LiteralPath $continuumArchive -Algorithm SHA256).Hash -ne 'bb388608d7d9ed2e8e652616ff60046d1a87529a4c89a235d7bc1ab626f9f70e') {
+    throw 'Preview ZIP checksum mismatch.'
+}
+Expand-Archive -LiteralPath $continuumArchive -DestinationPath (Join-Path $continuumDownload 'Unpacked')
+```
+
+The exact executable path is:
+
+```text
+%USERPROFILE%\Downloads\Continuum-SourceLayout-PR24\Unpacked\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe
+```
+
+To open the extracted app:
+
+```powershell
+$continuumExe = Join-Path $HOME 'Downloads\Continuum-SourceLayout-PR24\Unpacked\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe'
+if (!(Test-Path -LiteralPath $continuumExe -PathType Leaf)) { throw 'Extracted executable not found.' }
+Start-Process -FilePath $continuumExe -WorkingDirectory (Split-Path -Parent $continuumExe)
+```
+
+Keep the complete package together. Startup can query Codex metadata and usage; it does not schedule a job. After the artifact expires, use [Getting started](GETTING-STARTED.md) to build from source. The local review encountered Flutter's Windows symlink prerequisite; [troubleshooting](TROUBLESHOOTING.md#build-prerequisites) covers that setup error.
 
 ## Resume here
 
 Read this file first, then [the user guide](USER-GUIDE.md), [architecture](ARCHITECTURE.md), [quota presentation](QUOTA-PRESENTATION.md), and [Windows acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md). Current source authority is `main`; dated historical reviews are not instructions to reopen or re-merge earlier PRs.
 
-## Baseline and evidence
+## Baseline and evidence at the 6 Nov pause
 
 | Item | Recorded state |
 | --- | --- |
 | Flutter foundation / Shared sessions | PRs #17 and #18 merged; original combined baseline `15b32f74b0ea243e1e0bfa833ff33aa073c59089` |
 | Native Windows icon | PR #21 merged at `fa812e3c2f294c1b0e3f9ff39ef8bdb3c77b8210`; BP210 screenshot on BLACK-PUDDLE confirms the Continuum title-bar icon in Micro, not a warning triangle |
 | Quota display | PR #22 merged at `f83b11bc3acb9f0447b41d0a7b7d414bd86364ff`; no subscription-tier condition; Full, Monitor and Micro display actual returned windows |
-| Latest application preview | BP211, built from `796f25e757412a8cabc3fa68531405ffc1b6a21b`; its source tree equals the quota merge tree |
+| Application preview at pause | BP211, built from `796f25e757412a8cabc3fa68531405ffc1b6a21b`; its source tree equals the quota merge tree |
 | Windows verification | [Run 42327638037](https://github.com/Dukxud/codex-resume-scheduler/actions/runs/42327638037) passed source/worker/bridge checks, Flutter analysis/tests, debug and release builds, icon verification and package integrity |
 | Documentation | PR #19 brings current onboarding, historical separation and this pause handoff into the baseline; documentation commits do not create a new executable |
 | Public release | [v1.11.0](https://github.com/Dukxud/codex-resume-scheduler/releases/tag/v1.11.0) is still the legacy WinForms release. No signed Continuum production release was published |
 
 BP numbers identify review steps/packages, not product version numbers. `VERSION`, Flutter package metadata and the preview folder label still use different development-era version identifiers; publishing must reconcile them rather than invent a new version here.
 
-## Exact executable and reproducibility
+## Historical BP211 executable and reproducibility
 
-After the BP211 download/extraction command, the existing Windows executable is:
+The earlier BP211 package used this extraction path:
 
 ```text
 %USERPROFILE%\Downloads\Continuum-BP211-QuotaFix\Unpacked\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe

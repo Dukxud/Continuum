@@ -1,28 +1,43 @@
 # Continuum troubleshooting
 
-**Paused baseline:** [CURRENT-STATE.md](CURRENT-STATE.md). All diagnostics below are read-only unless explicitly described otherwise. Do not start a live Codex turn merely to diagnose the UI.
+Start by identifying the executable and checking its dependencies. The commands below inspect the local environment without scheduling work. See [current state](CURRENT-STATE.md) for recorded builds and known limitations.
 
-## Which binary?
+## Identify the running version
 
-BP211 is the latest application preview recorded at pause. Its normal extraction path is:
+The default output from [Getting started](GETTING-STARTED.md) is:
 
 ```text
-%USERPROFILE%\Downloads\Continuum-BP211-QuotaFix\Unpacked\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe
+%USERPROFILE%\Downloads\Continuum-Preview\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe
 ```
 
-BP210 fixed the icon; BP211 also contains the quota correction. BP208 cloned source but did not compile a separate EXE. `Continuum-Main` is a local build output, not automatically updated by a GitHub merge. The public v1.11.0 release is WinForms. Documentation commits do not rebuild an installed program. Keep the whole package; do not mix workers/DLLs between previews.
+Downloaded review packages have different paths; the [build record](CURRENT-STATE.md#source-layout-preview--11-nov-2026) identifies the verified source-layout preview. The public v1.11.0 release contains the older WinForms app. A GitHub merge does not update an installed executable. Keep each complete package together, including its workers and DLLs.
 
-For source identity: `git -C <checkout> log -1 --format="%H %s"`. For building/reopening, see [Flutter guide](../flutter_port/README.md).
+To inspect the running executable's path:
+
+```powershell
+Get-Process -Name codex_resume_flutter -ErrorAction SilentlyContinue |
+    Select-Object Id,Path
+```
+
+For source identity, run `git -C <checkout> log -1 --format="%H %s"` with your checkout path. All engineering previews currently share a development version label, so use the source SHA and recorded package checksum to identify a build.
+
+## Build prerequisites
+
+Run `flutter doctor -v` and resolve Windows toolchain errors. The builder requires `flutter.bat` on `PATH` and Visual Studio's **Desktop development with C++** workload.
+
+If runner generation reports **Building with plugins requires symlink support**, enable [Windows Developer Mode](https://learn.microsoft.com/en-us/windows/advanced-settings/developer-mode) on the build machine, then rerun the build. This requirement was encountered during the source-layout review; the same revision passed on the hosted Windows builder.
+
+If the builder reports **Review package already exists**, choose a fresh `-OutputDirectory`. It preserves existing packages. If a CI artifact has expired, use the [source-build instructions](GETTING-STARTED.md).
 
 ## Weekly appears as five-hour, or a phantom empty row
 
-This was the positional-label bug corrected in #22. BP211 displays the returned label/count in Full, Monitor and Micro for both Plus and Pro, without checking tier names. An older running EXE can continue showing the old layout even after source is merged. Confirm its path before concluding the fix failed.
+This was a positional-label bug corrected in PR #22. Current source displays the returned label and window count in Full, Monitor, and Micro. Confirm the running EXE's path: an older package can still show the previous behavior after a source merge.
 
 No usage windows, unknown resets and unavailable reads are different states; do not infer unlimited capacity or a new plan entitlement. Check the selected model and wait for the app's ordinary read-only refresh. [Display contract](QUOTA-PRESENTATION.md).
 
 ## Warning triangle in title bar
 
-The earlier new-versus-old screenshots established a visual regression. Equal `ExtractAssociatedIcon` hashes did not prove identical live title-bar icons or identify the cause. PR #21 pins the Continuum ICO after runner generation; BP210's Micro screenshot confirms the corrected native icon. Inspect the running binary's path before clearing Windows caches or changing OS security settings. The image alone did not establish an application/security warning.
+PR #21 corrected the native icon by installing the Continuum ICO after Windows runner generation. The corrected title-bar icon was observed in Micro view. Check that you launched a package containing that correction. The old triangle alone did not establish a security warning, and the cause of the original substitution was not proven. [Visual evidence](SCREENSHOTS.md).
 
 ## Missing model, usage or disabled schedule
 
@@ -32,11 +47,11 @@ Check dependencies without running a model turn:
 Get-Command node,pwsh,git,codex.cmd -ErrorAction Stop | Select-Object Name,Source
 ```
 
-The worker requires verifiable workspace identity, applicable quota and a supported model/effort. A failed/ambiguous metadata read cannot safely be replaced by guessed model/plan values. Separately authorize any Codex sign-in/version/real-task invocation when needed. Do not disable safeguards to bypass a blocked job.
+Confirm that the installed npm Codex CLI is signed in to the intended account. The app needs a verified workspace, a supported model and reasoning effort, and a current model-matched quota response. Exhausted quota can still permit scheduling for a future time; the worker checks availability again when the job starts. An unavailable or ambiguous metadata response can block scheduling. Inspect the displayed reason and allow the ordinary refresh to complete.
 
 ## Shared terminal reconnects
 
-The original task completed but owner shutdown dropped its TUI. The retention fix keeps a successful Shared owner alive for attached leases, with 15-second no-viewer grace and a two-hour cap. Its fixed live behavior remains a pending acceptance item. Later TUI turns are not continuously mirrored by the current host.
+The original Shared implementation closed the owner after the scheduled turn, disconnecting its terminal. Current source retains a successful owner for attached clients, with a 15-second no-viewer grace and a two-hour cap. Live verification of this retention behavior remains pending. Later TUI turns are not continuously mirrored by the current host.
 
 Inspect the **specific** job being investigated; do not assume the newest result belongs to it:
 
@@ -56,8 +71,6 @@ A removed `.shared.json` after cleanup is expected. While a native lease retains
 Get-ScheduledTask -TaskName 'CodexResume-*' -ErrorAction SilentlyContinue | Select-Object TaskName,State
 ```
 
-## Build failures and reports
+## Report a problem
 
-`flutter.bat` must resolve; `flutter doctor -v` diagnoses build prerequisites. The preview builder refuses existing output folders; use a fresh `-OutputDirectory`, not files copied over a previous build. Artifact expiry requires a source rebuild, not an invented download URL. Preview binaries are unsigned; do not disable antivirus or broadly exclude directories.
-
-Report exact SHA/package/EXE path, mode, expected/observed behavior and the affected job's sanitized outcome. Exclude tokens, personal paths, raw session IDs and full transcripts. [Security](SECURITY-AND-PRIVACY.md), [acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md).
+Include the source SHA or package identity, Windows and Codex CLI versions, execution mode, steps to reproduce, and expected versus observed behavior. Include the affected job's sanitized outcome when available. Remove private paths, tokens, raw session IDs, and conversation content before posting. See [security and privacy](SECURITY-AND-PRIVACY.md) and [contributing](CONTRIBUTING.md).
