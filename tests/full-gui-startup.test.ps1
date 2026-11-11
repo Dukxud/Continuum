@@ -2,7 +2,7 @@
 # A responsive native Forms window must exist, not merely a live PowerShell process.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$app = Join-Path $root 'CodexResumeScheduler.ps1'
+$app = Join-Path $root 'legacy/winforms/CodexResumeScheduler.ps1'
 $start = [System.Diagnostics.ProcessStartInfo]::new()
 $start.FileName = (Get-Command pwsh.exe -ErrorAction Stop).Source
 $start.WorkingDirectory = $root

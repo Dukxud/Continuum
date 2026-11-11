@@ -9,7 +9,8 @@ Flutter desktop UI
   -> WindowsSchedulerAdapter (JSON subprocess boundary)
   -> flutter_port/windows_bridge.ps1
   -> Windows Task Scheduler + immutable worker snapshot
-  -> CodexRunEngine.ps1 (identity/repository/model/quota/mutex checks)
+  -> src/backend/Invoke-CodexJob.ps1
+  -> src/backend/CodexRunEngine.ps1 (identity/repository/model/quota/mutex checks)
        Background: codex exec --json
        Native: ordinary Codex CLI TUI
        Shared: one App Server + authenticated local clients
@@ -21,10 +22,16 @@ Flutter desktop UI
 | State/adapter | `scheduler_controller.dart`, `bridge.dart` | Refresh, draft state, JSON calls; not a duplicate unattended worker |
 | Quota display | `dashboard_monitor.dart`, `dashboard_frame.dart`, `dashboard_micro.dart` | Actual window labels/counts and values, neutral empty states, shared Full/Monitor rendering |
 | Windows boundary | `flutter_port/windows_bridge.ps1` | Validate request, persist/register/cancel/query jobs, shared status and terminal actions |
-| Metadata/usage | `CodexUsage.js`, session/repository readers | Codex-supported account/model/rate/thread metadata; no prompt just to refresh quota |
-| Worker | `CodexRunEngine.ps1`, `CodexQuotaContinuation.ps1`, `CodexTerminalRun.ps1` | Pinned execution checks, original conversation, bounded retry, durable result |
+| Metadata/usage | `src/backend/CodexUsage.js`, session/repository readers | Codex-supported account/model/rate/thread metadata; no prompt just to refresh quota |
+| Worker | `src/backend/CodexRunEngine.ps1`, `src/backend/CodexQuotaContinuation.ps1`, `src/backend/CodexTerminalRun.ps1` | Pinned execution checks, original conversation, bounded retry, durable result |
 | Shared session | `components/SharedCodexSession/{main,host,remote,client,protocol}.mjs` | One App Server, pipe authentication, remote TUI credentials, requests and scheduled-turn lifecycle |
 | Generic services | `components/RuntimeBundle`, `OneTimeTasks`, `GitRepository`, `JobOutcomes`, `SettingsStore` | Independently scoped persistence/validation/infrastructure |
+
+## Source layout
+
+The active PowerShell backend lives in [src/backend/](../src/backend/), while [legacy/winforms/](../legacy/winforms/) contains the original UI and its launchers. The scheduled entry point, `src/backend/Invoke-CodexJob.ps1`, loads the worker directly without loading the legacy interface. Shared and reusable modules remain in `components/`; Flutter remains in `flutter_port/`.
+
+Packages and new immutable worker snapshots preserve these repository-relative paths. Their root is resolved from the entry script, independently of the process working directory. Previously scheduled jobs keep their existing snapshot and launch paths.
 
 ## Quota data is not position or subscription tier
 

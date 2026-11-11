@@ -1,8 +1,8 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexUiState.ps1')
+. (Join-Path $root 'legacy/winforms/CodexUiState.ps1')
 $script:ui = New-CodexUiState
-. (Join-Path $root 'CodexDashboard.ps1')
+. (Join-Path $root 'legacy/winforms/CodexDashboard.ps1')
 function Require($Condition, $Message) { if (-not $Condition) { throw $Message } }
 
 $now = [datetime]'2027-01-01T10:00:00'

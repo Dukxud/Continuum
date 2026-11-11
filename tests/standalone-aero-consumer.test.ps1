@@ -15,7 +15,7 @@ try {
     Expand-Archive -LiteralPath $archive -DestinationPath $expanded
     $kit=Get-ChildItem -LiteralPath $expanded -Directory | Select-Object -First 1
     $module=Join-Path $kit.FullName 'components/AeroProgress'
-    if(Test-Path (Join-Path $kit.FullName 'CodexRunEngine.ps1')){throw 'Reusable kit contained application worker.'}
+    if(Test-Path (Join-Path $kit.FullName 'src/backend/CodexRunEngine.ps1')){throw 'Reusable kit contained application worker.'}
     Import-Module (Join-Path $module 'AeroProgress.psd1') -Force -ErrorAction Stop
     $sdk=Join-Path $module 'AeroWebView2'
     $asset=Join-Path $module 'AeroBar.html'

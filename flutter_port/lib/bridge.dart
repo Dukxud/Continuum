@@ -39,7 +39,7 @@ class WindowsSchedulerAdapter implements SchedulerAdapter {
   static String findSourceDirectory() {
     final custom = Platform.environment['CODEX_SCHEDULER_SOURCE'];
     if (custom != null && custom.isNotEmpty) {
-      if (File('$custom\\CodexRunEngine.ps1').existsSync()) return custom;
+      if (File('$custom\\src\\backend\\CodexRunEngine.ps1').existsSync()) return custom;
       throw SchedulerException('CODEX_SCHEDULER_SOURCE is not a Scheduler checkout.');
     }
     return findSourceDirectoryFrom(
@@ -64,7 +64,7 @@ class WindowsSchedulerAdapter implements SchedulerAdapter {
     ]) {
       var current = start.absolute;
       for (var depth = 0; depth < 12; depth++) {
-        if (File(current.path + r'\CodexRunEngine.ps1').existsSync() &&
+        if (File(current.path + r'\src\backend\CodexRunEngine.ps1').existsSync() &&
             File(current.path + r'\flutter_port\windows_bridge.ps1').existsSync()) {
           return current.path;
         }

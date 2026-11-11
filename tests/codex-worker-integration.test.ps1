@@ -2,8 +2,8 @@
 # Never contacts the user's account, creates Windows tasks, or runs real Codex.
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexData.ps1')
-. (Join-Path $root 'CodexRunEngine.ps1')
+. (Join-Path $root 'src/backend/CodexData.ps1')
+. (Join-Path $root 'src/backend/CodexRunEngine.ps1')
 function Require($ok,[string]$message){if(-not $ok){throw $message}}
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('codex-worker-mock-' + [guid]::NewGuid().ToString('N'))
 try {
@@ -70,7 +70,7 @@ exit /b %errorlevel%
         } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $jobPath
         $psi=[Diagnostics.ProcessStartInfo]::new()
         $psi.FileName=(Get-Command pwsh.exe -ErrorAction Stop).Source
-        foreach($argument in @('-NoLogo','-NoProfile','-File',(Join-Path $runtime.Directory 'CodexResumeScheduler.ps1'),'-RunJob','-JobFile',$jobPath)){
+        foreach($argument in @('-NoLogo','-NoProfile','-File',(Join-Path $runtime.Directory 'src/backend/Invoke-CodexJob.ps1'),'-JobFile',$jobPath)){
             [void]$psi.ArgumentList.Add($argument)
         }
         $psi.UseShellExecute=$false
@@ -146,8 +146,8 @@ exit /b %errorlevel%
     Require ($interactiveFailed.Exit -eq 17 -and $failedStatus.status -eq 'failed') "Interactive Codex failure was not preserved. Exit=$($interactiveFailed.Exit), status=$($failedStatus.status), output=$($interactiveFailed.Output), errors=$($interactiveFailed.Errors)"
     $terminalWrongAccount=Run-CodexStub 0 $false 'wrong-workspace' $false $false $expectedAccountIdentity $false 'terminal'
     Require ($terminalWrongAccount.Exit -ne 0 -and -not $terminalWrongAccount.Executed) 'Terminal mode bypassed the workspace identity check.'
-    $terminalArgs=Get-CodexTaskArguments -Runner (Join-Path $temp 'CodexRunJob.vbs') -JobFile $jobPath -ExecutionMode 'terminal'
-    $backgroundArgs=Get-CodexTaskArguments -Runner (Join-Path $temp 'CodexRunJob.vbs') -JobFile $jobPath
+    $terminalArgs=Get-CodexTaskArguments -Runner (Join-Path $temp 'src/backend/CodexRunJob.vbs') -JobFile $jobPath -ExecutionMode 'terminal'
+    $backgroundArgs=Get-CodexTaskArguments -Runner (Join-Path $temp 'src/backend/CodexRunJob.vbs') -JobFile $jobPath
     Require ($terminalArgs.EndsWith(' terminal') -and -not $backgroundArgs.EndsWith(' terminal')) 'Terminal visibility did not remain opt-in per task.'
     # Child processes inherit a different LOCALAPPDATA. Events and outcomes
     # must live beside the immutable job payload, not there.
@@ -200,7 +200,7 @@ exit /b %errorlevel%
     }
 
     # A pinned runtime must fail closed after an existing dependency changes.
-    Set-Content -LiteralPath (Join-Path $runtime.Directory 'CodexUsage.js') -Value 'tampered'
+    Set-Content -LiteralPath (Join-Path $runtime.Directory 'src/backend/CodexUsage.js') -Value 'tampered'
     $tampered=Run-CodexStub 0 $false 'acct-1' $false
     Require ($tampered.Exit -ne 0 -and -not $tampered.Executed) "Modified scheduled runtime must fail before Codex: $($tampered.Output) $($tampered.Errors)"
     $outcome=Read-JobOutcome -Path $outcomePath

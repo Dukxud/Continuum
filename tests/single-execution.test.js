@@ -5,10 +5,10 @@ const fs=require('node:fs');
 const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=f=>fs.readFileSync(path.join(root,f),'utf8');
-const worker=read('CodexRunEngine.ps1');
-const continuation=read('CodexQuotaContinuation.ps1');
-const winforms=read('CodexUiActions.ps1');
-const forms=read('CodexUiForms.ps1');
+const worker=read('src/backend/CodexRunEngine.ps1');
+const continuation=read('src/backend/CodexQuotaContinuation.ps1');
+const winforms=read('legacy/winforms/CodexUiActions.ps1');
+const forms=read('legacy/winforms/CodexUiForms.ps1');
 const bridge=read('flutter_port/windows_bridge.ps1');
 
 test('legacy WinForms and old job files remain one-shot',()=>{
@@ -62,8 +62,8 @@ test('both distribution manifests include the new pinned worker source',()=>{
  const flutter=read('flutter_port/Build-WindowsPreview.ps1');
  const runtime=worker.match(/function Get-CodexRuntimeFiles\s*\{([\s\S]*?)\n\}/)?.[1];
  assert.ok(runtime);
- assert.match(runtime,/'CodexQuotaContinuation\.ps1'/);
- assert.match(release,/'CodexQuotaContinuation\.ps1'/);
- assert.match(flutter,/'CodexQuotaContinuation\.ps1'/);
- assert.match(runtime,/'CodexUsage\.js'/);
+ assert.match(runtime,/'src\/backend\/CodexQuotaContinuation\.ps1'/);
+ assert.match(release,/'src\/backend\/CodexQuotaContinuation\.ps1'/);
+ assert.match(flutter,/'src\/backend\/CodexQuotaContinuation\.ps1'/);
+ assert.match(runtime,/'src\/backend\/CodexUsage\.js'/);
 });

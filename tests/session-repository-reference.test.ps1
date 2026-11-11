@@ -1,6 +1,6 @@
 # Read-only session-to-checkout discovery. Uses isolated real Git repositories.
 $ErrorActionPreference='Stop'
-. (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexData.ps1')
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'src/backend/CodexData.ps1')
 function Assert-True([bool]$Condition,[string]$Reason){if(-not $Condition){throw $Reason}}
 function Normalize-Root([string]$Path){return $Path.Replace('\','/').TrimEnd('/')}
 $fixture=Join-Path ([IO.Path]::GetTempPath()) ('session-repository-'+[guid]::NewGuid().ToString('N'))

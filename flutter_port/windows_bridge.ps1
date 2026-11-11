@@ -20,9 +20,9 @@ try {
             ConvertFrom-Json -InputObject $json -ErrorAction Stop
         }
     }else{[pscustomobject]@{}}
-    . (Join-Path $source 'CodexRunEngine.ps1')
-    . (Join-Path $source 'CodexData.ps1')
-    . (Join-Path $source 'CodexRunActivity.ps1')
+    . (Join-Path $source 'src/backend/CodexRunEngine.ps1')
+    . (Join-Path $source 'src/backend/CodexData.ps1')
+    . (Join-Path $source 'src/backend/CodexRunActivity.ps1')
     # Presentation-only labels: preserve the WinForms session reader and its
     # full stable IDs, while making the Flutter chooser distinguish projects.
     function Get-FlutterSessionChoices {
@@ -35,7 +35,7 @@ try {
             try {
                 $shim=(Get-Command codex.cmd -ErrorAction Stop).Source
                 $cli=Join-Path (Split-Path -Parent $shim) 'node_modules\@openai\codex\bin\codex.js'
-                $helper=Join-Path $source 'CodexUsage.js'
+                $helper=Join-Path $source 'src/backend/CodexUsage.js'
                 if((Test-Path -LiteralPath $cli -PathType Leaf) -and
                    (Test-Path -LiteralPath $helper -PathType Leaf)){
                     $ids=@($choices | ForEach-Object { [string]$_.Id })
@@ -101,7 +101,7 @@ try {
         try {
             $shim=(Get-Command codex.cmd -ErrorAction Stop).Source
             $cli=Join-Path (Split-Path -Parent $shim) 'node_modules\@openai\codex\bin\codex.js'
-            $helper=Join-Path $source 'CodexUsage.js'
+            $helper=Join-Path $source 'src/backend/CodexUsage.js'
             if(-not (Test-Path -LiteralPath $cli -PathType Leaf) -or
                -not (Test-Path -LiteralPath $helper -PathType Leaf)){return $null}
             $lines=@(& node.exe $helper --cli-js $cli --thread-ids $SessionId)
@@ -181,7 +181,7 @@ try {
         'usage' {
             $model=[string]$request.model
             if($model -and $model -notmatch '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}$'){throw 'Invalid model identifier.'}
-            $helper=Join-Path $source 'CodexUsage.js'
+            $helper=Join-Path $source 'src/backend/CodexUsage.js'
             $cli=Get-CodexCliJs
             $arguments=@($helper,'--cli-js',$cli)
             if($model){$arguments+=@('--model',$model)}
@@ -251,7 +251,7 @@ try {
             $message=([string]$request.message).Trim()
             if(-not $message){throw 'Enter an instruction.'}
             # Register only with a fresh model-specific catalog and verified workspace.
-            $helper=Join-Path $source 'CodexUsage.js'
+            $helper=Join-Path $source 'src/backend/CodexUsage.js'
             $cli=Get-CodexCliJs
             $lines=@(& node.exe $helper --cli-js $cli --model $model)
             if($LASTEXITCODE -ne 0 -or -not $lines){throw 'Live Codex account verification failed.'}
@@ -284,7 +284,7 @@ try {
                 createdAt=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
                 accountId=[string]$usage.accountId;runtimeFingerprint=$runtime.Fingerprint;log=$log
             } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $jobFilePath -Encoding utf8
-            $runner=Join-Path $runtime.Directory 'CodexRunJob.vbs'
+            $runner=Join-Path $runtime.Directory 'src/backend/CodexRunJob.vbs'
             $arguments=Get-CodexTaskArguments -Runner $runner -JobFile $jobFilePath -ExecutionMode $executionMode
             try {
                 [void](Register-OneTimeTask -Name $name -At $when -Executable (Join-Path $env:WINDIR 'System32\wscript.exe') -Arguments $arguments -WorkingDirectory $root -Description "Codex session $sessionId ($branchName)")

@@ -1,4 +1,4 @@
-Import-Module (Join-Path $PSScriptRoot 'components/Countdown/Countdown.psm1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/Countdown/Countdown.psm1') -Force -ErrorAction Stop
 # Dashboard views. Approved Aero v3 bars use WebView2, with WPF fallback.
 
 # UI names preserved while calculations live in the reusable Countdown API.

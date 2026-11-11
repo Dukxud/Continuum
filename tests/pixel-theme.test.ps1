@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-. (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexUiPixelTheme.ps1')
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'legacy/winforms/CodexUiPixelTheme.ps1')
 function Require($condition,[string]$message){if(-not $condition){throw $message}}
 $form=[System.Windows.Forms.Form]::new()
 $form.ClientSize=[System.Drawing.Size]::new(480,245)

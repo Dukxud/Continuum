@@ -3,10 +3,10 @@
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'WinFormsEventGuard.ps1')
 Add-Type -AssemblyName System.Windows.Forms
-. (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexUiState.ps1')
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'legacy/winforms/CodexUiState.ps1')
 $appDir=Join-Path ([IO.Path]::GetTempPath()) ('codex-upcoming-only-' + [guid]::NewGuid().ToString('N'))
 [void](New-Item -ItemType Directory -Path $appDir -Force)
-. (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexJobStore.ps1')
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'src/backend/CodexJobStore.ps1')
 $script:ui=New-CodexUiState
 $script:ui.Dashboard.compactToggle=[System.Windows.Forms.CheckBox]::new()
 $grid=[System.Windows.Forms.DataGridView]::new()
@@ -19,7 +19,7 @@ function Update-DashboardLayout {}
 function Update-DashboardCountdowns {}
 function Update-DashboardActivity { param([object[]]$Items,[string]$Directory) }
 function Request-UsageRefresh {}
-. (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexUiPending.ps1')
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'legacy/winforms/CodexUiPending.ps1')
 function Require($condition,[string]$message){if(-not $condition){throw $message}}
 $now=Get-Date
 $failed=[pscustomobject]@{Name='BP090-Codex-Test';When=$now.AddHours(-2);Repo='-';Description='Historical failure';Session='-';Model='';Status='Failed (task exit 1)'}

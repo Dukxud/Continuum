@@ -2,7 +2,7 @@
 # no Codex execution and no real task creation, removal, or modification.
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexData.ps1')
+. (Join-Path $root 'src/backend/CodexData.ps1')
 function Require($ok,[string]$message){if(-not $ok){throw $message}}
 
 $now=Get-Date

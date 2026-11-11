@@ -3,12 +3,12 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $env:CODEX_BAR_RENDERER = 'wpf'
-. (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexFlowingBar.ps1')
-. (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexAeroBar.ps1')
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'legacy/winforms/CodexFlowingBar.ps1')
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'legacy/winforms/CodexAeroBar.ps1')
 $root = Split-Path -Parent $PSScriptRoot
 foreach ($spec in @(
-    @('New-UsageCard','CodexUiForms.ps1'),
-    @('Render-UsageCard','CodexUiUsage.ps1')
+    @('New-UsageCard','legacy/winforms/CodexUiForms.ps1'),
+    @('Render-UsageCard','legacy/winforms/CodexUiUsage.ps1')
 )) {
     $tokens = $null; $parseErrors = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile(

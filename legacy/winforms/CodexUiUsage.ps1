@@ -4,7 +4,7 @@
 function Start-UsageRead {
     $node = (Get-Command node.exe -ErrorAction Stop).Source
     $cliJs = Get-CodexCliJs
-    $helper = Join-Path $PSScriptRoot 'CodexUsage.js'
+    $helper = Join-Path $PSScriptRoot '../../src/backend/CodexUsage.js'
     if (-not (Test-Path -LiteralPath $cliJs -PathType Leaf)) { throw 'Codex npm entrypoint not found. Update/install Codex via npm.' }
     if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) { throw 'CodexUsage.js is missing. Extract the complete release.' }
     $start = [System.Diagnostics.ProcessStartInfo]::new()

@@ -8,7 +8,7 @@ try {
     '{}' | Set-Content -LiteralPath $jobFile
     $psi=[Diagnostics.ProcessStartInfo]::new()
     $psi.FileName=(Get-Command pwsh.exe -ErrorAction Stop).Source
-    foreach($arg in @('-NoLogo','-NoProfile','-File',(Join-Path $root 'CodexResumeScheduler.ps1'),'-RunJob','-JobFile',$jobFile)){[void]$psi.ArgumentList.Add($arg)}
+    foreach($arg in @('-NoLogo','-NoProfile','-File',(Join-Path $root 'src/backend/Invoke-CodexJob.ps1'),'-JobFile',$jobFile)){[void]$psi.ArgumentList.Add($arg)}
     $psi.UseShellExecute=$false
     $psi.CreateNoWindow=$true
     $psi.RedirectStandardOutput=$true

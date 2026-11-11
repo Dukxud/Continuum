@@ -1,6 +1,6 @@
 # Windows-native, read-only live Codex event monitor regression tests.
 $ErrorActionPreference='Stop'
-. (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexRunActivity.ps1')
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'src/backend/CodexRunActivity.ps1')
 function Assert-Activity([bool]$Condition,[string]$Message){
     if(-not $Condition){throw $Message}
 }

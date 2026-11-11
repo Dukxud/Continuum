@@ -1,5 +1,5 @@
-Import-Module (Join-Path $PSScriptRoot 'components/GitRepository/GitRepository.psm1') -Force -ErrorAction Stop
-Import-Module (Join-Path $PSScriptRoot 'components/SettingsStore/SettingsStore.psm1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/GitRepository/GitRepository.psm1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/SettingsStore/SettingsStore.psm1') -Force -ErrorAction Stop
 . (Join-Path $PSScriptRoot 'CodexJobStore.ps1')
 . (Join-Path $PSScriptRoot 'CodexSessionRepository.ps1')
 # Codex Resume Scheduler - local data readers (PowerShell 7).
@@ -104,7 +104,7 @@ function Get-ReportedThreadDirectory {
     try {
         $shim = (Get-Command codex.cmd -ErrorAction Stop).Source
         $cli = Join-Path (Split-Path -Parent $shim) 'node_modules\@openai\codex\bin\codex.js'
-        $helper = Join-Path $SourceFolder 'CodexUsage.js'
+        $helper = Join-Path $SourceFolder 'src/backend/CodexUsage.js'
         if (-not (Test-Path -LiteralPath $cli -PathType Leaf) -or -not (Test-Path -LiteralPath $helper -PathType Leaf)) { return $null }
         $lines = & node.exe $helper --cli-js $cli --thread-id $SessionId
         if ($LASTEXITCODE -ne 0 -or -not $lines) { return $null }

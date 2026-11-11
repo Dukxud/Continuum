@@ -1,6 +1,6 @@
 # Codex-specific on-disk task and outcome readers. No GUI or worker globals.
-Import-Module (Join-Path $PSScriptRoot 'components/JobOutcomes/JobOutcomes.psm1') -ErrorAction Stop
-Import-Module (Join-Path $PSScriptRoot 'components/SettingsStore/SettingsStore.psm1') -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/JobOutcomes/JobOutcomes.psm1') -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/SettingsStore/SettingsStore.psm1') -ErrorAction Stop
 function Get-CodexJobPayloadFiles {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Directory)

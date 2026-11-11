@@ -4,10 +4,10 @@ $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $root=Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexFlowingBar.ps1')
-. (Join-Path $root 'CodexAeroBar.ps1')
-. (Join-Path $root 'CodexDashboard.ps1')
-. (Join-Path $root 'CodexUiState.ps1')
+. (Join-Path $root 'legacy/winforms/CodexFlowingBar.ps1')
+. (Join-Path $root 'legacy/winforms/CodexAeroBar.ps1')
+. (Join-Path $root 'legacy/winforms/CodexDashboard.ps1')
+. (Join-Path $root 'legacy/winforms/CodexUiState.ps1')
 $script:ui = New-CodexUiState
 function Require($condition,[string]$message){if(-not $condition){throw $message}}
 Require (Test-AeroRenderer) "Aero prerequisite absent: $script:aeroError"

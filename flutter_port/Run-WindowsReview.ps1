@@ -7,7 +7,7 @@ $root=Split-Path -Parent $project
 # Catch a broken bridge before creating or launching a Flutter runner.
 & pwsh -NoProfile -File (Join-Path $root 'tests/flutter-port-source.test.ps1')
 if($LASTEXITCODE -ne 0){throw 'Flutter bridge source checks failed.'}
-if(-not (Test-Path -LiteralPath (Join-Path $root 'CodexRunEngine.ps1'))){throw 'Run from the complete Scheduler checkout.'}
+if(-not (Test-Path -LiteralPath (Join-Path $root 'src/backend/CodexRunEngine.ps1'))){throw 'Run from the complete Scheduler checkout.'}
 $flutter=Get-Command flutter.bat -ErrorAction SilentlyContinue
 if(-not $flutter){$flutter=Get-Command flutter -ErrorAction SilentlyContinue}
 if(-not $flutter){

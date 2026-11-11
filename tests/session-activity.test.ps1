@@ -1,6 +1,6 @@
 # Read-only Codex conversation naming tests. Never contacts Codex or Task Scheduler.
 $ErrorActionPreference='Stop'
-. (Join-Path (Split-Path -Parent $PSScriptRoot) 'CodexData.ps1')
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'src/backend/CodexData.ps1')
 function Require($condition,[string]$message){if(-not $condition){throw $message}}
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('codex-session-activity-'+[guid]::NewGuid().ToString('N'))
 [void](New-Item -ItemType Directory -Path $temp -Force)

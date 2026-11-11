@@ -4,7 +4,7 @@
 
 ## Contract
 
-`CodexUsage.js` selects the applicable model bucket, derives each window label from `windowDurationMins`, and omits absent primary/secondary windows. `SchedulerController.quotaWindows` supplies that normalized data to Full, Monitor and Micro. Presentation does not call a plan-tier switch.
+`src/backend/CodexUsage.js` selects the applicable model bucket, derives each window label from `windowDurationMins`, and omits absent primary/secondary windows. `SchedulerController.quotaWindows` supplies that normalized data to Full, Monitor and Micro. Presentation does not call a plan-tier switch.
 
 | Returned windows | All three views show |
 | --- | --- |

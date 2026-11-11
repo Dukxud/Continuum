@@ -5,7 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const source = ['CodexUiForms.ps1','CodexUiSelection.ps1','CodexUiPending.ps1','CodexUiUsage.ps1','CodexUiRefresh.ps1','CodexUiActions.ps1'].map(f=>fs.readFileSync(path.resolve(__dirname, '..', f),'utf8')).join('\n');
+const source = ['legacy/winforms/CodexUiForms.ps1','legacy/winforms/CodexUiSelection.ps1','legacy/winforms/CodexUiPending.ps1','legacy/winforms/CodexUiUsage.ps1','legacy/winforms/CodexUiRefresh.ps1','legacy/winforms/CodexUiActions.ps1'].map(f=>fs.readFileSync(path.resolve(__dirname, '..', f),'utf8')).join('\n');
 function namedFunction(name) {
   const begin = source.indexOf(`function ${name} {`);
   assert.ok(begin >= 0, `${name} should exist`);
@@ -92,7 +92,7 @@ test('usage reports remaining and keeps reset as an explicit action', () => {
 });
 
 test('one coordinator handles timer and window-activation refreshes', () => {
-  const lifecycle=fs.readFileSync(path.resolve(__dirname,'..','CodexUiLifecycle.ps1'),'utf8');
+  const lifecycle=fs.readFileSync(path.resolve(__dirname,'..','legacy/winforms/CodexUiLifecycle.ps1'),'utf8');
   assert.match(source,/function Request-SystemRefresh \{/);
   assert.match(source,/lastFullRefresh=Get-Date/);
   assert.match(source,/Refresh-SessionList/);
@@ -105,7 +105,7 @@ test('one coordinator handles timer and window-activation refreshes', () => {
 });
 
 test('dashboard shares the pending snapshot and renders distinct countdown and quota bars', () => {
-  const dash = fs.readFileSync(path.resolve(__dirname, '..', 'CodexDashboard.ps1'), 'utf8');
+  const dash = fs.readFileSync(path.resolve(__dirname, '..', 'legacy/winforms/CodexDashboard.ps1'), 'utf8');
   assert.match(source, /Columns\.Add\('Countdown','Time to run'\)/);
   assert.match(source, /\$grid\.RowTemplate\.Height = 40/);
   assert.match(source, /\$script:ui\.Usage\.usageRequestedModel = \$chosen/);
@@ -133,7 +133,7 @@ test('dashboard shares the pending snapshot and renders distinct countdown and q
 });
 
 test('routine status clutter is absent but actionable errors remain visible', () => {
-  const dash = fs.readFileSync(path.resolve(__dirname,'..','CodexDashboard.ps1'),'utf8');
+  const dash = fs.readFileSync(path.resolve(__dirname,'..','legacy/winforms/CodexDashboard.ps1'),'utf8');
   assert.doesNotMatch(dash,/activityPanel|activityLabel|Update-DashboardActivity/);
   assert.doesNotMatch(source,/\$usageNotice|\$autoResumeCheck/);
   assert.match(source,/\$status = Add-Label ''/);
@@ -144,7 +144,7 @@ test('routine status clutter is absent but actionable errors remain visible', ()
 });
 
 test('compact switch occupies dedicated header space in both layouts', () => {
-  const dash = fs.readFileSync(path.resolve(__dirname, '..', 'CodexDashboard.ps1'), 'utf8');
+  const dash = fs.readFileSync(path.resolve(__dirname, '..', 'legacy/winforms/CodexDashboard.ps1'), 'utf8');
   assert.match(dash, /\$script:ui\.Dashboard\.compactToggle\.Appearance = \[System\.Windows\.Forms\.Appearance\]::Button/);
   assert.match(dash, /\$script:ui\.Dashboard\.compactToggle\.Text = 'Compact mode: OFF'/);
   assert.match(dash, /\$script:ui\.Dashboard\.compactToggle\.Text = 'Compact mode: ON'/);
@@ -154,8 +154,8 @@ test('compact switch occupies dedicated header space in both layouts', () => {
 });
 
 test('pixel-art control groups and associated actions ship in the production app',()=>{
- const theme=fs.readFileSync(path.resolve(__dirname,'..','CodexUiPixelTheme.ps1'),'utf8');
- const lifecycle=fs.readFileSync(path.resolve(__dirname,'..','CodexUiLifecycle.ps1'),'utf8');
+ const theme=fs.readFileSync(path.resolve(__dirname,'..','legacy/winforms/CodexUiPixelTheme.ps1'),'utf8');
+ const lifecycle=fs.readFileSync(path.resolve(__dirname,'..','legacy/winforms/CodexUiLifecycle.ps1'),'utf8');
  const pack=fs.readFileSync(path.resolve(__dirname,'..','scripts/Package-CodexScheduler.ps1'),'utf8');
  for(const functionName of ['Set-PixelSurfaceStyle','Add-PixelBackplate','Set-PixelAction','Initialize-SchedulerPixelTheme']){
    assert.ok(theme.includes('function '+functionName),functionName+' missing');
@@ -166,12 +166,12 @@ test('pixel-art control groups and associated actions ship in the production app
  assert.ok(source.includes('Initialize-SchedulerPixelTheme -Form $form'));
  assert.ok(lifecycle.includes('Set-PixelSurfaceStyle -Panel $script:ui.Dashboard.compactRunPanel'));
  assert.ok(lifecycle.includes('Set-PixelAction -Button $script:ui.Dashboard.appearanceButton'));
- assert.ok(pack.includes("'CodexUiPixelTheme.ps1'"));
+ assert.ok(pack.includes("'legacy/winforms/CodexUiPixelTheme.ps1'"));
 });
 
 test('secondary actions use a restrained blue palette with no violet and clear disabled states',()=>{
- const theme=fs.readFileSync(path.resolve(__dirname,'..','CodexUiPixelTheme.ps1'),'utf8');
- const lifecycle=fs.readFileSync(path.resolve(__dirname,'..','CodexUiLifecycle.ps1'),'utf8');
+ const theme=fs.readFileSync(path.resolve(__dirname,'..','legacy/winforms/CodexUiPixelTheme.ps1'),'utf8');
+ const lifecycle=fs.readFileSync(path.resolve(__dirname,'..','legacy/winforms/CodexUiLifecycle.ps1'),'utf8');
  assert.doesNotMatch(theme,/#785AC5|#F1ECFF/i,'Violet UI accents were retained');
  assert.match(theme,/Now='#516F98';Reset='#516F98'/);
  assert.match(theme,/Schedule='#2277A1'/);

@@ -1,5 +1,5 @@
 # Codex theme adapter for the independently reusable animated WPF progress module.
-Import-Module (Join-Path $PSScriptRoot 'components/FlowingProgress/FlowingProgress.psm1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/FlowingProgress/FlowingProgress.psm1') -Force -ErrorAction Stop
 
 function Get-CodexFlowingPalette {
     param([ValidateSet('quota','weekly','time','working')][string]$Kind,[string]$Color='')

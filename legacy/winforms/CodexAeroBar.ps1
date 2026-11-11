@@ -1,7 +1,7 @@
 # Scheduler adapter around the standalone AeroProgress component.
 # Only this file knows Codex settings, WPF fallback and quota/countdown roles.
-Import-Module (Join-Path $PSScriptRoot 'components/AeroProgress/AeroProgress.psm1') -Force -ErrorAction Stop
-Import-Module (Join-Path $PSScriptRoot 'components/ProgressHost/ProgressHost.psm1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/AeroProgress/AeroProgress.psm1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSScriptRoot '../../components/ProgressHost/ProgressHost.psm1') -Force -ErrorAction Stop
 $script:aeroChecked = $false
 $script:aeroAvailable = $false
 $script:aeroError = ''
@@ -93,8 +93,8 @@ function Test-AeroRenderer {
     }
     if ($script:aeroChecked -and $script:aeroAvailable) { return $true }
     $script:aeroChecked = $true
-    $script:aeroSdk = Join-Path $PSScriptRoot 'AeroWebView2'
-    $script:aeroAsset = Join-Path $PSScriptRoot 'assets/AeroBar.html'
+    $script:aeroSdk = Join-Path $PSScriptRoot '../../AeroWebView2'
+    $script:aeroAsset = Join-Path $PSScriptRoot '../../assets/AeroBar.html'
     $support = Test-AeroProgressSupport -SdkDirectory $script:aeroSdk -AssetPath $script:aeroAsset
     $script:aeroAvailable = [bool]$support.Available
     $script:aeroError = [string]$support.Reason

@@ -2,9 +2,9 @@
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
 $root=Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexUiState.ps1')
-. (Join-Path $root 'CodexRunEngine.ps1')
-. (Join-Path $root 'CodexUiSelection.ps1')
+. (Join-Path $root 'legacy/winforms/CodexUiState.ps1')
+. (Join-Path $root 'src/backend/CodexRunEngine.ps1')
+. (Join-Path $root 'legacy/winforms/CodexUiSelection.ps1')
 $script:ui=New-CodexUiState
 $modelBox=[System.Windows.Forms.ComboBox]::new()
 $effortBox=[System.Windows.Forms.ComboBox]::new()

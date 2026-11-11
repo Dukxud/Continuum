@@ -5,11 +5,11 @@ $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
 $root=Split-Path -Parent $PSScriptRoot
 Import-Module (Join-Path $root 'components/WindowShell/WindowShell.psm1') -Force -ErrorAction Stop
-. (Join-Path $root 'CodexUiState.ps1')
+. (Join-Path $root 'legacy/winforms/CodexUiState.ps1')
 function Require($ok,[string]$message){if(-not $ok){throw $message}}
-$forms=Get-Content -LiteralPath (Join-Path $root 'CodexUiForms.ps1') -Raw
-$dashboard=Get-Content -LiteralPath (Join-Path $root 'CodexDashboard.ps1') -Raw
-$usage=Get-Content -LiteralPath (Join-Path $root 'CodexUiUsage.ps1') -Raw
+$forms=Get-Content -LiteralPath (Join-Path $root 'legacy/winforms/CodexUiForms.ps1') -Raw
+$dashboard=Get-Content -LiteralPath (Join-Path $root 'legacy/winforms/CodexDashboard.ps1') -Raw
+$usage=Get-Content -LiteralPath (Join-Path $root 'legacy/winforms/CodexUiUsage.ps1') -Raw
 Require ($forms -notmatch 'usageNotice|autoResumeCheck|Ready\. Keep Windows awake') 'Obsolete status/disclaimer controls remain.'
 Require ($dashboard -notmatch 'activityPanel|activityLabel|Update-DashboardActivity') 'Latest result ticker remains in dashboard.'
 Require ($usage -match 'Set-UsageUnavailable' -and $usage -notmatch 'usageNotice|card\.Updated') 'Usage failures must appear inside cards without an updated-time footer.'

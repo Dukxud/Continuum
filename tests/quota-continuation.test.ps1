@@ -1,7 +1,7 @@
 # Isolated quota-continuation contract tests: no real Codex or Task Scheduler.
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'CodexRunEngine.ps1')
+. (Join-Path $root 'src/backend/CodexRunEngine.ps1')
 function Require($ok,[string]$message){if(-not $ok){throw $message}}
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('quota-policy-'+[guid]::NewGuid().ToString('N'))
 [void](New-Item -ItemType Directory -Path $temp -Force)
@@ -105,7 +105,7 @@ try {
     $job | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $jobFile -Encoding utf8
     $runtime=Join-Path $temp 'runtime'
     [void](New-Item -ItemType Directory -Path $runtime -Force)
-    [void](New-Item -ItemType File -Path (Join-Path $runtime 'CodexRunJob.vbs') -Force)
+    [void](New-Item -ItemType File -Path (Join-Path $runtime 'src/backend/CodexRunJob.vbs') -Force)
 
     $scheduled=(Get-Date).AddHours(2).AddSeconds(37)
     $child=Register-CodexQuotaContinuation -Job $job -JobFile $jobFile -AppDirectory $temp -RuntimeDirectory $runtime -When $scheduled

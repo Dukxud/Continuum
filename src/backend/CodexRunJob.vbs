@@ -12,7 +12,7 @@ If WScript.Arguments.Count = 2 Then
     visibility = 1
 End If
 folder = files.GetParentFolderName(WScript.ScriptFullName)
-script = files.BuildPath(folder, "CodexResumeScheduler.ps1")
+script = files.BuildPath(folder, "Invoke-CodexJob.ps1")
 jobFile = WScript.Arguments(0)
 If Not files.FileExists(script) Or Not files.FileExists(jobFile) Then WScript.Quit 2
 ' Task Scheduler may use the repository as its working directory;
@@ -20,7 +20,7 @@ If Not files.FileExists(script) Or Not files.FileExists(jobFile) Then WScript.Qu
 pwsh = files.BuildPath(shell.ExpandEnvironmentStrings("%ProgramFiles%"), "PowerShell\7\pwsh.exe")
 If Not files.FileExists(pwsh) Then WScript.Quit 2
 command = Chr(34) & pwsh & Chr(34) & " -NoLogo -NoProfile -ExecutionPolicy Bypass -File " & Chr(34) & script & Chr(34) & _
-          " -RunJob -JobFile " & Chr(34) & jobFile & Chr(34)
+          " -JobFile " & Chr(34) & jobFile & Chr(34)
 On Error Resume Next
 status = shell.Run(command, visibility, True)
 If Err.Number <> 0 Then
