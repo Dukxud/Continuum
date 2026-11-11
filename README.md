@@ -10,6 +10,10 @@ Schedule a continuation for later, see the usage windows reported for your accou
 
 [Getting started](docs/GETTING-STARTED.md) · [User guide](docs/USER-GUIDE.md) · [Architecture](docs/ARCHITECTURE.md) · [Documentation](docs/README.md)
 
+![Continuum Full workspace showing conversation selection, scheduling, quota windows, and an upcoming run](docs/screenshots/2026-11-11/full.png)
+
+*Current Flutter interface with synthetic demo data. [See Monitor, Micro, and appearance views](docs/SCREENSHOTS.md).*
+
 ## What it does
 
 - **Schedule a saved conversation.** Choose a repository, model, access level, instruction, and time for a one-time Windows task.

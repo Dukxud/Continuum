@@ -1,0 +1,56 @@
+{
+  "capturedAtUtc": "2026-11-11T21:55:34.300341+00:00",
+  "applicationVersion": "0.1.0+1",
+  "sourceBaseCommit": "5520cd0085a4584f2374ccf8380bad7c05a6e45a",
+  "sourceChanges": "Updated synthetic capture harness and explicit Segoe UI dropdown font",
+  "environment": {
+    "os": "Windows",
+    "flutter": "3.47.9",
+    "dart": "3.13.7"
+  },
+  "captureKind": "Flutter widget-renderer output; synthetic data; static sprite renderer; no native window chrome or live account acceptance",
+  "images": [
+    {
+      "file": "full.png",
+      "width": 1240,
+      "height": 810,
+      "sha256": "69d13a30a8d7bd42a08e7f20884390c92a2a836f32fa1089d54957d9fa7ac665"
+    },
+    {
+      "file": "monitor.png",
+      "width": 540,
+      "height": 645,
+      "sha256": "96a329fcb2a9db64c9c507484d5d497a3d7d540c0150c47073f121c7e31e2e8e"
+    },
+    {
+      "file": "micro.png",
+      "width": 392,
+      "height": 212,
+      "sha256": "8423f201799ff5f150752cd0b036225d3de042ef0391ca41e1af9951a447c0dd"
+    },
+    {
+      "file": "appearance-colors.png",
+      "width": 900,
+      "height": 700,
+      "sha256": "36a0c165b45289ca43bb855aa8651c7fecc76cca357a7f275a2bc43bba600128"
+    },
+    {
+      "file": "appearance-optics.png",
+      "width": 900,
+      "height": 700,
+      "sha256": "e9e3fe38919ea1a86a6ab7753ae2eca2727b67d4ea6053717ef830b86577384a"
+    }
+  ],
+  "sourceTextSha256Lf": {
+    "src/desktop/test/parity_capture_test.dart": "da6648e2f739513a18832b090eafd4e9241f523d9d0338f1d84df919a1905a9d",
+    "src/desktop/lib/app.dart": "9b0f0bed9cdac158aa1fea2f88d4af35c8741fd64c842d2f50e363cb73bf4bce",
+    "src/desktop/lib/dashboard_skin.dart": "e25bfc25944edabf78bec50a0fe0eda9f31975b4672185e8a091332fa3b89339",
+    "src/desktop/lib/scheduler_home.dart": "56c80fd3d0742fab6535cc5e3e6c2330e0b0ee9264be3dd79dd354e11809470d",
+    "src/desktop/lib/dashboard_frame.dart": "2c50120d44af2e6f3b69e1eee8d7b0d6b0e896bb5990677c6bf420af9e42e83f",
+    "src/desktop/lib/dashboard_workbench.dart": "4fca0d4f710da7681a7bb5a133188a3a312ac59eefe93961f6527d5a895ce28c",
+    "src/desktop/lib/dashboard_monitor.dart": "caa147b6ead04602c755f49c388a61e147b9ff0205c0ec2bc2ff6de3d7fda1e2",
+    "src/desktop/lib/dashboard_micro.dart": "ad27dc10be37958c62014cd2c8774f8417b028ab3fa19cba19d11cd9b45fa77d",
+    "src/desktop/lib/appearance_dialog.dart": "0f10048f10e86029089d500b6d10007eadde99da6d11d33ee8671dbd628f5cc7",
+    "src/desktop/lib/aero_bar.dart": "0c3622c4c586e064d26bd616107a4b195c18bc7bc770233c7064b141c5b85d9a"
+  }
+}

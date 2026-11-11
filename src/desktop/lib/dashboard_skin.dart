@@ -318,6 +318,7 @@ class DeckSelect<T> extends StatelessWidget {
           size: 20,
         ),
         style: const TextStyle(
+          fontFamily: 'Segoe UI',
           fontSize: 13.5,
           fontWeight: FontWeight.w500,
           color: DeckColor.text,
