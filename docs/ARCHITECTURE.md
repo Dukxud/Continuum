@@ -1,6 +1,6 @@
 # Continuum architecture
 
-**Current authority:** merged `main`; [pause/baseline record](CURRENT-STATE.md). The older WinForms architecture is preserved separately in [history](history/ARCHITECTURE-WINFORMS.md).
+Continuum separates the Flutter desktop interface from Windows scheduling and execution. A JSON bridge connects the UI to a pinned PowerShell worker, with reusable modules for persistence, task registration, and outcomes. See the [maintainer handoff](CURRENT-STATE.md) for the current baseline and [project history](history/ARCHITECTURE-WINFORMS.md) for the original WinForms design.
 
 ## Runtime boundaries
 

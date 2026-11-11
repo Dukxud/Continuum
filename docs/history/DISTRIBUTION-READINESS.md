@@ -1,6 +1,6 @@
 # Distribution and adoption readiness
 
-**Dated assessment, 6 Nov 2026; deferred during the project pause.** [CURRENT-STATE.md](CURRENT-STATE.md) governs restart. No release, marketing, telemetry or outreach is authorized by this document.
+**Dated assessment, 6 Nov 2026; deferred during the project pause.** [CURRENT-STATE.md](../CURRENT-STATE.md) governs restart. No release, marketing, telemetry or outreach is authorized by this document.
 
 ## Observed evidence, not a user count
 
@@ -21,4 +21,4 @@ Continuum schedules saved Codex conversations on Windows with three execution mo
 5. Provide compatibility/known-limit notes, reproducible issue reporting and rollback instructions.
 6. With explicit launch approval, update discoverability metadata and invite a small external feedback group.
 
-Measure voluntary setup reports, reproducible external issues and available GitHub traffic/download indicators without pretending they equal unique active users. No invasive telemetry is needed for this pause. [Release policy](RELEASE-POLICY.md).
+Measure voluntary setup reports, reproducible external issues and available GitHub traffic/download indicators without pretending they equal unique active users. No invasive telemetry is needed for this pause. [Release policy](../RELEASE-POLICY.md).

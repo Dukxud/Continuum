@@ -10,3 +10,19 @@ node_modules/
 AeroWebView2/
 AeroScreenshots/
 QA-results-local-*/
+
+# Generated Flutter build and desktop runner files
+/flutter_port/.dart_tool/
+/flutter_port/build/
+/flutter_port/windows/
+/flutter_port/.flutter-plugins
+/flutter_port/.flutter-plugins-dependencies
+/flutter_port/.metadata
+/flutter_port/.idea/
+/flutter_port/*.iml
+/flutter_port/test/captures/
+
+# Local preview packages
+/PreviewArtifacts/
+/ComponentArtifacts/
+/ReusableArtifacts/

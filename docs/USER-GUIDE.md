@@ -1,10 +1,10 @@
 # Continuum user guide
 
-**Windows engineering preview; project paused.** [Current state and exact executable](CURRENT-STATE.md) are the starting point. The latest application preview is BP211. The public v1.11.0 release is legacy WinForms, not Continuum Flutter.
+Schedule saved conversations, monitor reported usage, and inspect results from the Continuum desktop app. For installation, start with [Getting started](GETTING-STARTED.md). The current Flutter version is a Windows engineering preview; feature development is paused.
 
 ## Open and prepare
 
-Use the [root build/open instructions](../README.md) or the BP211 path in the handoff. Keep the complete package beside `codex_resume_flutter.exe`. Running it requires Windows x64, a signed-in desktop, PowerShell 7, Node, Git and npm Codex with a usable account. Building also requires Flutter and Visual Studio C++ tools.
+Use the [build and launch instructions](GETTING-STARTED.md) or the recorded preview path in the [maintainer handoff](CURRENT-STATE.md). Keep the complete package beside `codex_resume_flutter.exe`. Running it requires Windows x64, a signed-in desktop, PowerShell 7, Node, Git and npm Codex with a usable account. Building also requires Flutter and Visual Studio C++ tools.
 
 Start with a disposable saved Codex conversation and Git checkout. The app reads metadata and usage on startup; no model turn is submitted merely by opening the GUI. Do not schedule an independently active conversation for a second writer.
 

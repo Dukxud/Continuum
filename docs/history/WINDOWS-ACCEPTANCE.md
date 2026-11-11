@@ -1,4 +1,4 @@
-> **Archived v1.16 WinForms acceptance procedure (historical PR #16).** Do not follow its outdated instructions to merge PR #16 or treat it as the present Flutter gate. For merged Continuum `main`, use [CONTINUUM-WINDOWS-ACCEPTANCE.md](CONTINUUM-WINDOWS-ACCEPTANCE.md).
+> **Archived v1.16 WinForms acceptance procedure (historical PR #16).** Do not follow its outdated instructions to merge PR #16 or treat it as the present Flutter gate. For merged Continuum `main`, use [CONTINUUM-WINDOWS-ACCEPTANCE.md](../CONTINUUM-WINDOWS-ACCEPTANCE.md).
 
 # Manual Windows acceptance gate — v1.16
 

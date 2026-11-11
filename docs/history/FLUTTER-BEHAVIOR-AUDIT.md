@@ -1,6 +1,4 @@
- > **Historical Flutter behavior audit:** evidence from the earlier port candidate. For merged `main` and Shared sessions, use [current acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md). Keep original evidence below for traceability.
-
-> **Historical Flutter behavior audit:** evidence from its original development candidate. For merged `main` and Shared sessions, see [current acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md). This file is retained for traceability.
+> **Historical Flutter behavior audit:** evidence from its original development candidate. For merged `main` and Shared sessions, see [current acceptance](../CONTINUUM-WINDOWS-ACCEPTANCE.md). This file is retained for traceability.
 
 # Flutter ↔ WinForms v1.16 behavioral parity audit
 

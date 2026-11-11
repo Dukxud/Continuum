@@ -11,4 +11,4 @@
 - Never disable antivirus/SmartScreen globally or create broad exclusions to make an unsigned preview run. SHA-256 checks prove content integrity, not trust in a publisher.
 - Screenshots must show real, accurately captioned behavior. Historical failures and pre-quota-fix images cannot advertise BP211 success. [Screenshot rules](SCREENSHOTS.md).
 
-Distribution work and promotion are deferred. [Readiness assessment](DISTRIBUTION-READINESS.md) is a recorded backlog, not an active launch instruction.
+Distribution work and promotion are deferred. [Readiness assessment](history/DISTRIBUTION-READINESS.md) is a recorded backlog, not an active launch instruction.
