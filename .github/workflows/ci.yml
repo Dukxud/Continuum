@@ -25,12 +25,12 @@ jobs:
     outputs:
       application: ${{ steps.scope.outputs.application }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ env.SOURCE_SHA }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: '22'
           cache: npm
@@ -63,11 +63,11 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ env.SOURCE_SHA }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: '22'
           cache: npm
@@ -81,9 +81,7 @@ jobs:
         shell: pwsh
         working-directory: src/desktop
         run: |
-          flutter create --no-pub --platforms=windows --project-name codex_resume_flutter .
-          if ($LASTEXITCODE -ne 0) { throw 'Windows runner generation failed.' }
-          ./scripts/Install-WindowsIcon.ps1
+          ./scripts/Initialize-WindowsRunner.ps1
           flutter pub get --enforce-lockfile
           if ($LASTEXITCODE -ne 0) { throw 'Locked dependency resolution failed.' }
       - name: Check Dart formatting and analysis
@@ -110,7 +108,7 @@ jobs:
           ./src/desktop/Build-WindowsPreview.ps1 -PackageVerifiedBuild -OutputDirectory ./src/desktop/build/review-out
       - name: Upload unsigned Windows preview
         timeout-minutes: 3
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: continuum-windows-${{ env.SOURCE_SHA }}
           path: src/desktop/build/review-out/*.zip
@@ -120,7 +118,7 @@ jobs:
         if: failure()
         timeout-minutes: 2
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: windows-test-logs-${{ env.SOURCE_SHA }}
           path: QA-results-local-*/*.log

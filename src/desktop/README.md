@@ -56,6 +56,6 @@ The package includes the Flutter runtime, bridge handlers, backend, required com
 
 ## Branding and acceptance
 
-The checked-in `branding/continuum.ico` is the icon authority. After runner generation, `scripts/Install-WindowsIcon.ps1` installs it and validates the resource reference. Generated runner files remain untracked.
+The checked-in `branding/continuum.ico` is the icon authority. `scripts/Initialize-WindowsRunner.ps1` generates the runner while preserving the application lockfile, then calls `scripts/Install-WindowsIcon.ps1` to install the icon and validate the resource reference. Local scripts and CI use the same initializer. Generated runner files remain untracked.
 
 A green build establishes source and package checks, not native behavior. The [acceptance ledger](../../docs/CONTINUUM-WINDOWS-ACCEPTANCE.md) records observations and pending live checks. The [current state](../../docs/CURRENT-STATE.md) retains earlier build evidence. Include the exact source SHA, checksum, download or launch command, and verification scope with a review build.

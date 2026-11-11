@@ -19,10 +19,8 @@ try{
     $env:CODEX_SCHEDULER_SOURCE=$root
     & pwsh -NoProfile -STA -File (Join-Path $root 'tests/flutter-port-bridge.test.ps1')
     if($LASTEXITCODE -ne 0){throw 'Live Windows bridge integration failed.'}
-    & $flutter.Source create --no-pub --platforms=windows --project-name codex_resume_flutter .
-    if($LASTEXITCODE -ne 0){throw 'Flutter Windows runner generation failed.'}
-    & pwsh -NoProfile -File (Join-Path $project 'scripts/Install-WindowsIcon.ps1')
-    if($LASTEXITCODE -ne 0){throw 'Continuum native icon installation failed.'}
+    & pwsh -NoProfile -File (Join-Path $project 'scripts/Initialize-WindowsRunner.ps1')
+    if($LASTEXITCODE -ne 0){throw 'Windows runner initialization failed.'}
     & $flutter.Source pub get --enforce-lockfile
     if($LASTEXITCODE -ne 0){throw 'Flutter dependencies failed.'}
     & $flutter.Source analyze --no-pub
