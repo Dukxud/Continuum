@@ -17,18 +17,27 @@ export async function unusedLoopbackPort() {
     return server.address().port;
   } finally {
     if (server.listening) {
-      await new Promise(resolve => server.close(resolve));
+      await new Promise((resolve) => server.close(resolve));
     }
   }
 }
 
 export function nativeTuiArguments(codexEntry, endpoint, threadId) {
-  if (!/^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(threadId) ||
-      !/^ws:\/\/127\.0\.0\.1:\d{1,5}$/.test(endpoint)) {
+  if (
+    !/^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(threadId) ||
+    !/^ws:\/\/127\.0\.0\.1:\d{1,5}$/.test(endpoint)
+  ) {
     throw new Error('Native TUI requires a loopback owner and a saved thread');
   }
-  return [codexEntry, '--remote', endpoint,
-    '--remote-auth-token-env', REMOTE_TOKEN_ENV, 'resume', threadId];
+  return [
+    codexEntry,
+    '--remote',
+    endpoint,
+    '--remote-auth-token-env',
+    REMOTE_TOKEN_ENV,
+    'resume',
+    threadId,
+  ];
 }
 
 async function dial(endpoint, token, makeSocket, timeoutMs) {
@@ -36,19 +45,23 @@ async function dial(endpoint, token, makeSocket, timeoutMs) {
   try {
     await new Promise((resolve, reject) => {
       let settled = false;
-      const done = error => {
+      const done = (error) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
         socket.removeEventListener('open', onOpen);
         socket.removeEventListener('error', onError);
         socket.removeEventListener('close', onClose);
-        if (error) reject(error); else resolve();
+        if (error) reject(error);
+        else resolve();
       };
       const onOpen = () => done();
       const onError = () => done(new Error('Codex WebSocket authentication or connection failed'));
       const onClose = () => done(new Error('Codex WebSocket closed during connection'));
-      const timer = setTimeout(() => done(new Error('Codex WebSocket connection timed out')), timeoutMs);
+      const timer = setTimeout(
+        () => done(new Error('Codex WebSocket connection timed out')),
+        timeoutMs,
+      );
       socket.addEventListener('open', onOpen);
       socket.addEventListener('error', onError);
       socket.addEventListener('close', onClose);
@@ -56,7 +69,11 @@ async function dial(endpoint, token, makeSocket, timeoutMs) {
     return socket;
   } catch (error) {
     // Closing a socket that never completed its handshake can itself throw.
-    try { socket.close(); } catch { /* The connection was never usable. */ }
+    try {
+      socket.close();
+    } catch {
+      /* The connection was never usable. */
+    }
     throw error;
   }
 }
@@ -67,11 +84,14 @@ async function dial(endpoint, token, makeSocket, timeoutMs) {
  * The Codex process is spawned exactly once by SharedSessionHost.
  */
 export async function openRemoteProtocol({
-  endpoint, token, child, makeSocket = (url, options) => new WebSocket(url, options),
-  attempts = CONNECT_ATTEMPTS, retryMs = RETRY_DELAY_MS,
+  endpoint,
+  token,
+  child,
+  makeSocket = (url, options) => new WebSocket(url, options),
+  attempts = CONNECT_ATTEMPTS,
+  retryMs = RETRY_DELAY_MS,
 }) {
-  if (!/^ws:\/\/127\.0\.0\.1:\d{1,5}$/.test(endpoint) ||
-      !/^[a-f0-9]{64}$/i.test(token)) {
+  if (!/^ws:\/\/127\.0\.0\.1:\d{1,5}$/.test(endpoint) || !/^[a-f0-9]{64}$/i.test(token)) {
     throw new Error('Remote Codex connection must use authenticated loopback');
   }
   let socket, lastError;
@@ -84,7 +104,7 @@ export async function openRemoteProtocol({
       break;
     } catch (error) {
       lastError = error;
-      if (attempt + 1 < attempts) await new Promise(resolve => setTimeout(resolve, retryMs));
+      if (attempt + 1 < attempts) await new Promise((resolve) => setTimeout(resolve, retryMs));
     }
   }
   if (!socket) throw lastError ?? new Error('Codex App Server listener unavailable');
@@ -93,7 +113,9 @@ export async function openRemoteProtocol({
   const channel = new EventEmitter();
   channel.stdout = messages;
   channel.stdin = {
-    get writable() { return socket.readyState === 1; },
+    get writable() {
+      return socket.readyState === 1;
+    },
     write(value) {
       if (socket.readyState !== 1) throw new Error('Codex WebSocket disconnected');
       socket.send(value.trimEnd());
@@ -102,13 +124,13 @@ export async function openRemoteProtocol({
   };
   const protocol = new AppServerProtocol(channel);
   let closed = false;
-  const fail = error => {
+  const fail = (error) => {
     if (closed) return;
     closed = true;
     protocol.fail(error);
     messages.end();
   };
-  socket.addEventListener('message', event => {
+  socket.addEventListener('message', (event) => {
     const message = event.data;
     if (typeof message !== 'string' || Buffer.byteLength(message, 'utf8') > MAX_MESSAGE_BYTES) {
       fail(new Error('Codex WebSocket message invalid or oversized'));

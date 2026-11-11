@@ -2,7 +2,7 @@
 # No scheduled task creation, cancellation, or login state changes.
 $ErrorActionPreference='Stop'
 if(-not $IsWindows){throw 'Windows required for bridge integration.'}
-$project=Join-Path (Split-Path -Parent $PSScriptRoot) 'flutter_port'
+$project=Join-Path (Split-Path -Parent $PSScriptRoot) 'src/desktop'
 $bridge=Join-Path $project 'windows_bridge.ps1'
 if(-not (Test-Path -LiteralPath $bridge -PathType Leaf)){throw 'Flutter JSON bridge missing.'}
 foreach($action in @('load','pending')){

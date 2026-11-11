@@ -1,0 +1,16 @@
+{
+  "name": "continuum-dev-tools",
+  "private": true,
+  "description": "Repository checks for the Continuum Windows scheduler",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test tests/*.test.js tests/*.test.mjs",
+    "check:docs": "node scripts/check-docs.mjs",
+    "format:check": "prettier --check \"src/backend/*.js\" \"components/SharedCodexSession/*.mjs\" \"tests/*.{js,mjs}\" \"scripts/*.mjs\"",
+    "format": "prettier --write \"src/backend/*.js\" \"components/SharedCodexSession/*.mjs\" \"tests/*.{js,mjs}\" \"scripts/*.mjs\""
+  },
+  "devDependencies": {
+    "markdown-it": "15.0.3",
+    "prettier": "3.10.0"
+  }
+}

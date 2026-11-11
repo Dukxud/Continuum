@@ -23,7 +23,9 @@ foreach ($definition in $definitions | Where-Object Name -in @('Refresh-SessionL
 }
 # Start-DataRead must coalesce an in-flight request, not start parallel duplicates.
 # Load the actual file so PSScriptRoot resolves the backend from its new location.
+Add-Type -AssemblyName System.Windows.Forms
 . (Join-Path $root 'legacy/winforms/CodexUiRefresh.ps1')
+$dataPoll.Dispose()
 $script:ui.Async.dataJobs = @{}; $script:ui.Async.dataQueued = @{}; $script:startedJobs = 0
 function Start-ThreadJob { param($ArgumentList,$ScriptBlock) $script:startedJobs++; [pscustomobject]@{ State = 'Running' } }
 function Update-Status { param($Text) throw "Unexpected start failure: $Text" }

@@ -1,25 +1,30 @@
-# One deterministic, manual Windows acceptance entrypoint. Never calls CI.
+# Windows regression suite shared by local development and CI.
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidatePattern('^[a-fA-F0-9]{40}$')][string]$ExpectedCommit,
+    [ValidatePattern('^[a-fA-F0-9]{40}$')][string]$ExpectedCommit,
     [ValidateRange(30,1800)][int]$TestTimeoutSeconds = 300
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $originalDirectory = (Get-Location).Path
 $logRoot = Join-Path $root ('QA-results-local-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-Write-Host 'BLACK-PUDDLE — LOCAL ACCEPTANCE START' -ForegroundColor Magenta
+Write-Host 'Continuum — Windows acceptance start' -ForegroundColor Magenta
 try {
     if (-not $IsWindows -or $PSVersionTable.PSVersion.Major -lt 7) { throw 'PowerShell 7 on Windows is required.' }
     Set-Location -LiteralPath $root
     $null = Get-Command git.exe -ErrorAction Stop
     $actual = (& git -C $root rev-parse HEAD).Trim()
-    if ($LASTEXITCODE -ne 0 -or $actual -cne $ExpectedCommit) { throw "Source commit mismatch: $actual" }
-    if (@(& git -C $root status --porcelain --untracked-files=no).Count -gt 0) { throw 'Tracked source has local edits; isolated candidate no longer matches the reviewed commit.' }
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the checkout.' }
+    if ($ExpectedCommit) {
+        if ($actual -cne $ExpectedCommit) { throw "Source commit mismatch: $actual" }
+        if (@(& git -C $root status --porcelain --untracked-files=no).Count -gt 0) { throw 'Tracked source has local edits; candidate no longer matches the requested commit.' }
+    }
     $null = Get-Command node.exe -ErrorAction Stop
     $null = Get-Command pwsh.exe -ErrorAction Stop
     [void](New-Item -ItemType Directory -Path $logRoot -Force)
-    $source = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $_.Extension -in @('.ps1','.psm1','.psd1') })
+    $source = @(& git -C $root ls-files -- '*.ps1' '*.psm1' '*.psd1' |
+        ForEach-Object { Get-Item -LiteralPath (Join-Path $root $_) -ErrorAction Stop })
+    if ($LASTEXITCODE -ne 0 -or $source.Count -eq 0) { throw 'Cannot discover tracked PowerShell source.' }
     $syntax = @(
         foreach ($file in $source) {
             # ParseInput distinguishes file-access failures from syntax errors.
@@ -51,7 +56,7 @@ try {
     # Catch disappearances between the initial Git check and source discovery:
     # missing files must never make the acceptance suite appear smaller/green.
     $postScan = @(& git -C $root status --porcelain --untracked-files=no)
-    if ($LASTEXITCODE -ne 0 -or $postScan.Count -gt 0) {
+    if ($LASTEXITCODE -ne 0 -or ($ExpectedCommit -and $postScan.Count -gt 0)) {
         throw "SOURCE INTEGRITY FAILURE during scan: $($postScan -join '; ')"
     }
     Write-Host "PASS — parsed $($source.Count) PowerShell source files" -ForegroundColor Green
@@ -68,11 +73,11 @@ try {
         if ($missingSdk.Count -gt 0) { throw "WebView2 SDK remains incomplete: $($missingSdk -join ', ')" }
     }
     Write-Host 'PASS — WebView2 SDK dependencies available' -ForegroundColor Green
-    $tests = @(Get-ChildItem -LiteralPath (Join-Path $root 'tests') -File | Where-Object { $_.Name -match '\.test\.(ps1|js)$' } | Sort-Object Name)
+    $tests = @(Get-ChildItem -LiteralPath (Join-Path $root 'tests') -File | Where-Object { $_.Name -match '\.test\.(ps1|js|mjs)$' } | Sort-Object Name)
     # Git-tracked test inventory is authoritative in both local and manual CI.
     # Do not silently pass after an antivirus deletion or stale workflow list.
     $expected = @(& git -C $root ls-files -- tests | Where-Object {
-        $_ -match '^tests/[^/]+\.test\.(?:ps1|js)$'
+        $_ -match '^tests/[^/]+\.test\.(?:ps1|js|mjs)$'
     } | ForEach-Object { [IO.Path]::GetFileName($_) } | Sort-Object)
     if ($LASTEXITCODE -ne 0 -or $expected.Count -eq 0) { throw 'Could not discover the tracked test inventory.' }
     $actual = @($tests | ForEach-Object Name)
@@ -90,13 +95,21 @@ try {
         $stdout = ''
         $stderr = ''
         $startInfo = [Diagnostics.ProcessStartInfo]::new()
-        $startInfo.FileName = if ($test.Extension -eq '.js') { 'node.exe' } else { 'pwsh.exe' }
-        $arguments = if ($test.Extension -eq '.js') {
+        $startInfo.FileName = if ($test.Extension -in @('.js','.mjs')) { 'node.exe' } else { 'pwsh.exe' }
+        $arguments = if ($test.Extension -in @('.js','.mjs')) {
             @('--test', $test.FullName)
         } else {
             @('-NoProfile', '-STA', '-File', $test.FullName)
         }
         foreach ($argument in $arguments) { [void]$startInfo.ArgumentList.Add($argument) }
+        # Each test receives empty application/session state, including tests
+        # that exercise the real read-only bridge or open the legacy GUI.
+        $testProfile = Join-Path $logRoot ('profiles/' + $test.BaseName)
+        $localProfile = Join-Path $testProfile 'local'
+        $codexProfile = Join-Path $testProfile 'codex'
+        [void](New-Item -ItemType Directory -Path $localProfile,$codexProfile -Force)
+        $startInfo.Environment['LOCALAPPDATA'] = $localProfile
+        $startInfo.Environment['CODEX_HOME'] = $codexProfile
         $startInfo.UseShellExecute = $false
         $startInfo.CreateNoWindow = $true
         $startInfo.RedirectStandardOutput = $true
@@ -131,7 +144,7 @@ try {
         Write-Host "$(if($code -eq 0){'PASS'}else{'FAIL'}) — $($test.Name)" -ForegroundColor $(if($code -eq 0){'Green'}else{'Red'})
     }
     $postTests = @(& git -C $root status --porcelain --untracked-files=no)
-    if ($LASTEXITCODE -ne 0 -or $postTests.Count -gt 0) {
+    if ($LASTEXITCODE -ne 0 -or ($ExpectedCommit -and $postTests.Count -gt 0)) {
         throw "SOURCE INTEGRITY FAILURE during tests: $($postTests -join '; ')"
     }
     $failed = @($results | Where-Object Exit -ne 0)
@@ -153,5 +166,5 @@ try {
     exit 1
 } finally {
     try { Set-Location -LiteralPath $originalDirectory } catch { }
-    Write-Host 'BLACK-PUDDLE — LOCAL ACCEPTANCE END' -ForegroundColor Magenta
+    Write-Host 'Continuum — Windows acceptance end' -ForegroundColor Magenta
 }

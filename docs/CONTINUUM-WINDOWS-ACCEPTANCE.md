@@ -1,6 +1,6 @@
 # Continuum Windows acceptance and evidence
 
-**Current baseline and pause:** [CURRENT-STATE.md](CURRENT-STATE.md). This gate describes future verification, not an instruction to resume work now or reopen already merged PRs. Merge authorization is distinct from a recorded native pass.
+The [project status](CURRENT-STATE.md) records the current baseline. This ledger distinguishes automated checks from native observations and tracks the remaining acceptance scenarios.
 
 ## Repository maintenance verification — 11 Nov 2026
 

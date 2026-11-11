@@ -17,11 +17,18 @@ test('launchers rely only on the Windows provided script host', () => {
   assert.match(runner, /visibility = 1/);
   assert.match(runner, /Invoke-CodexJob\.ps1/);
   assert.match(runner, /WScript\.Quit status/);
-  assert.match(runner, /errorPath = files\.GetParentFolderName\(jobFile\)/, 'Runner startup diagnostics must follow its job payload, not ambient LOCALAPPDATA.');
-  for(const launcher of [gui,runner]) {
-    assert.match(launcher,/pwsh = files\.BuildPath\(shell\.ExpandEnvironmentStrings\("%ProgramFiles%"\), "PowerShell\\7\\pwsh\.exe"\)/);
-    assert.match(launcher,/command = Chr\(34\) & pwsh & Chr\(34\)/);
-    assert.doesNotMatch(launcher,/command\s*=\s*"pwsh\.exe/i);
+  assert.match(
+    runner,
+    /errorPath = files\.GetParentFolderName\(jobFile\)/,
+    'Runner startup diagnostics must follow its job payload, not ambient LOCALAPPDATA.',
+  );
+  for (const launcher of [gui, runner]) {
+    assert.match(
+      launcher,
+      /pwsh = files\.BuildPath\(shell\.ExpandEnvironmentStrings\("%ProgramFiles%"\), "PowerShell\\7\\pwsh\.exe"\)/,
+    );
+    assert.match(launcher, /command = Chr\(34\) & pwsh & Chr\(34\)/);
+    assert.doesNotMatch(launcher, /command\s*=\s*"pwsh\.exe/i);
   }
   assert.match(runner, /-JobFile/);
   assert.doesNotMatch(gui + runner + cmd, /CodexScheduler\.exe|CodexLauncher\.cs/);
@@ -40,7 +47,7 @@ test('single-run registration uses the installed Windows Script Host wrapper', (
 
 test('release version is displayed in the interface', () => {
   const source = fs.readFileSync(path.join(root, 'legacy/winforms/CodexUiForms.ps1'), 'utf8');
-  const version = fs.readFileSync(path.join(root, 'VERSION'), 'utf8').trim();
-  assert.ok(source.includes("Codex Resume Scheduler v" + version));
+  const version = fs.readFileSync(path.join(root, 'legacy/winforms/VERSION'), 'utf8').trim();
+  assert.ok(source.includes('Codex Resume Scheduler v' + version));
   assert.match(version, /^\d+\.\d+\.\d+$/);
 });

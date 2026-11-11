@@ -28,4 +28,4 @@ Pending requests are validated for supported method and thread/turn identity. Ap
 
 The first real disposable task produced `NATIVE TERMINAL TEST COMPLETE`, but its old server died at completion and the TUI reconnected. BP206 recorded completed/exit 0 with no descriptor. This is historical defect evidence, not a passing lifecycle demonstration.
 
-The lease/fallback fix is merged and Windows mock/build CI passed on `6cd11c6`; BP207 launched. No repeat fixed-binary post-completion TUI pass or dual-surface approval pass was supplied before the pause. BP201 backend and BP202 capability passes do not fill these gaps. Follow [Windows acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md) only after renewed explicit authorization for live Codex tests.
+The lease/fallback fix is merged and Windows mock/build CI passed on `6cd11c6`; BP207 launched. No repeat fixed-binary post-completion TUI pass or dual-surface approval pass was supplied before the pause. BP201 backend and BP202 capability passes do not fill these gaps. The remaining scenarios are tracked in [Windows acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md); live Codex tests require operator authorization.

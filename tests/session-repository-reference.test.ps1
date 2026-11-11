@@ -26,7 +26,7 @@ try{
         return [pscustomobject]@{Id='00000000-0000-0000-0000-000000000001';Cwd=$testHome;File=$file}
     }
 
-    # Reproduce BLACK-PUDDLE: neither checkout folder nor remote slug is
+    # Reproduce the repository-discovery regression: neither checkout folder nor remote slug is
     # literally "AIVault", but the verified origin has that full project
     # name as its first hyphen-delimited component.
     $aiv=New-TestRepo 'source\aivault-phase1-firewall-free'

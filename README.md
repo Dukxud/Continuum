@@ -1,5 +1,7 @@
 # Continuum
 
+[![CI](https://github.com/Dukxud/codex-resume-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/Dukxud/codex-resume-scheduler/actions/workflows/ci.yml)
+
 **A Windows desktop app for scheduling and monitoring saved Codex conversations.**
 
 Schedule a continuation for later, see the usage windows reported for your account, and track the result from a full dashboard or a compact desktop monitor. Continuum keeps the selected conversation and repository context with the job.
@@ -44,7 +46,8 @@ Shared sessions must be started by Continuum. Retained terminals and later turns
 - **Reproducible job runtimes.** Content-addressed worker snapshots and SHA-256 verification keep scheduled execution tied to the files selected when the job was created. [RuntimeBundle](components/RuntimeBundle/RuntimeBundle.psm1)
 - **Explicit execution ownership.** Per-conversation worker coordination and authenticated local Shared clients prevent competing scheduler workers from starting the same conversation. [Shared protocol](components/SharedCodexSession)
 - **Reusable infrastructure.** Independently importable PowerShell modules cover task registration, settings, outcomes, repository inspection, and rendering. [Component guide](components/README.md)
-- **Tests across the boundaries.** Node protocol mocks, PowerShell integration checks, and Flutter widget and logic tests cover their respective layers. [Developer guide](flutter_port/README.md)
+- **Reproducible builds.** Committed dependency locks, strict analysis, version-derived packages, and source identity metadata make review builds traceable. [Desktop guide](src/desktop/README.md)
+- **Tests across the boundaries.** Node protocol mocks, PowerShell integration checks, and Flutter widget and logic tests cover their respective layers. [Test guide](tests/README.md)
 
 ## Try it
 
@@ -58,18 +61,18 @@ The published [v1.11.0 release](https://github.com/Dukxud/codex-resume-scheduler
 
 Feature development is paused. The current source includes the Flutter interface, three execution modes, native Windows branding, and usage-window rendering. Windows CI and package checks are recorded in the [acceptance ledger](docs/CONTINUUM-WINDOWS-ACCEPTANCE.md). Live verification of the latest quota display and Shared session retention/approval flows remains pending.
 
-The [maintainer handoff](docs/CURRENT-STATE.md) retains exact builds, verification results, and deferred work. Closing the app does not cancel jobs already registered with Windows Task Scheduler.
+The [project status](docs/CURRENT-STATE.md) records build evidence and remaining acceptance. Closing the app does not cancel jobs already registered with Windows Task Scheduler.
 
 ## Explore the source
 
 | Location | Contents |
 | --- | --- |
-| [flutter_port/](flutter_port) | Flutter UI, Windows bridge, widget tests, and preview builder |
+| [src/desktop/](src/desktop) | Flutter UI, Windows bridge, widget tests, and preview builder |
+| [src/backend/](src/backend/) | Active scheduling backend, metadata readers, and scheduled-job entry point |
 | [components/](components) | Reusable PowerShell modules and the Shared session host |
 | [tests/](tests) | PowerShell and Node regression and integration tests |
 | [scripts/](scripts) | Packaging, diagnostics, signing, and acceptance tools |
 | [docs/](docs) | Setup, usage, architecture, and verification records |
-| [src/backend/](src/backend/) | Active scheduling backend, metadata readers, and scheduled-job entry point |
 | [legacy/winforms/](legacy/winforms/) | Retained PowerShell/WinForms interface and its launchers |
 
 The Flutter frontend uses the backend in `src/backend/`. Preview packages and new worker snapshots preserve that layout; existing scheduled jobs retain their original saved runtimes.

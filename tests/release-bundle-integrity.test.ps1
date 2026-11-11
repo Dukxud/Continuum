@@ -56,9 +56,15 @@ try {
         if(-not (Test-Path -LiteralPath (Join-Path $base $file))){throw "Missing reusable module artifact: $file"}
       }
       if(Test-Path (Join-Path $base 'legacy/winforms/CodexResumeScheduler.ps1')){throw 'Reusable kit must not contain Codex or UI runtime.'}
+      if(Test-Path (Join-Path $base 'components/SharedCodexSession')){throw 'Reusable kit must exclude the Codex-specific Shared host.'}
     }
     Write-Host "$([IO.Path]::GetFileName($zip)): $checked files independently verified."
   }
 }finally{
-  Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+  $resolved=[IO.Path]::GetFullPath($work)
+  $parent=[IO.Path]::GetFullPath($tempRoot).TrimEnd([IO.Path]::DirectorySeparatorChar)
+  if((Split-Path -Parent $resolved) -ine $parent -or (Split-Path -Leaf $resolved) -notlike 'aero-integrity-*'){
+    throw 'Refusing cleanup outside the package integrity fixture.'
+  }
+  Remove-Item -LiteralPath $resolved -Recurse -Force -ErrorAction SilentlyContinue
 }

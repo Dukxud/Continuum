@@ -4,7 +4,7 @@
 param([string]$ExecutablePath='')
 $ErrorActionPreference='Stop'
 if(-not $IsWindows){throw 'Windows icon resource validation requires Windows.'}
-$project=Join-Path (Split-Path -Parent $PSScriptRoot) 'flutter_port'
+$project=Join-Path (Split-Path -Parent $PSScriptRoot) 'src/desktop'
 & pwsh -NoProfile -File (Join-Path $project 'scripts/Install-WindowsIcon.ps1') -VerifyOnly
 if($LASTEXITCODE -ne 0){throw 'Pinned runner resource verification failed.'}
 if(-not $ExecutablePath){return}
