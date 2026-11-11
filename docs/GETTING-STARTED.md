@@ -10,11 +10,11 @@ This guide builds the current Flutter version of Continuum from source on Window
 | PowerShell | PowerShell 7 in its standard `C:\Program Files\PowerShell\7` location |
 | Node.js and Git | Available on `PATH`; the recorded CI baseline uses Node 22 |
 | Codex CLI | npm installation, signed in to the account you intend to use |
-| Flutter | `flutter.bat` available on `PATH`; Windows preflight pins Flutter 3.47.9 |
+| Flutter | `flutter.bat` available on `PATH`; CI pins Flutter 3.47.9 |
 | Visual Studio | Desktop development with C++ workload and Windows build tools |
 | Windows build permissions | Symbolic-link support for Flutter plugins; enable [Developer Mode](https://learn.microsoft.com/en-us/windows/advanced-settings/developer-mode) on the build machine if Flutter requests it |
 
-The pinned versions describe the recorded build environment. Compatibility with a different Codex CLI or SDK version should be checked before scheduling work. See the [developer guide](../flutter_port/README.md) for the verification commands.
+The pinned versions describe the recorded build environment. Compatibility with a different Codex CLI or SDK version should be checked before scheduling work. See the [developer guide](../src/desktop/README.md) for the verification commands.
 
 Before building, run `flutter doctor -v` and resolve any Windows toolchain errors. See [troubleshooting](TROUBLESHOOTING.md#build-prerequisites) if runner generation reports that symlink support is missing.
 
@@ -35,7 +35,7 @@ git clone --branch main --single-branch https://github.com/Dukxud/codex-resume-s
 if ($LASTEXITCODE -ne 0) { throw 'Clone failed.' }
 
 Set-Location -LiteralPath $continuumRepo
-pwsh -NoProfile -STA -File .\flutter_port\Build-WindowsPreview.ps1 -OutputDirectory $continuumOutput
+pwsh -NoProfile -STA -File .\src\desktop\Build-WindowsPreview.ps1 -OutputDirectory $continuumOutput
 if ($LASTEXITCODE -ne 0) { throw 'Preview build failed.' }
 ```
 
@@ -46,17 +46,17 @@ The builder generates the Windows runner, installs the checked-in icon, runs sou
 After a successful build, run this in PowerShell 7:
 
 ```powershell
-$continuumExe = Join-Path $HOME 'Downloads\Continuum-Preview\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe'
+$continuumExe = Join-Path $HOME 'Downloads\Continuum-Preview\Continuum-Windows-v0.1.0+1-UNSIGNED-PREVIEW\codex_resume_flutter.exe'
 if (!(Test-Path -LiteralPath $continuumExe -PathType Leaf)) {
     throw 'Executable not found. Confirm the build succeeded and check its output path.'
 }
 Start-Process -FilePath $continuumExe -WorkingDirectory (Split-Path -Parent $continuumExe)
 ```
 
-If you selected a different output directory, update the launch path to match. The executable's default location is:
+If you selected a different output directory, update the launch path to match. The package version comes from `src/desktop/pubspec.yaml`; the example below uses `0.1.0+1`. The executable's default location is:
 
 ```text
-%USERPROFILE%\Downloads\Continuum-Preview\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe
+%USERPROFILE%\Downloads\Continuum-Preview\Continuum-Windows-v0.1.0+1-UNSIGNED-PREVIEW\codex_resume_flutter.exe
 ```
 
 Keep the complete package together, including its DLLs, `data` folder, bridge, and worker files. Opening Continuum may query account, conversation, model, and usage metadata. A model turn starts only when an execution is requested.
@@ -74,4 +74,4 @@ See the [user guide](USER-GUIDE.md) for mode-specific behavior and cancellation 
 
 The Flutter package is an unsigned engineering preview. Feature development is paused, and Shared retention/approval behavior and the latest live quota display still have outstanding native checks. See [Windows acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md).
 
-Previously built review packages are documented in the [maintainer handoff](CURRENT-STATE.md). Their CI downloads expire; this source-build guide is the durable setup path. The [release policy](RELEASE-POLICY.md) describes the remaining requirements for a signed production release.
+Previously built review packages are documented in the [project status](CURRENT-STATE.md). Their CI downloads expire; this source-build guide is the durable setup path. The [release policy](RELEASE-POLICY.md) describes the remaining requirements for a signed production release.

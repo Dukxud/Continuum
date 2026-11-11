@@ -1,12 +1,15 @@
 # Source and boundary smoke checks without requiring Flutter on existing CI hosts.
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
-$folder=Join-Path $root 'flutter_port'
+$folder=Join-Path $root 'src/desktop'
 $bridge=Join-Path $folder 'windows_bridge.ps1'
 # A frontend can fail at startup because it dot-sources the backend. Parse
 # the entire load chain before the costly Flutter install, not just the bridge.
 foreach($relative in @(
-    'flutter_port/windows_bridge.ps1','src/backend/CodexRunEngine.ps1',
+    'src/desktop/windows_bridge.ps1',
+    'src/desktop/bridge/ReadModels.ps1', 'src/desktop/bridge/Scheduling.ps1',
+    'src/desktop/bridge/SharedSessions.ps1', 'src/desktop/bridge/Preferences.ps1',
+    'src/backend/CodexRunEngine.ps1',
     'src/backend/CodexQuotaContinuation.ps1','src/backend/CodexTerminalRun.ps1','src/backend/CodexData.ps1','src/backend/CodexSessionRepository.ps1',
     'src/backend/CodexRunActivity.ps1',
     'src/backend/Invoke-CodexJob.ps1','components/JobOutcomes/JobOutcomes.psm1'
@@ -18,14 +21,16 @@ foreach($relative in @(
         throw "Flutter startup dependency does not parse: $relative line $($errors[0].Extent.StartLineNumber): $($errors[0].Message)"
     }
 }
-foreach($relative in @('pubspec.yaml','lib/main.dart','lib/aero_bar.dart',
-        'lib/bridge.dart','lib/scheduler_controller.dart','lib/dashboard_skin.dart','lib/dashboard_frame.dart',
+foreach($relative in @('pubspec.yaml','pubspec.lock','lib/main.dart','lib/aero_bar.dart',
+        'lib/bridge.dart','lib/windows_scheduler_adapter.dart','lib/schedule_time.dart',
+        'lib/app.dart','lib/scheduler_home.dart','lib/history_dialog.dart',
+        'lib/live_activity_dialog.dart','lib/shared_session_panel.dart','lib/scheduler_controller.dart','lib/dashboard_skin.dart','lib/dashboard_frame.dart',
         'lib/dashboard_workbench.dart','lib/dashboard_monitor.dart','lib/date_labels.dart','lib/desktop_window.dart',
         'lib/aero_appearance.dart','lib/appearance_dialog.dart','branding/continuum.ico','scripts/Install-WindowsIcon.ps1','test/appearance_test.dart','test/widget_test.dart',
         'test/logic_test.dart','test/aero_static_test.dart','test/window_mode_test.dart','test/windows_adapter_integration_test.dart','test/parity_capture_test.dart','Build-WindowsPreview.ps1','Run-WindowsReview.ps1','README.md')){
     if(-not (Test-Path -LiteralPath (Join-Path $folder $relative) -PathType Leaf)){throw "Missing Flutter file: $relative"}
 }
-foreach($relative in @('Run-WindowsReview.ps1','Build-WindowsPreview.ps1','scripts/Install-WindowsIcon.ps1','../tests/flutter-windows-icon.test.ps1','../tests/flutter-port-bridge.test.ps1')){
+foreach($relative in @('Run-WindowsReview.ps1','Build-WindowsPreview.ps1','scripts/Get-PreviewMetadata.ps1','scripts/Initialize-WindowsRunner.ps1','scripts/Install-WindowsIcon.ps1','../../tests/flutter-windows-icon.test.ps1','../../tests/flutter-port-bridge.test.ps1')){
     $path=Join-Path $folder $relative
     $pTokens=$null;$pErrors=$null
     [void][System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$pTokens,[ref]$pErrors)
@@ -33,12 +38,14 @@ foreach($relative in @('Run-WindowsReview.ps1','Build-WindowsPreview.ps1','scrip
 }
 foreach($preview in @('Run-WindowsReview.ps1','Build-WindowsPreview.ps1')){
     $script=Get-Content -LiteralPath (Join-Path $folder $preview) -Raw
-    if(-not $script.Contains('scripts/Install-WindowsIcon.ps1')){throw "Missing native Windows icon installation in $preview"}
+    if(-not $script.Contains('scripts/Initialize-WindowsRunner.ps1')){throw "Missing shared Windows runner initialization in $preview"}
 }
 $iconBytes=[IO.File]::ReadAllBytes((Join-Path $folder 'branding/continuum.ico'))
 if($iconBytes.Length -lt 512 -or [BitConverter]::ToUInt16($iconBytes,2) -ne 1 -or
     [BitConverter]::ToUInt16($iconBytes,4) -lt 4){throw 'Pinned native Windows icon invalid.'}
-$source=Get-Content -LiteralPath $bridge -Raw
+$source=(Get-Content -LiteralPath $bridge -Raw) + [Environment]::NewLine +
+    ((Get-ChildItem -LiteralPath (Join-Path $folder 'bridge') -Filter '*.ps1' -File | Sort-Object Name |
+        ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join [Environment]::NewLine)
 foreach($contract in @('Test-CanonicalWorkspaceIdentity','Assert-ModelEffortSupported',
     'Publish-ImmutableRuntime','Register-OneTimeTask','Remove-OneTimeTask',
     'Get-CodexRunEvidence','Get-CodexRunHistory','Get-CodexCliJs')){

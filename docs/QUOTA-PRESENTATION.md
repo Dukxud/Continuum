@@ -24,7 +24,7 @@ The response describes current account/model data, not a promise that every Plus
 
 ## Verification
 
-`flutter_port/test/quota_windows_test.dart` has 23 in-memory-adapter widget cases: weekly-only, five-hour-only, both windows in both orders, unfamiliar/blank labels, empty data, two-to-one refresh, unavailable/recovery, view switching without extra reads and weekly exhaustion countdown. It never starts Codex or registers a task.
+`src/desktop/test/quota_windows_test.dart` has 23 in-memory-adapter widget cases: weekly-only, five-hour-only, both windows in both orders, unfamiliar/blank labels, empty data, two-to-one refresh, unavailable/recovery, view switching without extra reads and weekly exhaustion countdown. It never starts Codex or registers a task.
 
 Windows run [42327638037](https://github.com/Dukxud/codex-resume-scheduler/actions/runs/42327638037) passed on `796f25e757412a8cabc3fa68531405ffc1b6a21b`; BP211 packages that candidate. PR #22 merged at `f83b11bc3acb9f0447b41d0a7b7d414bd86364ff` with the same source tree. The owner authorized merge and a project pause; live BP211 visual confirmation remains unrecorded.
 

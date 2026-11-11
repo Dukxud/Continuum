@@ -2,7 +2,7 @@
 
 Continuum is a personal Windows desktop project. Focused bug reports, documentation corrections, and small, well-explained changes are welcome. Feature development is currently paused; discuss substantial proposals before implementing them.
 
-For the current baseline and known limitations, read the [maintainer handoff](CURRENT-STATE.md). The [architecture guide](ARCHITECTURE.md) explains how the Flutter interface, Windows bridge, and scheduled worker fit together.
+For the current baseline and known limitations, read the [project status](CURRENT-STATE.md). The [architecture guide](ARCHITECTURE.md) explains how the Flutter interface, Windows bridge, and scheduled worker fit together.
 
 ## Report a problem
 
@@ -23,18 +23,22 @@ Preserve historical test results and their dates. A source review, successful bu
 
 ## Verify your change
 
-For documentation-only changes, check relative links, code examples, formatting, and the rendered page. Application builds and live Codex runs are not needed for prose edits.
+For documentation changes, run `npm ci --ignore-scripts` and `npm run check:docs`, then review code examples and rendered pages. The checker validates tracked local paths and anchors; newly added documents must be staged. Application builds and live Codex runs are not needed for prose edits.
 
 For application changes, use a complete checkout in PowerShell 7:
 
 ```powershell
-node --test tests/shared-codex-session.test.mjs tests/shared-codex-remote.test.mjs
-if ($LASTEXITCODE -ne 0) { throw 'Shared protocol tests failed.' }
-pwsh -NoProfile -STA -File .\flutter_port\Run-WindowsReview.ps1 -TestsOnly
+npm ci --ignore-scripts
+if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
+npm test
+if ($LASTEXITCODE -ne 0) { throw 'Node tests failed.' }
+npm run format:check
+if ($LASTEXITCODE -ne 0) { throw 'JavaScript formatting differs.' }
+pwsh -NoProfile -STA -File .\src\desktop\Run-WindowsReview.ps1 -TestsOnly
 if ($LASTEXITCODE -ne 0) { throw 'Windows/Flutter checks failed.' }
 ```
 
-The review script checks source and bridge contracts, generates the Windows runner with the pinned icon, resolves dependencies, and runs analysis and tests. The [preview builder](../flutter_port/README.md) adds release compilation and package-integrity verification. Inspect a failure before rerunning the affected check.
+The review script checks source and bridge contracts, generates the Windows runner with the pinned icon, restores locked dependencies, and runs strict analysis and tests. The [preview builder](../src/desktop/README.md) adds release compilation and package-integrity verification. Use the [test guide](../tests/README.md) for the complete backend/component acceptance harness and CI coverage. Inspect a failure before rerunning the affected check.
 
 Node mocks and Flutter fixtures do not require live Codex turns. Account interactions, actual scheduled jobs, and native acceptance require explicit operator authorization; use the [Windows acceptance checklist](CONTINUUM-WINDOWS-ACCEPTANCE.md) for those scenarios.
 

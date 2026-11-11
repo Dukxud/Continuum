@@ -1,100 +1,65 @@
-> **Current context:** These reusable PowerShell components remain in merged Flutter Continuum `main`. For current product behavior see the [root README](../README.md) and [current architecture](../docs/ARCHITECTURE.md); the WinForms-only descriptions below document their original consumers.
+# Components
 
-# Reusable components
+This directory contains ten independently importable PowerShell modules and the application's Codex-specific Shared session host.
 
-These PowerShell modules can be imported independently. None needs Codex, the scheduler GUI, a session ID or application-specific settings. Choose only the components your next application needs.
+## Reusable modules
 
-| Module | Purpose | Platform | Public functions |
-|---|---|---|---|
-| AeroProgress | Live WebGL2 optical progress bars in Windows Forms | Windows + WebView2 | Test-AeroProgressColor, Test-AeroProgressSupport, New-AeroProgressView, Set-AeroProgressViewState, Get-AeroProgressViewStatus |
-| Countdown | Pure elapsed percentage and time-to-run text | PowerShell 7 | Get-CountdownText, Get-CountdownElapsedPercent |
-| SettingsStore | Atomic local JSON settings, schema defined by the host | PowerShell 7 | Read-JsonSettings, Write-JsonSettings |
-| RuntimeBundle | Fingerprinted, content-addressed runtime snapshots | PowerShell 7 | Get-RuntimeFingerprint, Assert-RuntimeFingerprint, Publish-ImmutableRuntime |
-| OneTimeTasks | One-time Windows Task Scheduler registration, validation and cancellation | Windows | Register-OneTimeTask, Disable-OneTimeTask, Remove-OneTimeTask |
+| Module | Purpose | Requirements |
+| --- | --- | --- |
+| [AeroProgress](AeroProgress/README.md) | WebGL2 progress surface in Windows Forms | Windows, STA UI thread, WebView2 runtime and SDK |
+| [Countdown](Countdown/Countdown.psd1) | Elapsed percentage and time-to-run text | PowerShell 7 |
+| [FlowingProgress](FlowingProgress/FlowingProgress.psd1) | WPF compositor-animated progress surface | Windows, STA UI thread, WPF and WindowsFormsIntegration |
+| [GitRepository](GitRepository/GitRepository.psd1) | Read-only repository root and branch inspection | PowerShell 7, Git |
+| [JobOutcomes](JobOutcomes/JobOutcomes.psd1) | Validated, atomic outcome records | PowerShell 7, SettingsStore |
+| [OneTimeTasks](OneTimeTasks/OneTimeTasks.psd1) | One-time task registration and conservative cancellation | Windows Task Scheduler |
+| [ProgressHost](ProgressHost/ProgressHost.psd1) | Renderer-neutral fallback ownership and lifecycle | Windows, STA UI thread |
+| [RuntimeBundle](RuntimeBundle/RuntimeBundle.psd1) | Content-addressed runtime snapshots and verification | PowerShell 7 |
+| [SettingsStore](SettingsStore/SettingsStore.psd1) | Atomic local JSON preferences | PowerShell 7 |
+| [WindowShell](WindowShell/WindowShell.psd1) | Native Windows Forms windows and controls | Windows, STA UI thread |
 
-## Additional independently reusable modules
+The generic modules do not require Codex, application settings, or a session identifier. Copy only the folders needed by your application; copy SettingsStore alongside JobOutcomes. Windows UI modules need a functioning message loop.
 
-| Module | Purpose | Platform |
-|---|---|---|
-| GitRepository | Read-only Git root and current-branch inspection | PowerShell 7 + Git |
-| JobOutcomes | Atomic and validated completed/failed/deferred/blocked/cancelled outcome records | PowerShell 7 |
-| WindowShell | Native Windows Forms windows and standard controls | Windows |
-| ProgressHost | Renderer-neutral fallback ownership and lifecycle without requiring `Control.Tag` metadata | Windows |
-| FlowingProgress | Native WPF compositor-animated glossy progress surface with caller-defined colors | Windows |
+The standalone reusable-kit ZIP includes these ten modules. AeroProgress's HTML renderer and Microsoft WebView2 SDK files are packaged inside its own folder. The kit excludes the application-specific Shared host.
 
-The reusable kit has **ten** modules. Each may be copied alone, except JobOutcomes requires the small SettingsStore dependency (copy both folders together). AeroProgress requires its local HTML shader and WebView2 SDK files. FlowingProgress requires WPF and WindowsFormsIntegration, but no Codex settings, quota code, or browser.
+## Use a module
 
-The independent consumer test under tests/second-application-reuse.test.ps1 copies only components/ into an unrelated application and exercises the APIs without importing Codex.
+Import the module manifest from your own application:
 
-## Using any component
-
-Copy the desired folder from this repository's components directory into another application, or extract the versioned ReusableComponents preview ZIP. Import only the module you need:
-
-~~~powershell
+```powershell
 Import-Module .\components\Countdown\Countdown.psd1
 Get-CountdownText -DueAt (Get-Date).AddMinutes(8) -Now (Get-Date)
-~~~
+```
 
-Another application can use the JSON settings store without the scheduler:
+SettingsStore leaves the schema to its caller:
 
-~~~powershell
+```powershell
 Import-Module .\components\SettingsStore\SettingsStore.psd1
-Write-JsonSettings -Path "$env:LOCALAPPDATA\MyApp\settings.json" -Value @{ theme='blue' }
+Write-JsonSettings -Path "$env:LOCALAPPDATA\MyApp\settings.json" -Value @{ theme = 'blue' }
 Read-JsonSettings -Path "$env:LOCALAPPDATA\MyApp\settings.json"
-~~~
+```
 
-A program that registers independent background work can copy its necessary script files into a content-addressed snapshot and store the returned fingerprint alongside its task metadata:
+RuntimeBundle snapshots only the files named by the caller:
 
-~~~powershell
+```powershell
 Import-Module .\components\RuntimeBundle\RuntimeBundle.psd1
-$runtime=Publish-ImmutableRuntime -SourceDirectory . -DestinationDirectory "$env:LOCALAPPDATA\MyApp\runtimes" -RelativeFiles @('worker.ps1')
+$runtime = Publish-ImmutableRuntime -SourceDirectory . -DestinationDirectory "$env:LOCALAPPDATA\MyApp\runtimes" -RelativeFiles @('worker.ps1')
 Assert-RuntimeFingerprint -Directory $runtime.Directory -RelativeFiles @('worker.ps1') -ExpectedFingerprint $runtime.Fingerprint
-~~~
+```
 
-OneTimeTasks accepts **your** executable path, arguments, working directory, task name and time; it does not assume PowerShell or Codex. The application must decide how to launch its worker and handle errors. A successfully registered task is **not** proof that the worker completed.
+## Contracts worth preserving
 
-See [AeroProgress](AeroProgress/README.md) for a complete standalone animated Windows Forms example. The standalone reusable-kit ZIP places the advanced shader's AeroBar.html and Microsoft WebView2 SDK DLLs **inside** the AeroProgress folder so that folder can be copied and imported by itself.
+- **Persistence:** SettingsStore handles replaceable, single-writer preferences. Missing or malformed JSON returns null. The caller owns validation, schema upgrades, and recovery; the module does not provide concurrent transactions or historical recovery.
+- **Runtime identity:** fingerprints detect changed files. They do not authenticate the publisher or defend against the same Windows user changing both files and local metadata.
+- **Scheduling:** OneTimeTasks accepts the caller's executable, arguments, working directory, name, and trigger. It uses the signed-in interactive-user principal. Registration does not establish successful execution.
+- **Cancellation:** `Remove-OneTimeTask -OnlyBeforeStart` rereads state and last-run information, requiring Ready, no previous run, and one trigger at least 90 seconds away. It cannot atomically prevent all scheduling races or terminate a running worker. Unguarded removal is an explicit maintenance operation.
+- **Time:** Countdown compares UTC instants. OneTimeTasks converts explicit UTC values to local triggers, treats unspecified values as local, and rejects ambiguous or nonexistent daylight-saving times.
+- **Renderer ownership:** ProgressHost owns primary/fallback disposal; its caller decides when a renderer has failed. AeroProgress and FlowingProgress do not reserve the caller's `Control.Tag`.
+- **Native loading:** AeroProgress loads the WebView2 loader from an explicit path without changing global `PATH`. Changing an already-loaded native SDK can require restarting the host.
 
-## Boundaries and constraints
+FlowingProgress exposes value and color setters without replacing the hosted control. AeroProgress exposes `Get-AeroProgressViewStatus` for readiness and failure inspection. See each manifest for the exported API.
 
-- UI-specific bindings (CodexUi*) and CodexRunEngine.ps1 are adapters, not reusable core.
-- RuntimeBundle protects against accidental replacement and checks file content before execution. It is **not** a security boundary against the same Windows user, who can modify both the runtime and locally stored task metadata. Signed first-party code is needed for publisher authentication.
-- OneTimeTasks uses Windows Task Scheduler's interactive-user principal and does not run while signed out.
-- SettingsStore handles single-writer, replaceable preferences only. It returns null for either missing or corrupted JSON and offers no concurrent transaction isolation, compare-and-swap revision protection or historical recovery. Do not reuse it for Weight Trajectory measurements or other irreplaceable records. The host owns schema validation and upgrades.
-- Countdown has no UI dependencies; unknown creation time produces null, never a fabricated progress percentage.
-- Each module is independently importable; the Windows-specific modules are not directly portable to non-Windows UI frameworks.
-- The scheduler's Codex-specific recovery and account verification are intentionally **not** in the general-purpose components.
+## Application-specific host
 
-Unit and Windows GUI integration checks live under tests. The app package and standalone components package share exactly the same module sources.
+[SharedCodexSession](https://github.com/Dukxud/codex-resume-scheduler/tree/main/components/SharedCodexSession) owns a Codex App Server and authenticates the desktop and native terminal clients. It is a separate Node.js component, not one of the reusable PowerShell modules. Its scheduled-turn lifecycle and later-turn limitations are documented in the [Shared session contract](https://github.com/Dukxud/codex-resume-scheduler/blob/main/docs/SHARED-NATIVE-TUI.md).
 
-## Host and threading prerequisites
-
-The reusable Windows Forms and Windows Presentation Foundation components (`WindowShell`, `AeroProgress`, `FlowingProgress`, `ProgressHost`) must run on **Windows with a single-threaded apartment (STA) UI thread** and a functioning message loop. Independent tests launch them with `pwsh -STA`. The Aero view also needs the Microsoft Edge WebView2 runtime plus the locally packaged WebView2 SDK and HTML shader. These components are not language-independent or headless services; they can be transplanted into other Windows desktop applications that supply a compatible host.
-
-`OneTimeTasks` requires Windows Task Scheduler and registers tasks for the signed-in interactive desktop user. `Countdown`, `SettingsStore`, `RuntimeBundle`, `GitRepository`, and `JobOutcomes` require PowerShell 7 and their stated external dependencies (for GitRepository, Git), but not a UI thread.
-
-## Renderer host ownership
-
-`Repair-ProgressHost -Primary <control> -Failed $true -FallbackFactory <scriptblock>` creates a generic fallback when the host's renderer has failed. The host—not the library—determines failure. `Get-ProgressHostSurface` returns the active view, `Set-ProgressHostLayout` updates it, `Reset-ProgressHostFallback` frees the fallback while retaining the primary, and `Remove-ProgressHost` disposes both. The host is free to use `Control.Tag` for unrelated information.
-
-`AeroProgress` loads its WebView2 native loader from an explicit SDK path; it never mutates global `PATH`. A previously missing asset can be installed and retested without restarting. Switching native SDKs inside a process where one has already loaded may require restarting, because loaded native DLLs cannot always be unloaded safely.
-
-The standalone consumer tests run generic one-time scheduling against an isolated fake OS task provider and exercise the **real** WebView2 shader from a packaged standalone module in a separate Windows application. They do not execute the user's actual scheduled tasks.
-
-**Clock correctness:** Countdown converts timestamps to UTC before computing elapsed time, preventing wrong durations across daylight-saving time changes. OneTimeTasks rejects ambiguous or nonexistent local trigger times rather than guessing which clock occurrence to schedule; the caller should request another unambiguous time.
-
-OneTimeTasks accepts local `DateTime` instances and explicit UTC `DateTime` values, converting UTC instants to local Task Scheduler boundaries. Unspecified `DateTime` values are interpreted as local wall-clock times. Ambiguous or invalid daylight-saving clock times are rejected rather than guessed.
-
-### FlowingProgress state and appearance contract
-
-The public API includes New-FlowingProgressView, Get-FlowingProgressViewValue, Set-FlowingProgressViewState, and Set-FlowingProgressViewColors. Accepted percentages are owned by the module, not the caller's ElementHost.Tag. Palettes supply BaseTop, BaseBottom, Track, and Outline hexadecimal colors. Calling Set-FlowingProgressViewColors recolors an existing live view without replacing its ElementHost.
-
-The scheduler-specific adapter tracks native fallback bars alongside browser-backed bars. It can apply an appearance change to either renderer while preserving each caller's control reference. These latest changes have been inspected statically, not validated by a new Windows execution or CI run.
-
-### AeroProgress consumer independence
-
-AeroProgress has a public status API and no longer uses adopter-owned Control.Tag. The scheduler adapter alone owns its quota/time metadata. An unrelated program may store arbitrary data in Control.Tag without affecting renderer readiness or state. For value and failure checks, use Get-AeroProgressViewStatus instead of reading the control's Tag.
-
-## OneTimeTasks cancellation contract
-
-Unregistering a Windows task never guarantees a running worker is terminated. To cancel via the UI, the scheduler now invokes the reusable Remove-OneTimeTask command with -OnlyBeforeStart, which rereads Windows state and last-run information and refuses removal unless the task is Ready, has not run before, and has a single trigger at least 90 seconds in the future. Plain Remove-OneTimeTask remains available for explicit maintenance; callers must not misrepresent it as process cancellation. The conservative pre-start guard is designed to avoid accidental deletion of live worker payloads, not to establish an atomic Windows Task Scheduler transaction.
+See the [architecture guide](https://github.com/Dukxud/codex-resume-scheduler/blob/main/docs/ARCHITECTURE.md) for application adapters and the [test guide](https://github.com/Dukxud/codex-resume-scheduler/blob/main/tests/README.md) for independent-consumer and packaged-renderer checks. Scheduling tests use an isolated fake task provider; they do not execute existing user jobs.

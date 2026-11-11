@@ -19,7 +19,7 @@ const runId = 'BP201';
 const jobName = 'CodexResume-20261105-2220-a11ce999';
 const deadline = 90000;
 const seen = [];
-const print = message => process.stdout.write('[' + runId + '] ' + message + '\n');
+const print = (message) => process.stdout.write('[' + runId + '] ' + message + '\n');
 
 async function withDeadline(promise, maxMs, message) {
   let timer;
@@ -38,12 +38,15 @@ async function withDeadline(promise, maxMs, message) {
 function waitForCompletedTurn(api, threadId) {
   let dispose = () => {};
   const promise = new Promise((resolve, reject) => {
-    const onMessage = message => {
+    const onMessage = (message) => {
       if (message.method !== 'turn/completed' || message.params?.threadId !== threadId) return;
       dispose();
       resolve(message.params.turn);
     };
-    const onClosed = error => { dispose(); reject(error); };
+    const onClosed = (error) => {
+      dispose();
+      reject(error);
+    };
     dispose = () => {
       api.off('message', onMessage);
       api.off('closed', onClosed);
@@ -59,13 +62,18 @@ function waitForCompletedTurn(api, threadId) {
 async function waitForFile(path, maxMs = 15000) {
   const end = Date.now() + maxMs;
   while (Date.now() < end) {
-    try { await access(path); return; } catch { await delay(50); }
+    try {
+      await access(path);
+      return;
+    } catch {
+      await delay(50);
+    }
   }
   throw new Error('Shared owner did not create its endpoint descriptor');
 }
 async function stop(child) {
   if (!child) return;
-  const closed = new Promise(resolve => child.once('close', resolve));
+  const closed = new Promise((resolve) => child.once('close', resolve));
   if (child.exitCode === null && child.signalCode === null) child.kill();
   try {
     await withDeadline(closed, 2000, 'App Server close timed out');
@@ -80,12 +88,18 @@ async function main() {
   let initialChild, host, first, second;
   try {
     initialChild = spawn(process.execPath, [codexEntry, 'app-server'], {
-      cwd: dir, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true,
+      cwd: dir,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     });
     initialChild.stderr.resume();
     const api = new AppServerProtocol(initialChild, { timeoutMs: 20000 });
     const init = await api.request('initialize', {
-      clientInfo: { name: 'continuum_native_probe', title: 'Continuum Native Probe', version: '0.1.0' },
+      clientInfo: {
+        name: 'continuum_native_probe',
+        title: 'Continuum Native Probe',
+        version: '0.1.0',
+      },
       capabilities: { experimentalApi: true },
     });
     assert.ok(init && typeof init === 'object', 'Codex initialize returned no object');
@@ -108,41 +122,60 @@ async function main() {
         sandboxPolicy: { type: 'readOnly' },
       });
       assert.ok(started?.turn?.id, 'Seed turn was not acknowledged');
-      const completed = await withDeadline(seed.promise, deadline, 'Disposable seed turn timed out');
+      const completed = await withDeadline(
+        seed.promise,
+        deadline,
+        'Disposable seed turn timed out',
+      );
       assert.equal(completed?.id, started.turn.id, 'Different seed turn completed');
       assert.equal(completed?.status, 'completed', 'Disposable seed turn failed');
     } finally {
       seed.dispose();
     }
     const persisted = await api.request('thread/turns/list', {
-      threadId, limit: 5, sortDirection: 'desc', itemsView: 'notLoaded',
+      threadId,
+      limit: 5,
+      sortDirection: 'desc',
+      itemsView: 'notLoaded',
     });
-    assert.ok(Array.isArray(persisted?.data) && persisted.data.length > 0,
-      'First turn completed but thread history was not persisted');
+    assert.ok(
+      Array.isArray(persisted?.data) && persisted.data.length > 0,
+      'First turn completed but thread history was not persisted',
+    );
     print('PASS - Seed turn completed and persisted before App Server restart');
     await stop(initialChild);
     initialChild = undefined;
 
     host = new SharedSessionHost({
       job: {
-        sessionId: threadId, repo: dir,
-        message: 'Reply with the exact words: Continuum native probe passed. Do not use tools or edit files.',
+        sessionId: threadId,
+        repo: dir,
+        message:
+          'Reply with the exact words: Continuum native probe passed. Do not use tools or edit files.',
         access: 'read-only',
       },
-      jobName, appDir: dir, codexEntry,
+      jobName,
+      appDir: dir,
+      codexEntry,
     });
     const completion = host.begin();
     // The host's completion promise may reject while we await its descriptor.
     completion.catch(() => {});
     await waitForFile(locationFor(dir, jobName).descriptor);
-    first = await connectToSession(locationFor(dir, jobName).descriptor, msg => seen.push({ viewer: 1, msg }));
-    second = await connectToSession(locationFor(dir, jobName).descriptor, msg => seen.push({ viewer: 2, msg }));
+    first = await connectToSession(locationFor(dir, jobName).descriptor, (msg) =>
+      seen.push({ viewer: 1, msg }),
+    );
+    second = await connectToSession(locationFor(dir, jobName).descriptor, (msg) =>
+      seen.push({ viewer: 2, msg }),
+    );
     assert.equal(host.sockets.size, 2, 'Not exactly two attached viewers');
     print('PASS - Two authenticated viewers, one Codex App Server owner');
 
     const outcome = await withDeadline(completion, deadline, 'Native resumed turn timed out');
     assert.equal(outcome, 'completed', 'Native Codex turn did not complete');
-    assert.ok(host.events.some(event => event.kind === 'turn' && event.method === 'turn/completed'));
+    assert.ok(
+      host.events.some((event) => event.kind === 'turn' && event.method === 'turn/completed'),
+    );
     assert.ok(seen.some(({ viewer, msg }) => viewer === 1 && msg.action === 'snapshot'));
     assert.ok(seen.some(({ viewer, msg }) => viewer === 2 && msg.action === 'snapshot'));
     print('PASS - Real resumed thread completed through shared owner');
@@ -160,7 +193,7 @@ async function main() {
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 }
-main().catch(error => {
+main().catch((error) => {
   print('FAIL - ' + error.message);
   process.exitCode = 1;
 });

@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  quality:
+    name: Source and documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      application: ${{ steps.scope.outputs.application }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run format:check
+      - run: npm run check:docs
+      - run: npm test
+      - name: Select application checks
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync } from 'node:fs';
+          const base = process.env.BASE_SHA || '';
+          let application = true;
+          if (/^[a-f0-9]{40}$/.test(base) && !/^0+$/.test(base)) {
+            const files = execFileSync('git', ['diff', '--name-only', base, process.env.SOURCE_SHA],
+              { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+            application = files.some(file => !file.endsWith('.md') && !file.startsWith('docs/'));
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `application=${application}\n`);
+          NODE
+
+  windows:
+    name: Windows tests and preview
+    needs: quality
+    if: needs.quality.outputs.application == 'true'
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+      - name: Generate Windows runner and pin branding
+        shell: pwsh
+        working-directory: src/desktop
+        run: |
+          ./scripts/Initialize-WindowsRunner.ps1
+          flutter pub get --enforce-lockfile
+          if ($LASTEXITCODE -ne 0) { throw 'Locked dependency resolution failed.' }
+      - name: Check Dart formatting and analysis
+        shell: pwsh
+        working-directory: src/desktop
+        run: |
+          dart format --output=none --set-exit-if-changed lib test
+          if ($LASTEXITCODE -ne 0) { throw 'Dart formatting differs.' }
+          flutter analyze --no-pub
+          if ($LASTEXITCODE -ne 0) { throw 'Dart analysis failed.' }
+      - name: Flutter widget and logic tests
+        working-directory: src/desktop
+        run: flutter test --no-pub --exclude-tags visual-capture
+      - name: Backend, protocol, and reusable component acceptance
+        shell: pwsh
+        run: ./scripts/Invoke-LocalAcceptance.ps1 -ExpectedCommit $env:SOURCE_SHA
+      - name: Compile Windows release
+        working-directory: src/desktop
+        run: flutter build windows --release --no-pub
+      - name: Verify icon and package contents
+        shell: pwsh
+        run: |
+          ./tests/flutter-windows-icon.test.ps1 -ExecutablePath ./src/desktop/build/windows/x64/runner/Release/codex_resume_flutter.exe
+          ./src/desktop/Build-WindowsPreview.ps1 -PackageVerifiedBuild -OutputDirectory ./src/desktop/build/review-out
+      - name: Upload unsigned Windows preview
+        timeout-minutes: 3
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: continuum-windows-${{ env.SOURCE_SHA }}
+          path: src/desktop/build/review-out/*.zip
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload failure logs
+        if: failure()
+        timeout-minutes: 2
+        continue-on-error: true
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: windows-test-logs-${{ env.SOURCE_SHA }}
+          path: QA-results-local-*/*.log
+          if-no-files-found: ignore
+          retention-days: 7

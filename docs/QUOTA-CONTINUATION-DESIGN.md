@@ -40,4 +40,4 @@ A08 Manual cancellation of a pending child leaves the chain stopped; running job
 
 A09 Flutter choice defaults off, restores and saves accurately, travels through the JSON bridge and never makes a task with missing authorization; switch remains usable at normal/compact window sizes.
 
-A10 Exact-head Windows fake-CLI and fake-Task Scheduler tests, including actual parent worker deferral, persisted child, parent replay, child execution and outcome linkage, plus old WinForms acceptance, Flutter tests and artifact integrity checks pass. Native BLACK-PUDDLE execution with actual Task Scheduler and independent code review remain prerequisites to completion.
+A10 Exact-head Windows fake-CLI and fake-Task Scheduler tests, including actual parent worker deferral, persisted child, parent replay, child execution and outcome linkage, plus old WinForms acceptance, Flutter tests and artifact integrity checks pass. Native Windows execution with actual Task Scheduler and independent code review remain prerequisites to completion.

@@ -6,7 +6,11 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { AppServerProtocol } from '../components/SharedCodexSession/protocol.mjs';
-import { openRemoteProtocol, nativeTuiArguments, REMOTE_TOKEN_ENV } from '../components/SharedCodexSession/remote.mjs';
+import {
+  openRemoteProtocol,
+  nativeTuiArguments,
+  REMOTE_TOKEN_ENV,
+} from '../components/SharedCodexSession/remote.mjs';
 import { SharedSessionHost, locationFor } from '../components/SharedCodexSession/host.mjs';
 import { connectToSession } from '../components/SharedCodexSession/client.mjs';
 
@@ -14,7 +18,7 @@ const sessionId = '11111111-2222-3333-4444-555555555555';
 const jobName = 'CodexResume-20261105-2245-abc123ef';
 const fakeServer = resolve('tests/shared-codex-fake-app-server.mjs');
 const token = 'a'.repeat(64);
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function waitFor(predicate) {
   for (let i = 0; i < 150; i++) {
     if (predicate()) return;
@@ -40,8 +44,10 @@ class FakeSocket extends EventTarget {
     const request = this.sent.at(-1);
     if (Object.hasOwn(request, 'id')) {
       const event = new Event('message');
-      event.data = JSON.stringify({ id: request.id,
-        result: { method: request.method, params: request.params } });
+      event.data = JSON.stringify({
+        id: request.id,
+        result: { method: request.method, params: request.params },
+      });
       queueMicrotask(() => this.dispatchEvent(event));
     }
   }
@@ -55,7 +61,8 @@ class FakeSocket extends EventTarget {
 test('authenticated loopback protocol sends framed JSON-RPC without starting a second server', async () => {
   let socket;
   const connection = await openRemoteProtocol({
-    endpoint: 'ws://127.0.0.1:43129', token,
+    endpoint: 'ws://127.0.0.1:43129',
+    token,
     child: { exitCode: null, signalCode: null },
     makeSocket: (endpoint, options) => {
       socket = new FakeSocket(endpoint, options);
@@ -75,31 +82,48 @@ test('authenticated loopback protocol sends framed JSON-RPC without starting a s
 });
 
 test('remote policy refuses unauthenticated and non-loopback endpoints', async () => {
-  await assert.rejects(openRemoteProtocol({
-    endpoint: 'ws://0.0.0.0:43129', token,
-    child: { exitCode: null, signalCode: null },
-  }));
-  await assert.rejects(openRemoteProtocol({
-    endpoint: 'ws://127.0.0.1:43129', token: 'short',
-    child: { exitCode: null, signalCode: null },
-  }));
+  await assert.rejects(
+    openRemoteProtocol({
+      endpoint: 'ws://0.0.0.0:43129',
+      token,
+      child: { exitCode: null, signalCode: null },
+    }),
+  );
+  await assert.rejects(
+    openRemoteProtocol({
+      endpoint: 'ws://127.0.0.1:43129',
+      token: 'short',
+      child: { exitCode: null, signalCode: null },
+    }),
+  );
   assert.throws(() => nativeTuiArguments('codex.js', 'ws://example.com:4500', sessionId));
-  assert.deepEqual(nativeTuiArguments('codex.js', 'ws://127.0.0.1:4500', sessionId),
-    ['codex.js', '--remote', 'ws://127.0.0.1:4500',
-      '--remote-auth-token-env', REMOTE_TOKEN_ENV, 'resume', sessionId]);
+  assert.deepEqual(nativeTuiArguments('codex.js', 'ws://127.0.0.1:4500', sessionId), [
+    'codex.js',
+    '--remote',
+    'ws://127.0.0.1:4500',
+    '--remote-auth-token-env',
+    REMOTE_TOKEN_ENV,
+    'resume',
+    sessionId,
+  ]);
 });
 
-test('native credentials are private, require active owner, and never fork the thread', async t => {
+test('native credentials are private, require active owner, and never fork the thread', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'continuum-remote-mock-'));
   let args;
   const host = new SharedSessionHost({
     job: { sessionId, repo: process.cwd(), message: 'Continue.', access: 'workspace-write' },
-    jobName, appDir: directory, codexEntry: fakeServer, remote: true,
+    jobName,
+    appDir: directory,
+    codexEntry: fakeServer,
+    remote: true,
     reservePort: async () => 45621,
-    spawnServer: values => {
+    spawnServer: (values) => {
       args = values;
-      return spawn(process.execPath, [fakeServer], { stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, FAKE_THREAD_ID: sessionId } });
+      return spawn(process.execPath, [fakeServer], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, FAKE_THREAD_ID: sessionId },
+      });
     },
     connectRemote: async ({ endpoint, token: secret, child }) => {
       assert.equal(endpoint, 'ws://127.0.0.1:45621');
@@ -121,38 +145,54 @@ test('native credentials are private, require active owner, and never fork the t
   assert.equal(disk.remoteToken, undefined);
   assert.equal(host.snapshot().token, undefined);
   assert.equal(host.snapshot().remoteEndpoint, undefined);
-  assert.deepEqual(args.slice(0, 4),
-    ['--listen', 'ws://127.0.0.1:45621', '--ws-auth', 'capability-token']);
+  assert.deepEqual(args.slice(0, 4), [
+    '--listen',
+    'ws://127.0.0.1:45621',
+    '--ws-auth',
+    'capability-token',
+  ]);
   const events = [];
   let assigned = false;
-  const viewer = await connectToSession(descriptor, message => {
-    if (message.action === 'snapshot') assert.equal(assigned, true,
-      'Initial snapshot must follow the resolved socket');
+  const viewer = await connectToSession(descriptor, (message) => {
+    if (message.action === 'snapshot')
+      assert.equal(assigned, true, 'Initial snapshot must follow the resolved socket');
     events.push(message);
   });
   assigned = true;
   await waitFor(() => host.sockets.size === 1);
   viewer.write(JSON.stringify({ action: 'native-attach' }) + '\n');
-  await waitFor(() => events.some(message => message.action === 'native-credentials'));
-  const creds = events.find(message => message.action === 'native-credentials');
+  await waitFor(() => events.some((message) => message.action === 'native-credentials'));
+  const creds = events.find((message) => message.action === 'native-credentials');
   assert.equal(creds.threadId, sessionId);
   assert.equal(creds.endpoint, 'ws://127.0.0.1:45621');
   assert.equal(args[5], createHash('sha256').update(creds.token).digest('hex'));
-  assert.equal(events.some(event => event.action === 'snapshot' && event.token), false);
-  viewer.write(JSON.stringify({ action: 'answer', id: '100', result: { decision: 'accept' } }) + '\n');
+  assert.equal(
+    events.some((event) => event.action === 'snapshot' && event.token),
+    false,
+  );
+  viewer.write(
+    JSON.stringify({ action: 'answer', id: '100', result: { decision: 'accept' } }) + '\n',
+  );
   await waitFor(() => host.pending.has('101'));
-  viewer.write(JSON.stringify({ action: 'answer', id: '101',
-    result: { answers: { choice: { answers: ['Yes'] } } } }) + '\n');
+  viewer.write(
+    JSON.stringify({
+      action: 'answer',
+      id: '101',
+      result: { answers: { choice: { answers: ['Yes'] } } },
+    }) + '\n',
+  );
   assert.equal(await running, 'completed');
   assert.equal(host.nativeViewers.size, 1);
   assert.equal(host.snapshot().status, 'completed');
   const kept = host.waitForNativeViewers({ idleMs: 40, maxMs: 1000 });
   let released = false;
-  kept.then(() => { released = true; });
+  kept.then(() => {
+    released = true;
+  });
   await sleep(90);
   assert.equal(released, false, 'Completed turn must not kill an attached terminal');
   viewer.write(JSON.stringify({ action: 'native-attach' }) + '\n');
-  await waitFor(() => events.filter(event => event.action === 'native-credentials').length === 2);
+  await waitFor(() => events.filter((event) => event.action === 'native-credentials').length === 2);
   viewer.end();
   assert.equal(await kept, 'idle');
   assert.equal(host.nativeViewers.size, 0);
@@ -160,7 +200,10 @@ test('native credentials are private, require active owner, and never fork the t
 test('shared owner closes after a bounded idle grace or maximum lifetime', async () => {
   const host = new SharedSessionHost({
     job: { sessionId, repo: process.cwd(), message: 'Continue.' },
-    jobName, appDir: tmpdir(), codexEntry: fakeServer, remote: true,
+    jobName,
+    appDir: tmpdir(),
+    codexEntry: fakeServer,
+    remote: true,
   });
   host.completed = true;
   host.status = 'completed';
@@ -170,18 +213,23 @@ test('shared owner closes after a bounded idle grace or maximum lifetime', async
   host.nativeViewers.clear();
 });
 
-test('owner closes promptly even if a native terminal lease is still connected', async t => {
+test('owner closes promptly even if a native terminal lease is still connected', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'continuum-remote-close-'));
   const host = new SharedSessionHost({
     job: { sessionId, repo: process.cwd(), message: 'Continue.' },
-    jobName, appDir: directory, codexEntry: fakeServer, remote: true,
+    jobName,
+    appDir: directory,
+    codexEntry: fakeServer,
+    remote: true,
     reservePort: async () => 45622,
-    spawnServer: () => spawn(process.execPath, [fakeServer], {
-      stdio: ['pipe','pipe','pipe'],
-      env: { ...process.env, FAKE_THREAD_ID: sessionId },
-    }),
+    spawnServer: () =>
+      spawn(process.execPath, [fakeServer], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, FAKE_THREAD_ID: sessionId },
+      }),
     connectRemote: async ({ child }) => ({
-      protocol: new AppServerProtocol(child), close() {},
+      protocol: new AppServerProtocol(child),
+      close() {},
     }),
   });
   t.after(async () => {
@@ -194,17 +242,27 @@ test('owner closes promptly even if a native terminal lease is still connected',
   const viewer = await connectToSession(locationFor(directory, jobName).descriptor, () => {});
   viewer.write(JSON.stringify({ action: 'native-attach' }) + '\n');
   await waitFor(() => host.nativeViewers.size === 1);
-  viewer.write(JSON.stringify({ action: 'answer', id: '100', result: { decision: 'accept' } }) + '\n');
+  viewer.write(
+    JSON.stringify({ action: 'answer', id: '100', result: { decision: 'accept' } }) + '\n',
+  );
   await waitFor(() => host.pending.has('101'));
-  viewer.write(JSON.stringify({ action: 'answer', id: '101', result: {
-    answers: { choice: { answers: ['Yes'] } },
-  } }) + '\n');
+  viewer.write(
+    JSON.stringify({
+      action: 'answer',
+      id: '101',
+      result: {
+        answers: { choice: { answers: ['Yes'] } },
+      },
+    }) + '\n',
+  );
   assert.equal(await running, 'completed');
   assert.equal(await host.waitForNativeViewers({ idleMs: 10, maxMs: 30 }), 'maximum');
   // A hung native client must not prevent the owner from cleaning up.
   await Promise.race([
     host.close(),
-    sleep(1500).then(() => { throw new Error('Owner shutdown blocked on TUI lease'); }),
+    sleep(1500).then(() => {
+      throw new Error('Owner shutdown blocked on TUI lease');
+    }),
   ]);
   assert.equal(host.nativeViewers.size, 0);
   viewer.destroy();

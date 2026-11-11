@@ -16,7 +16,8 @@ Continuum schedules and monitors saved Codex conversations on Windows. Start wit
 | Guide | What you will find |
 | --- | --- |
 | [Architecture](ARCHITECTURE.md) | UI, bridge, worker, and persistence boundaries |
-| [Flutter developer guide](../flutter_port/README.md) | Source layout, local checks, and Windows builds |
+| [Flutter developer guide](../src/desktop/README.md) | Source layout, local checks, and Windows builds |
+| [Testing](../tests/README.md) | Portable and Windows checks, isolation, coverage, and CI |
 | [Reusable components](../components/README.md) | Independent PowerShell modules and example consumers |
 | [Shared sessions](SHARED-NATIVE-TUI.md) | One App Server, authenticated clients, and lifecycle limits |
 | [Quota presentation](QUOTA-PRESENTATION.md) | Rendering the usage windows returned for the selected model |
@@ -29,7 +30,7 @@ Feature development is paused. These records distinguish automated checks, nativ
 
 | Record | Purpose |
 | --- | --- |
-| [Current state](CURRENT-STATE.md) | Baseline commits, exact preview paths, and maintainer handoff |
+| [Current state](CURRENT-STATE.md) | Current capabilities, build identity, and remaining acceptance |
 | [Windows acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md) | Recorded results and outstanding native scenarios |
 | [Screenshots](SCREENSHOTS.md) | Dated visual evidence and capture guidance |
 | [Release policy](RELEASE-POLICY.md) | Preview packaging and production release requirements |

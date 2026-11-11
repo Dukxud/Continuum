@@ -7,7 +7,7 @@ Start by identifying the executable and checking its dependencies. The commands 
 The default output from [Getting started](GETTING-STARTED.md) is:
 
 ```text
-%USERPROFILE%\Downloads\Continuum-Preview\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe
+%USERPROFILE%\Downloads\Continuum-Preview\Continuum-Windows-v0.1.0+1-UNSIGNED-PREVIEW\codex_resume_flutter.exe
 ```
 
 Downloaded review packages have different paths; the [build record](CURRENT-STATE.md#source-layout-preview--11-nov-2026) identifies the verified source-layout preview. The public v1.11.0 release contains the older WinForms app. A GitHub merge does not update an installed executable. Keep each complete package together, including its workers and DLLs.
@@ -19,7 +19,7 @@ Get-Process -Name codex_resume_flutter -ErrorAction SilentlyContinue |
     Select-Object Id,Path
 ```
 
-For source identity, run `git -C <checkout> log -1 --format="%H %s"` with your checkout path. All engineering previews currently share a development version label, so use the source SHA and recorded package checksum to identify a build.
+New packages include `build-info.json` beside the executable with the application version, source commit, build time, and whether tracked source files were modified. For an older package, use its recorded source SHA and checksum. In a source checkout, `git log -1 --format="%H %s"` identifies the commit; `git status --short` shows local changes.
 
 ## Build prerequisites
 
