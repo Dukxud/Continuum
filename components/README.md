@@ -60,6 +60,6 @@ FlowingProgress exposes value and color setters without replacing the hosted con
 
 ## Application-specific host
 
-[SharedCodexSession](https://github.com/Dukxud/codex-resume-scheduler/tree/main/components/SharedCodexSession) owns a Codex App Server and authenticates the desktop and native terminal clients. It is a separate Node.js component, not one of the reusable PowerShell modules. Its scheduled-turn lifecycle and later-turn limitations are documented in the [Shared session contract](https://github.com/Dukxud/codex-resume-scheduler/blob/main/docs/SHARED-NATIVE-TUI.md).
+[SharedCodexSession](https://github.com/Dukxud/Continuum/tree/main/components/SharedCodexSession) owns a Codex App Server and authenticates the desktop and native terminal clients. It is a separate Node.js component, not one of the reusable PowerShell modules. Its scheduled-turn lifecycle and later-turn limitations are documented in the [Shared session contract](https://github.com/Dukxud/Continuum/blob/main/docs/SHARED-NATIVE-TUI.md).
 
-See the [architecture guide](https://github.com/Dukxud/codex-resume-scheduler/blob/main/docs/ARCHITECTURE.md) for application adapters and the [test guide](https://github.com/Dukxud/codex-resume-scheduler/blob/main/tests/README.md) for independent-consumer and packaged-renderer checks. Scheduling tests use an isolated fake task provider; they do not execute existing user jobs.
+See the [architecture guide](https://github.com/Dukxud/Continuum/blob/main/docs/ARCHITECTURE.md) for application adapters and the [test guide](https://github.com/Dukxud/Continuum/blob/main/tests/README.md) for independent-consumer and packaged-renderer checks. Scheduling tests use an isolated fake task provider; they do not execute existing user jobs.

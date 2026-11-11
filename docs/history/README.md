@@ -4,7 +4,7 @@ These records trace Continuum's WinForms foundation, migration to Flutter, and e
 
 | Record | Context |
 | --- | --- |
-| [6 November handoff and earlier build records](https://github.com/Dukxud/codex-resume-scheduler/blob/060683a879ee8b876e34b69b7404bab1ec9298a9/docs/CURRENT-STATE.md) | Pinned snapshot of the pause, native observations, and PR #24 artifact details |
+| [6 November handoff and earlier build records](https://github.com/Dukxud/Continuum/blob/060683a879ee8b876e34b69b7404bab1ec9298a9/docs/CURRENT-STATE.md) | Pinned snapshot of the pause, native observations, and PR #24 artifact details |
 | [WinForms README](LEGACY-WINFORMS-README.md) | Pinned reference to the original product documentation |
 | [WinForms architecture](ARCHITECTURE-WINFORMS.md) | v1.16 module boundaries and worker design |
 | [WinForms source review](ADVERSARIAL-SOURCE-REVIEW.md) | Source findings and subsequent local test feedback |

@@ -1,6 +1,6 @@
 # Getting started
 
-This guide builds the current Flutter version of Continuum from source on Windows. The published [v1.11.0 ZIP](https://github.com/Dukxud/codex-resume-scheduler/releases/tag/v1.11.0) contains the earlier WinForms application.
+This guide builds the current Flutter version of Continuum from source on Windows. The published [v1.11.0 ZIP](https://github.com/Dukxud/Continuum/releases/tag/v1.11.0) contains the earlier WinForms application.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ if (Test-Path -LiteralPath $continuumRepo) {
     throw 'This checkout already exists. Use it deliberately or choose a new path.'
 }
 New-Item -ItemType Directory -Path (Split-Path -Parent $continuumRepo) -Force | Out-Null
-git clone --branch main --single-branch https://github.com/Dukxud/codex-resume-scheduler.git $continuumRepo
+git clone --branch main --single-branch https://github.com/Dukxud/Continuum.git $continuumRepo
 if ($LASTEXITCODE -ne 0) { throw 'Clone failed.' }
 
 Set-Location -LiteralPath $continuumRepo

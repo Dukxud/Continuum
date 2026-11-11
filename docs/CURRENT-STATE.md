@@ -21,13 +21,13 @@ The active application is organized under `src/desktop/` and `src/backend/`. Reu
 
 The Flutter version is `0.1.0+1` in `src/desktop/pubspec.yaml`. New preview names derive from it and include `build-info.json` with the source commit and build time. Use the source SHA and package checksum to identify a particular preview. The WinForms version in `legacy/winforms/VERSION` belongs to the retained application.
 
-The public [v1.11.0 release](https://github.com/Dukxud/codex-resume-scheduler/releases/tag/v1.11.0) is the older WinForms application. Source merges do not replace installed executables. Follow [Getting started](GETTING-STARTED.md) for a fresh source build and [release policy](RELEASE-POLICY.md) for publication requirements.
+The public [v1.11.0 release](https://github.com/Dukxud/Continuum/releases/tag/v1.11.0) is the older WinForms application. Source merges do not replace installed executables. Follow [Getting started](GETTING-STARTED.md) for a fresh source build and [release policy](RELEASE-POLICY.md) for publication requirements.
 
 ### Source-layout preview — 11 Nov 2026
 
-[PR #24](https://github.com/Dukxud/codex-resume-scheduler/pull/24) produced a verified earlier preview at source `e998e489af688567081209f6b30a18459fd0cb1e`. It predates the desktop relocation and module extractions now in source. Its Windows build, 47 package-manifest checks, and extracted bridge checks passed.
+[PR #24](https://github.com/Dukxud/Continuum/pull/24) produced a verified earlier preview at source `e998e489af688567081209f6b30a18459fd0cb1e`. It predates the desktop relocation and module extractions now in source. Its Windows build, 47 package-manifest checks, and extracted bridge checks passed.
 
-The [pinned build record](https://github.com/Dukxud/codex-resume-scheduler/blob/060683a879ee8b876e34b69b7404bab1ec9298a9/docs/CURRENT-STATE.md) retains the exact download command, artifact and package hashes, executable path, and older BP211 evidence. Artifact `13888139672` expires on **18 Nov 2026 at 20:01 UTC**; historical archive names remain unchanged.
+The [pinned build record](https://github.com/Dukxud/Continuum/blob/060683a879ee8b876e34b69b7404bab1ec9298a9/docs/CURRENT-STATE.md) retains the exact download command, artifact and package hashes, executable path, and older BP211 evidence. Artifact `13888139672` expires on **18 Nov 2026 at 20:01 UTC**; historical archive names remain unchanged.
 
 ## Remaining acceptance
 

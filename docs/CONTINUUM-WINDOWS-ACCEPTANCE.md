@@ -4,12 +4,12 @@ The [project status](CURRENT-STATE.md) records the current baseline. This ledger
 
 ## Repository maintenance verification — 11 Nov 2026
 
-[PR #24](https://github.com/Dukxud/codex-resume-scheduler/pull/24) moved the active backend and legacy UI into separate directories and updated runtime snapshots, packaging, and imports. The verified head was `e998e489af688567081209f6b30a18459fd0cb1e`; merge `f72617dd1bbb50722e22780c6f77e740f6d5eae3` has the same source tree.
+[PR #24](https://github.com/Dukxud/Continuum/pull/24) moved the active backend and legacy UI into separate directories and updated runtime snapshots, packaging, and imports. The verified head was `e998e489af688567081209f6b30a18459fd0cb1e`; merge `f72617dd1bbb50722e22780c6f77e740f6d5eae3` has the same source tree.
 
 | Check | Result / boundary |
 | --- | --- |
 | Local automated checks | 76 Node tests, 40 PowerShell test files, and 104 Flutter tests passed; Flutter analysis had no errors or warnings |
-| Hosted Windows build | [Run 43091625553](https://github.com/Dukxud/codex-resume-scheduler/actions/runs/43091625553) passed debug/release compilation, compiled icon verification, and package integrity |
+| Hosted Windows build | [Run 43091625553](https://github.com/Dukxud/Continuum/actions/runs/43091625553) passed debug/release compilation, compiled icon verification, and package integrity |
 | Downloaded artifact | All 47 manifest entries independently verified; packaged JSON bridge and runtime snapshot checks passed outside the checkout with an isolated profile |
 | Local build environment | Runner generation stopped at Flutter's symlink prerequisite; the hosted Windows build passed |
 | Native application behavior | No new live Codex or GUI acceptance for this refactor; quota display, Shared retention, and approval scenarios remain open |
