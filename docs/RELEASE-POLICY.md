@@ -1,10 +1,11 @@
 # Release and preview policy
 
-Continuum's Flutter application is an unsigned Windows engineering preview. Feature development and production publication are paused; repository maintenance continues within the owner's authorized scope. [Current state](CURRENT-STATE.md) records builds and outstanding verification.
+Continuum's Flutter application is an unsigned Windows engineering preview. The owner authorized publication of the first public engineering preview on 11 November 2026. Feature expansion, live Codex testing, and signed production publication remain paused. [Current state](CURRENT-STATE.md) records builds and outstanding verification.
 
 ## Available builds
 
-- The latest public release checked on 11 Nov 2026 is [v1.11.0](https://github.com/Dukxud/Continuum/releases/tag/v1.11.0), the older WinForms application.
+- [Continuum 0.1.0 Preview 1](https://github.com/Dukxud/Continuum/releases/tag/v0.1.0-preview.1) provides the current Flutter Windows x64 ZIP and a SHA-256 checksum. It is an unsigned prerelease for evaluation.
+- [v1.11.0](https://github.com/Dukxud/Continuum/releases/tag/v1.11.0) is the older WinForms application.
 - The [PR #24 preview record](CURRENT-STATE.md#source-layout-preview--11-nov-2026) links the earlier verified Flutter package, source SHA, checksums, download command, and expiry. That build predates the current desktop relocation. CI artifacts are temporary review downloads.
 - [Getting started](GETTING-STARTED.md) provides the durable source-build path. Existing installations are not updated by source merges.
 

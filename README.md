@@ -55,11 +55,13 @@ Shared sessions must be started by Continuum. Retained terminals and later turns
 
 ## Try it
 
-The current Flutter application is a **Windows engineering preview**. Build it from source with Windows x64, PowerShell 7, Node.js, Git, Flutter, Visual Studio's C++ desktop tools, and an installed, signed-in Codex CLI.
+**[Download Continuum for Windows x64 →](https://github.com/Dukxud/Continuum/releases/download/v0.1.0-preview.1/Continuum-Windows-v0.1.0%2B1-UNSIGNED-PREVIEW.zip)**
 
-**[Build and open Continuum →](docs/GETTING-STARTED.md)**
+Extract the complete ZIP and open `codex_resume_flutter.exe`. Running it requires PowerShell 7, Node.js, Git, the [Microsoft Visual C++ v14 Redistributable (x64)](https://aka.ms/vc14/vc_redist.x64.exe), and an installed, signed-in Codex CLI. Flutter and Visual Studio are only needed when building from source.
 
-The published [v1.11.0 release](https://github.com/Dukxud/Continuum/releases/tag/v1.11.0) is the earlier WinForms application. Current Flutter previews are unsigned; there is no signed production release of Continuum yet.
+This is an **unsigned engineering preview**. Read the [preview notes and known limitations](https://github.com/Dukxud/Continuum/releases/tag/v0.1.0-preview.1), or follow [setup and source-build instructions](docs/GETTING-STARTED.md).
+
+The older [v1.11.0 release](https://github.com/Dukxud/Continuum/releases/tag/v1.11.0) is the earlier WinForms application. Current Flutter previews are unsigned; there is no signed production release of Continuum yet.
 
 ## Project status
 

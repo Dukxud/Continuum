@@ -10,7 +10,7 @@ The default output from [Getting started](GETTING-STARTED.md) is:
 %USERPROFILE%\Downloads\Continuum-Preview\Continuum-Windows-v0.1.0+1-UNSIGNED-PREVIEW\codex_resume_flutter.exe
 ```
 
-Downloaded review packages have different paths; the [build record](CURRENT-STATE.md#source-layout-preview--11-nov-2026) identifies the verified source-layout preview. The public v1.11.0 release contains the older WinForms app. A GitHub merge does not update an installed executable. Keep each complete package together, including its workers and DLLs.
+The [public preview](https://github.com/Dukxud/Continuum/releases/tag/v0.1.0-preview.1) can be extracted to any chosen folder. Downloaded review packages have different paths; the [build record](CURRENT-STATE.md#source-layout-preview--11-nov-2026) identifies the verified source-layout preview. The public v1.11.0 release contains the older WinForms app. A GitHub merge does not update an installed executable. Keep each complete package together, including its workers and DLLs.
 
 To inspect the running executable's path:
 
@@ -20,6 +20,10 @@ Get-Process -Name codex_resume_flutter -ErrorAction SilentlyContinue |
 ```
 
 New packages include `build-info.json` beside the executable with the application version, source commit, build time, and whether tracked source files were modified. For an older package, use its recorded source SHA and checksum. In a source checkout, `git log -1 --format="%H %s"` identifies the commit; `git status --short` shows local changes.
+
+## Missing Visual C++ runtime
+
+If Windows reports a missing `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`, or `MSVCP140.dll`, install the [Microsoft Visual C++ v14 Redistributable (x64)](https://aka.ms/vc14/vc_redist.x64.exe) from Microsoft, then reopen the app. These runtime libraries are required by the compiled Windows application; installing the full Visual Studio build tools is unnecessary for the downloaded preview.
 
 ## Build prerequisites
 

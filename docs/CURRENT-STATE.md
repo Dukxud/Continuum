@@ -1,6 +1,6 @@
 # Current project state
 
-Continuum is an unsigned Windows engineering preview. Repository maintenance is active; feature expansion, live Codex testing, and production publication remain paused.
+Continuum is an unsigned Windows engineering preview. Repository maintenance and publication of the first public engineering preview are authorized. Feature expansion, live Codex testing, and signed production publication remain paused.
 
 ## Source baseline
 
@@ -13,9 +13,13 @@ The active application is organized under `src/desktop/` and `src/backend/`. Reu
 | Quota display | Uses actual returned windows; latest live account display still needs native verification |
 | Shared lifecycle | Retention is implemented; retained-terminal and approval scenarios remain pending |
 | Windows branding | Checked-in icon is installed after runner generation; earlier Micro title-bar observation is recorded |
-| Distribution | Unsigned source builds and temporary CI previews; no signed production Continuum release |
+| Distribution | Public unsigned engineering preview, source builds, and temporary CI artifacts; no signed production Continuum release |
 
 [Windows acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md) distinguishes automated checks from native observations. [Shared session limits](SHARED-NATIVE-TUI.md) include incomplete mirroring of later terminal turns. Closing the application does not cancel registered tasks.
+
+## Public preview
+
+[Continuum 0.1.0 Preview 1](https://github.com/Dukxud/Continuum/releases/tag/v0.1.0-preview.1) provides a durable Windows x64 download and ZIP checksum. Extract the full package and open `codex_resume_flutter.exe`. It contains the current desktop/backend layout and dropdown font correction. The release notes record the exact build identity and verification. The Shared lifecycle and native acceptance limits above remain open.
 
 ## Build identity
 
