@@ -10,7 +10,7 @@ The default output from [Getting started](GETTING-STARTED.md) is:
 %USERPROFILE%\Downloads\Continuum-Preview\Continuum-Windows-v0.1.0+1-UNSIGNED-PREVIEW\codex_resume_flutter.exe
 ```
 
-Downloaded review packages have different paths; the [build record](CURRENT-STATE.md#source-layout-preview--11-nov-2026) identifies the verified source-layout preview. The public v1.11.0 release contains the older WinForms app. A GitHub merge does not update an installed executable. Keep each complete package together, including its workers and DLLs.
+The [public preview](https://github.com/Dukxud/Continuum/releases/tag/v0.1.0-preview.1) can be extracted to any chosen folder. Downloaded review packages have different paths; the [build record](CURRENT-STATE.md#source-layout-preview--11-nov-2026) identifies the verified source-layout preview. The public v1.11.0 release contains the older WinForms app. A GitHub merge does not update an installed executable. Keep each complete package together, including its workers and DLLs.
 
 To inspect the running executable's path:
 

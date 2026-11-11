@@ -1,6 +1,16 @@
 # Getting started
 
-This guide builds the current Flutter version of Continuum from source on Windows. The published [v1.11.0 ZIP](https://github.com/Dukxud/Continuum/releases/tag/v1.11.0) contains the earlier WinForms application.
+The [Windows engineering preview](https://github.com/Dukxud/Continuum/releases/tag/v0.1.0-preview.1) is available as a ready-to-run ZIP. You can also build the current Flutter application from source. The older [v1.11.0 ZIP](https://github.com/Dukxud/Continuum/releases/tag/v1.11.0) contains the WinForms application.
+
+## Download and run
+
+1. Download `Continuum-Windows-v0.1.0+1-UNSIGNED-PREVIEW.zip` from the [preview release](https://github.com/Dukxud/Continuum/releases/tag/v0.1.0-preview.1).
+2. Extract the complete ZIP to a new folder. Keep its DLLs, `data`, `src`, and `components` folders beside the executable.
+3. Open `codex_resume_flutter.exe`. Windows x64, PowerShell 7 in its standard installation location, Node.js, Git, and an installed, signed-in npm Codex CLI are required.
+
+Flutter, Visual Studio, and Developer Mode are build prerequisites; they are not required for running the downloaded package. The preview is unsigned; read its release notes for known limitations. `SHA256SUMS.txt` on the release page verifies the downloaded ZIP, and the manifest inside the package covers its individual files.
+
+For source builds, continue below.
 
 ## Prerequisites
 

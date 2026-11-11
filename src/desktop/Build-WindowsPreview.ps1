@@ -96,14 +96,15 @@ try{
         builtAtUtc=[DateTimeOffset]::UtcNow.ToString('o')
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'build-info.json') -Encoding utf8
     @'
-UNSIGNED FLUTTER ENGINEERING PREVIEW — NOT FOR PUBLIC DISTRIBUTION.
+CONTINUUM — UNSIGNED WINDOWS ENGINEERING PREVIEW
+Provided for evaluation; see the release notes for known limitations.
 No digital signatures or antivirus exclusions have been applied.
 Requires PowerShell 7, Node.js, Git and Codex CLI (npm installation).
 Uses Windows Task Scheduler and the bundled backend under src/backend.
 Build identity is recorded in build-info.json; keep the complete package together.
 Run codex_resume_flutter.exe. A working signed-in desktop is required.
 No publisher authentication or full device acceptance is asserted.
-'@ | Set-Content -LiteralPath (Join-Path $destination 'UNSIGNED-REVIEW-ONLY.txt') -Encoding utf8
+'@ | Set-Content -LiteralPath (Join-Path $destination 'PREVIEW-NOTES.txt') -Encoding utf8
     $files=@(Get-ChildItem -LiteralPath $destination -File -Recurse |
         Where-Object { $_.Name -ne 'SHA256SUMS.txt' } |
         Sort-Object FullName)
