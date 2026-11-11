@@ -1,65 +1,80 @@
-# Continuum — Codex Resume Scheduler
+# Continuum
 
-Schedule a saved Codex conversation on Windows, monitor its usage and job status, and optionally open the real Codex terminal on a Shared execution owner.
+**A Windows desktop app for scheduling and monitoring saved Codex conversations.**
 
-**Engineering preview. Development is paused at the owner's request.** `main` is the retained baseline, with the native icon fix and response-driven quota display merged. Start with **[current state and restart handoff](docs/CURRENT-STATE.md)** for commits, verification boundaries and the exact executable location. This is an independent community project, not an OpenAI product.
+Schedule a continuation for later, see the usage windows reported for your account, and track the result from a full dashboard or a compact desktop monitor. Continuum keeps the selected conversation and repository context with the job.
 
-## What is included
+**Windows · Flutter / Dart · PowerShell · Node.js · MIT**
 
-Full, Monitor and Micro windows; native Always on Top; customizable Aero-inspired bars; manual scheduling and saved drafts; pinned worker/runtime integrity; account/model/repository checks; history/results; and three execution modes:
+[Getting started](docs/GETTING-STARTED.md) · [User guide](docs/USER-GUIDE.md) · [Architecture](docs/ARCHITECTURE.md) · [Documentation](docs/README.md)
 
-| Mode | Execution owner / interaction | Quota-only continuation |
+## What it does
+
+- **Schedule a saved conversation.** Choose a repository, model, access level, instruction, and time for a one-time Windows task.
+- **Keep usage in view.** Full, Monitor, and Micro layouts display the usage windows and reset times Codex reports, including accounts that return only a weekly window.
+- **Choose how a job runs.** Use a background worker, an interactive terminal, or a shared session with a desktop panel and an attached native terminal.
+- **Follow the outcome.** Inspect live activity and saved results, with separate states for completed, failed, blocked, deferred, and cancelled jobs.
+- **Customize the desktop UI.** Pin the window above other apps and adjust the Aero-inspired progress bars and appearance.
+
+## How it works
+
+```mermaid
+flowchart TD
+    UI[Flutter desktop UI] --> Bridge[PowerShell JSON bridge]
+    Bridge --> Tasks[Windows Task Scheduler]
+    Tasks --> Worker[Pinned worker runtime]
+    Worker --> Background[Background CLI]
+    Worker --> Native[Native terminal]
+    Worker --> Shared[Shared App Server]
+```
+
+The UI manages presentation and scheduling requests. Windows Task Scheduler launches a separate worker, which validates the saved runtime, account, repository, model, and conversation ownership before execution. Scheduled jobs keep their original runtime snapshot when the application is upgraded.
+
+| Mode | Interaction | Optional quota continuation |
 | --- | --- | --- |
-| Background | Pinned noninteractive worker; structured logs/results | Optional, off by default, up to three eligible follow-ups |
-| Native terminal | Ordinary Codex CLI TUI owns the interactive run | No |
-| Shared session | One App Server; Continuum panel plus optional native remote TUI client | No |
+| Background | Noninteractive worker with logs and saved results | Off by default; up to three eligible follow-ups |
+| Native terminal | Interactive Codex CLI | No |
+| Shared session | Continuum panel and a native terminal connected to one App Server | No |
 
-Shared attaches only to a session **started by Continuum**, not any independently running Codex process. Successful scheduled completion can retain an attached TUI with a 15-second no-viewer grace and two-hour cap. Later TUI turns are not continuously mirrored by the current host. Retained live attachment and simultaneous approvals still have pending native tests. [Full Shared contract](docs/SHARED-NATIVE-TUI.md).
+Shared sessions must be started by Continuum. Retained terminals and later turns have [documented lifecycle limits](docs/SHARED-NATIVE-TUI.md).
 
-## Plus and Pro: same display implementation
+## Engineering highlights
 
-Continuum renders the usage windows Codex actually returns for the selected account/model. A five-hour and Weekly response gives two rows; Weekly alone gives one WEEKLY row. Unknown/blank data is not an invented plan limit or unlimited usage. Labels, remaining percentages and resets stay together in Full, Monitor and Micro. **There is no Pro-only patch or subscription-tier switch.** [Quota contract and evidence](docs/QUOTA-PRESENTATION.md).
+- **Separation of UI and execution.** A JSON subprocess boundary connects the Flutter interface to the Windows scheduling backend. [Architecture](docs/ARCHITECTURE.md)
+- **Reproducible job runtimes.** Content-addressed worker snapshots and SHA-256 verification keep scheduled execution tied to the files selected when the job was created. [RuntimeBundle](components/RuntimeBundle/RuntimeBundle.psm1)
+- **Explicit execution ownership.** Per-conversation worker coordination and authenticated local Shared clients prevent competing scheduler workers from starting the same conversation. [Shared protocol](components/SharedCodexSession)
+- **Reusable infrastructure.** Independently importable PowerShell modules cover task registration, settings, outcomes, repository inspection, and rendering. [Component guide](components/README.md)
+- **Tests across the boundaries.** Node protocol mocks, PowerShell integration checks, and Flutter widget and logic tests cover their respective layers. [Developer guide](flutter_port/README.md)
 
-## Open the latest recorded preview
+## Try it
 
-BP211 includes both the accepted icon and quota correction. After following its download/extraction instructions, reopen it with PowerShell 7:
+The current Flutter application is a **Windows engineering preview**. Build it from source with Windows x64, PowerShell 7, Node.js, Git, Flutter, Visual Studio's C++ desktop tools, and an installed, signed-in Codex CLI.
 
-```powershell
-$p=Join-Path $HOME 'Downloads\Continuum-BP211-QuotaFix\Unpacked\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe'
-if(!(Test-Path -LiteralPath $p -PathType Leaf)){throw 'BP211 not found; use the source build instructions below.'}
-Start-Process -FilePath $p -WorkingDirectory (Split-Path -Parent $p)
-```
+**[Build and open Continuum →](docs/GETTING-STARTED.md)**
 
-The path is literal and version-specific; merging source/docs does not update an installed EXE. Keep its DLLs, `data`, bridge and workers beside it. Opening the app can query Codex metadata/usage but does not schedule a model turn. [Artifact/run/hash and expiry](docs/CURRENT-STATE.md).
+The published [v1.11.0 release](https://github.com/Dukxud/codex-resume-scheduler/releases/tag/v1.11.0) is the earlier WinForms application. Current Flutter previews are unsigned; there is no signed production release of Continuum yet.
 
-**Download distinction:** [v1.11.0](https://github.com/Dukxud/codex-resume-scheduler/releases/tag/v1.11.0), still the latest published release at closeout, is the **older WinForms ZIP**, not current Flutter Continuum. CI previews are unsigned and expire. No new public production release is authorized during the pause.
+## Project status
 
-## Build from source when needed
+Feature development is paused. The current source includes the Flutter interface, three execution modes, native Windows branding, and usage-window rendering. Windows CI and package checks are recorded in the [acceptance ledger](docs/CONTINUUM-WINDOWS-ACCEPTANCE.md). Live verification of the latest quota display and Shared session retention/approval flows remains pending.
 
-Runtime prerequisites: Windows x64 and signed-in desktop, PowerShell 7 in its standard installation, Node, Git and npm Codex installed/signed in. Building additionally needs Flutter and Visual Studio's Desktop development with C++ workload. The pinned CI baseline uses Flutter 3.47.9, Node 22 and Windows 2022; this is build evidence, not a promise every future CLI/SDK version is compatible.
+The [maintainer handoff](docs/CURRENT-STATE.md) retains exact builds, verification results, and deferred work. Closing the app does not cancel jobs already registered with Windows Task Scheduler.
 
-From PowerShell 7, with `flutter.bat` on PATH:
+## Explore the source
 
-```powershell
-$ErrorActionPreference='Stop'
-$repo=Join-Path $HOME 'source\continuum'
-if(Test-Path -LiteralPath $repo){throw 'Checkout already exists; inspect it before updating, or choose another path.'}
-git clone --branch main --single-branch https://github.com/Dukxud/codex-resume-scheduler.git $repo
-if($LASTEXITCODE -ne 0){throw 'Clone failed'}
-Set-Location -LiteralPath $repo
-pwsh -NoProfile -STA -File .\flutter_port\Build-WindowsPreview.ps1 -OutputDirectory "$HOME\Downloads\Continuum-Main"
-if($LASTEXITCODE -ne 0){throw 'Build failed; no preview launched'}
-$p=Join-Path $HOME 'Downloads\Continuum-Main\CodexResumeFlutter-Windows-v0.2-UNSIGNED-PREVIEW\codex_resume_flutter.exe'
-if(!(Test-Path -LiteralPath $p -PathType Leaf)){throw 'Built executable missing'}
-Start-Process -FilePath $p -WorkingDirectory (Split-Path -Parent $p)
-```
+| Location | Contents |
+| --- | --- |
+| [flutter_port/](flutter_port) | Flutter UI, Windows bridge, widget tests, and preview builder |
+| [components/](components) | Reusable PowerShell modules and the Shared session host |
+| [tests/](tests) | PowerShell and Node regression and integration tests |
+| [scripts/](scripts) | Packaging, diagnostics, signing, and acceptance tools |
+| [docs/](docs) | Setup, usage, architecture, and verification records |
+| Root `Codex*.ps1` / `CodexUsage.js` | Scheduling backend, metadata readers, and retained WinForms frontend |
 
-The builder refuses existing output packages; choose a fresh output directory for a new build. A source clone alone is not a compiled preview. [Developer commands](flutter_port/README.md).
+The root script layout is shared by the worker snapshot and packaging tools. The Flutter frontend uses that backend directly.
 
-## Documentation and evidence
+## Contributing and license
 
-[Documentation index](docs/README.md) · [User guide](docs/USER-GUIDE.md) · [Architecture](docs/ARCHITECTURE.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Security](docs/SECURITY-AND-PRIVACY.md) · [Windows acceptance](docs/CONTINUUM-WINDOWS-ACCEPTANCE.md) · [Screenshots](docs/SCREENSHOTS.md) · [Contributing](docs/CONTRIBUTING.md) · [Release policy](docs/RELEASE-POLICY.md).
+See the [contribution guide](docs/CONTRIBUTING.md) for focused changes and verification commands, and [security and privacy](docs/SECURITY-AND-PRIVACY.md) for execution and data-storage boundaries.
 
-BP210's title-bar icon was visually accepted. BP211 passed Windows CI and all 47 package checksums; its live quota-display screenshot was not provided before pause. Original Shared task completion passed but exposed a disconnect defect; the fixed retained-terminal/dual-surface behavior still needs native acceptance. Merging at the owner's direction does not manufacture those missing results. Historical screenshots and reviews remain explicitly historical.
-
-Closing the GUI or pausing project development **does not cancel scheduled Windows tasks**. Do not disable antivirus, run unrestricted access, execute Codex, publish or expand scope as a side effect of this handoff. [MIT license](LICENSE).
+Created by [Dukxud](https://github.com/Dukxud). Licensed under [MIT](LICENSE). Continuum is an independent project and is not affiliated with OpenAI.

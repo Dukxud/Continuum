@@ -15,7 +15,7 @@
 | Package integrity | BP211 inner ZIP checksum and 47 manifest entries independently checked | Content verified, not signed publisher authentication |
 | Production distribution | No signed Continuum release published | Deferred |
 
-The old [WinForms gate](WINDOWS-ACCEPTANCE.md) is historical, not the current Flutter release checklist.
+The old [WinForms gate](history/WINDOWS-ACCEPTANCE.md) is historical, not the current Flutter release checklist.
 
 ## Future preflight (without a model turn)
 

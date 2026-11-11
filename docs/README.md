@@ -1,28 +1,39 @@
-# Continuum documentation index
+# Documentation
 
-**Project paused on 6 Nov 2026. Start with [CURRENT-STATE.md](CURRENT-STATE.md).** `main` is the current Flutter baseline, including the native Windows icon (#21) and plan-independent quota presentation (#22). The public v1.11.0 release is the older WinForms generation, not BP211.
+Continuum schedules and monitors saved Codex conversations on Windows. Start with the guides below, or read the [project overview](../README.md).
 
-| Document | Authority and purpose |
+## Use Continuum
+
+| Guide | What you will find |
 | --- | --- |
-| [Current state / handoff](CURRENT-STATE.md) | Baseline commits, executable path, evidence, known limitations and restart instructions |
-| [Root README](../README.md) | Product overview, modes, quota compatibility and build/open instructions |
-| [User guide](USER-GUIDE.md) | Scheduling, access, live views, quota, persistence and results |
-| [Architecture](ARCHITECTURE.md) | Current Flutter/bridge/worker boundaries, ownership and data flow |
-| [Quota presentation](QUOTA-PRESENTATION.md) | One/two-window behavior for Plus and Pro; no hard-coded plan assumptions |
-| [Shared terminal](SHARED-NATIVE-TUI.md) | One App Server, native clients, lifecycle and limits |
-| [Quota continuation](QUOTA-CONTINUATION-DESIGN.md) | Background-only bounded retry policy, independent of quota display |
-| [Windows acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md) | Actual pass/pending distinctions and future native test gate |
-| [Troubleshooting](TROUBLESHOOTING.md) | Version confusion, missing quota, reconnects, icons and read-only diagnostics |
-| [Security/privacy](SECURITY-AND-PRIVACY.md) | Permissions, stored data, local transport and unsigned binary boundary |
-| [Screenshots](SCREENSHOTS.md) | Actual historical evidence, current screenshot status and capture protocol |
-| [Flutter developer guide](../flutter_port/README.md) | Source review, complete package build, test commands and icon installation |
-| [Contributing](CONTRIBUTING.md) | Explicit authorization, narrow changes, bounded tests and delivery expectations |
-| [Release policy](RELEASE-POLICY.md) | Preview versus production release; no publication during the pause |
-| [Distribution readiness](DISTRIBUTION-READINESS.md) | Dated adoption evidence and deferred release blockers |
-| [Reusable components](../components/README.md) | Independent PowerShell components; not a cross-platform execution promise |
+| [Getting started](GETTING-STARTED.md) | Prerequisites, a source build, and the exact launch command |
+| [User guide](USER-GUIDE.md) | Scheduling, execution modes, usage windows, appearance, and results |
+| [Troubleshooting](TROUBLESHOOTING.md) | Setup checks, version identification, and common symptoms |
+| [Security and privacy](SECURITY-AND-PRIVACY.md) | Permissions, local data, credentials, and unsigned previews |
 
-## Historical evidence
+## Understand the implementation
 
-[WinForms README](LEGACY-WINFORMS-README.md), [WinForms architecture](history/ARCHITECTURE-WINFORMS.md), [v1.16 Windows gate](WINDOWS-ACCEPTANCE.md), [adversarial review](ADVERSARIAL-SOURCE-REVIEW.md), [security review](SECURITY-REVIEW.md), [Flutter parity](FLUTTER-PARITY.md), and [Flutter behavior audit](FLUTTER-BEHAVIOR-AUDIT.md) are historical records. Their original PR blockers, layouts, build claims and test outcomes do not override the current handoff. Preserve their dates and evidence; do not rewrite a historical failure as success.
+| Guide | What you will find |
+| --- | --- |
+| [Architecture](ARCHITECTURE.md) | UI, bridge, worker, and persistence boundaries |
+| [Flutter developer guide](../flutter_port/README.md) | Source layout, local checks, and Windows builds |
+| [Reusable components](../components/README.md) | Independent PowerShell modules and example consumers |
+| [Shared sessions](SHARED-NATIVE-TUI.md) | One App Server, authenticated clients, and lifecycle limits |
+| [Quota presentation](QUOTA-PRESENTATION.md) | Rendering the usage windows returned for the selected model |
+| [Quota continuation](QUOTA-CONTINUATION-DESIGN.md) | Optional Background retries and their eligibility checks |
+| [Contributing](CONTRIBUTING.md) | Change scope, verification, and pull requests |
 
-All current docs describe the implementation, not a guarantee of current Codex subscription entitlements. For testing, distinguish source/mocks, compiled binary, local launch, live execution, visual acceptance and signed distribution. A merge is not a substitute for a missing test.
+## Status and verification
+
+Feature development is paused. These records distinguish automated checks, native observations, and work that still needs verification.
+
+| Record | Purpose |
+| --- | --- |
+| [Current state](CURRENT-STATE.md) | Baseline commits, exact preview paths, and maintainer handoff |
+| [Windows acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md) | Recorded results and outstanding native scenarios |
+| [Screenshots](SCREENSHOTS.md) | Dated visual evidence and capture guidance |
+| [Release policy](RELEASE-POLICY.md) | Preview packaging and production release requirements |
+
+## Project history
+
+The [history index](history/README.md) collects the WinForms documentation, migration audits, and earlier reviews. Those records describe their original candidates; current behavior and verification are documented above.

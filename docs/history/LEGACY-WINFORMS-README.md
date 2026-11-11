@@ -6,4 +6,4 @@ This is an archival entry, **not** the current install guide. The verbatim pre-C
 
 It describes the PowerShell/WinForms generations and retains the old PR #16 merge instructions and source-only acceptance statements. Those are historical, not current project state. The duplicate relocated copy was replaced by this pinned reference to avoid broken root-relative links while preserving the exact original text and provenance.
 
-Current product: [Continuum README](../README.md). Current authority and pause: [CURRENT-STATE.md](CURRENT-STATE.md). Current native tests: [Continuum acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md).
+Current product: [Continuum README](../../README.md). Current authority and pause: [CURRENT-STATE.md](../CURRENT-STATE.md). Current native tests: [Continuum acceptance](../CONTINUUM-WINDOWS-ACCEPTANCE.md).

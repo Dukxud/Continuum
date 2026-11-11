@@ -1,4 +1,4 @@
-> **Historical parity checklist:** originally written during PR #17 Flutter development. PR #17 and shared PR #18 merged into `main` on 6 Nov 2026. This checklist is evidence/history, **not** a blanket assertion that all current native behavior passed. Use [current Continuum Windows acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md) for the present gate.
+> **Historical parity checklist:** originally written during PR #17 Flutter development. PR #17 and shared PR #18 merged into `main` on 6 Nov 2026. This checklist is evidence/history, **not** a blanket assertion that all current native behavior passed. Use [current Continuum Windows acceptance](../CONTINUUM-WINDOWS-ACCEPTANCE.md) for the present gate.
 
 # Flutter parity acceptance — Windows v1.16 baseline
 
