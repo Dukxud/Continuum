@@ -6,7 +6,7 @@ The [Windows engineering preview](https://github.com/Dukxud/Continuum/releases/t
 
 1. Download `Continuum-Windows-v0.1.0+1-UNSIGNED-PREVIEW.zip` from the [preview release](https://github.com/Dukxud/Continuum/releases/tag/v0.1.0-preview.1).
 2. Extract the complete ZIP to a new folder. Keep its DLLs, `data`, `src`, and `components` folders beside the executable.
-3. Open `codex_resume_flutter.exe`. Windows x64, PowerShell 7 in its standard installation location, Node.js, Git, and an installed, signed-in npm Codex CLI are required.
+3. Open `codex_resume_flutter.exe`. Windows x64, PowerShell 7 in its standard installation location, Node.js, Git, the [Microsoft Visual C++ v14 Redistributable (x64)](https://aka.ms/vc14/vc_redist.x64.exe), and an installed, signed-in npm Codex CLI are required.
 
 Flutter, Visual Studio, and Developer Mode are build prerequisites; they are not required for running the downloaded package. The preview is unsigned; read its release notes for known limitations. `SHA256SUMS.txt` on the release page verifies the downloaded ZIP, and the manifest inside the package covers its individual files.
 

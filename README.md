@@ -57,7 +57,7 @@ Shared sessions must be started by Continuum. Retained terminals and later turns
 
 **[Download Continuum for Windows x64 →](https://github.com/Dukxud/Continuum/releases/download/v0.1.0-preview.1/Continuum-Windows-v0.1.0%2B1-UNSIGNED-PREVIEW.zip)**
 
-Extract the complete ZIP and open `codex_resume_flutter.exe`. Running it requires PowerShell 7, Node.js, Git, and an installed, signed-in Codex CLI. Flutter and Visual Studio are only needed when building from source.
+Extract the complete ZIP and open `codex_resume_flutter.exe`. Running it requires PowerShell 7, Node.js, Git, the [Microsoft Visual C++ v14 Redistributable (x64)](https://aka.ms/vc14/vc_redist.x64.exe), and an installed, signed-in Codex CLI. Flutter and Visual Studio are only needed when building from source.
 
 This is an **unsigned engineering preview**. Read the [preview notes and known limitations](https://github.com/Dukxud/Continuum/releases/tag/v0.1.0-preview.1), or follow [setup and source-build instructions](docs/GETTING-STARTED.md).
 

@@ -100,6 +100,8 @@ CONTINUUM — UNSIGNED WINDOWS ENGINEERING PREVIEW
 Provided for evaluation; see the release notes for known limitations.
 No digital signatures or antivirus exclusions have been applied.
 Requires PowerShell 7, Node.js, Git and Codex CLI (npm installation).
+Also requires Microsoft Visual C++ v14 Redistributable (x64):
+https://aka.ms/vc14/vc_redist.x64.exe
 Uses Windows Task Scheduler and the bundled backend under src/backend.
 Build identity is recorded in build-info.json; keep the complete package together.
 Run codex_resume_flutter.exe. A working signed-in desktop is required.

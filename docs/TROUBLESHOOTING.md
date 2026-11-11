@@ -21,6 +21,10 @@ Get-Process -Name codex_resume_flutter -ErrorAction SilentlyContinue |
 
 New packages include `build-info.json` beside the executable with the application version, source commit, build time, and whether tracked source files were modified. For an older package, use its recorded source SHA and checksum. In a source checkout, `git log -1 --format="%H %s"` identifies the commit; `git status --short` shows local changes.
 
+## Missing Visual C++ runtime
+
+If Windows reports a missing `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`, or `MSVCP140.dll`, install the [Microsoft Visual C++ v14 Redistributable (x64)](https://aka.ms/vc14/vc_redist.x64.exe) from Microsoft, then reopen the app. These runtime libraries are required by the compiled Windows application; installing the full Visual Studio build tools is unnecessary for the downloaded preview.
+
 ## Build prerequisites
 
 Run `flutter doctor -v` and resolve Windows toolchain errors. The builder requires `flutter.bat` on `PATH` and Visual Studio's **Desktop development with C++** workload.
