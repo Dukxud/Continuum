@@ -1,6 +1,6 @@
 # Continuum
 
-[![CI](https://github.com/Dukxud/codex-resume-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/Dukxud/codex-resume-scheduler/actions/workflows/ci.yml)
+[![CI](https://github.com/Dukxud/Continuum/actions/workflows/ci.yml/badge.svg)](https://github.com/Dukxud/Continuum/actions/workflows/ci.yml)
 
 **A Windows desktop app for scheduling and monitoring saved Codex conversations.**
 
@@ -55,7 +55,7 @@ The current Flutter application is a **Windows engineering preview**. Build it f
 
 **[Build and open Continuum →](docs/GETTING-STARTED.md)**
 
-The published [v1.11.0 release](https://github.com/Dukxud/codex-resume-scheduler/releases/tag/v1.11.0) is the earlier WinForms application. Current Flutter previews are unsigned; there is no signed production release of Continuum yet.
+The published [v1.11.0 release](https://github.com/Dukxud/Continuum/releases/tag/v1.11.0) is the earlier WinForms application. Current Flutter previews are unsigned; there is no signed production release of Continuum yet.
 
 ## Project status
 
