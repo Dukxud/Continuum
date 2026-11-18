@@ -33,7 +33,7 @@ try {
         throw 'Cached launcher did not open the expected executable.'
     }
 
-    Remove-Item -LiteralPath (Split-Path -Parent $exe) -Recurse -Force
+    Remove-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'Continuum\Previews\v0.1.0-preview.1') -Recurse -Force
     $script:launches.Clear()
     & {
         function Invoke-WebRequest {
