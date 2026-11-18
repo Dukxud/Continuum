@@ -73,20 +73,45 @@ try {
     )
     $manifest | Set-Content -LiteralPath (Join-Path $local 'SHA256SUMS.txt') -Encoding utf8
 
-    $script:launches.Clear()
-    & {
-        function Invoke-WebRequest { throw 'Packaged preview unexpectedly downloaded a release.' }
-        function Start-Process {
-            param([string]$FilePath,[string]$WorkingDirectory)
-            $script:launches.Add($FilePath)
+    # Capture the subprocess target on disk; script-scoped mocks can resolve
+    # different $script: variables when the launcher lives in another folder.
+    $capture = Join-Path $tempRoot 'launched-executable.txt'
+    $env:CONTINUUM_TEST_LAUNCH_CAPTURE = $capture
+    try {
+        & {
+            function Invoke-WebRequest { throw 'Packaged preview unexpectedly downloaded a release.' }
+            function Start-Process {
+                param([string]$FilePath,[string]$WorkingDirectory)
+                [IO.File]::WriteAllText($env:CONTINUUM_TEST_LAUNCH_CAPTURE,$FilePath)
+            }
+            . (Join-Path $local 'Run-Continuum.ps1')
         }
-        . (Join-Path $local 'Run-Continuum.ps1')
-    }
-    $actualLaunches=@($script:launches.ToArray())
-    $normalizedActual=if($actualLaunches.Count -eq 1){[IO.Path]::GetFullPath($actualLaunches[0])}else{''}
-    $normalizedExpected=[IO.Path]::GetFullPath($localExe)
-    if($actualLaunches.Count -ne 1 -or $normalizedActual -ine $normalizedExpected){
-        throw "Packaged launch must use only its local verified executable. Expected '$normalizedExpected'; actual: '$($actualLaunches -join '; ')'."
+        $actual=if(Test-Path -LiteralPath $capture){[IO.File]::ReadAllText($capture)}else{''}
+        if(-not $actual -or [IO.Path]::GetFullPath($actual) -ine [IO.Path]::GetFullPath($localExe)){
+            throw "Packaged launch chose '$actual', expected '$localExe'."
+        }
+
+        # Earlier PR artifacts omit the later-added launcher from their
+        # manifest. Adding the sidecar must not redirect them to old releases.
+        $withoutSidecars=@($manifest | Where-Object {
+            $_ -notmatch '  Run-Continuum[.](?:cmd|ps1)$'
+        })
+        $withoutSidecars | Set-Content -LiteralPath (Join-Path $local 'SHA256SUMS.txt') -Encoding utf8
+        Remove-Item -LiteralPath $capture
+        & {
+            function Invoke-WebRequest { throw 'Legacy review sidecar unexpectedly downloaded a release.' }
+            function Start-Process {
+                param([string]$FilePath,[string]$WorkingDirectory)
+                [IO.File]::WriteAllText($env:CONTINUUM_TEST_LAUNCH_CAPTURE,$FilePath)
+            }
+            . (Join-Path $local 'Run-Continuum.ps1')
+        }
+        $actual=if(Test-Path -LiteralPath $capture){[IO.File]::ReadAllText($capture)}else{''}
+        if(-not $actual -or [IO.Path]::GetFullPath($actual) -ine [IO.Path]::GetFullPath($localExe)){
+            throw "Legacy review artifact with launcher sidecar chose '$actual', expected '$localExe'."
+        }
+    } finally {
+        Remove-Item Env:CONTINUUM_TEST_LAUNCH_CAPTURE -ErrorAction SilentlyContinue
     }
 
     Set-Content -LiteralPath $localBridge -Value 'TAMPERED'
