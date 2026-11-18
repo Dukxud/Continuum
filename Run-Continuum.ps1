@@ -13,6 +13,53 @@ function Start-Continuum {
     Start-Process -FilePath $Executable -WorkingDirectory (Split-Path -Parent $Executable)
 }
 
+# Packaged CI previews ship this same launcher beside the executable.
+# A local, manifest-verified package takes precedence over the pinned public
+# release; otherwise reviewing a PR would silently launch old application code.
+$localExecutable = Join-Path $PSScriptRoot 'codex_resume_flutter.exe'
+if (-not $BuildFromSource -and (Test-Path -LiteralPath $localExecutable -PathType Leaf)) {
+    $manifest = Join-Path $PSScriptRoot 'SHA256SUMS.txt'
+    if (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
+        throw 'Local preview checksum manifest missing; refusing to launch.'
+    }
+
+    $prefix = [IO.Path]::GetFullPath($PSScriptRoot).TrimEnd([char[]]@('/','\')) +
+        [IO.Path]::DirectorySeparatorChar
+    $entries = @(Get-Content -LiteralPath $manifest -ErrorAction Stop)
+    if ($entries.Count -eq 0) { throw 'Local preview checksum manifest is empty.' }
+    $verified = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($entry in $entries) {
+        $match = [regex]::Match($entry, '^([0-9A-Fa-f]{64})  ([^\\]+)$')
+        if (-not $match.Success) { throw 'Malformed local preview checksum entry.' }
+        $relative = $match.Groups[2].Value.Replace('/', '\')
+        $full = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $relative))
+        if (-not $full.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase) -or
+            -not $verified.Add($relative)) {
+            throw 'Unsafe or duplicated local preview checksum path.'
+        }
+        if (-not (Test-Path -LiteralPath $full -PathType Leaf) -or
+            (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash -ine $match.Groups[1].Value) {
+            throw "Local preview checksum failed: $relative. Nothing was launched."
+        }
+    }
+    foreach ($required in @('codex_resume_flutter.exe','flutter_windows.dll',
+        'Run-Continuum.ps1','Run-Continuum.cmd','src\desktop\windows_bridge.ps1',
+        'src\backend\Invoke-CodexJob.ps1')) {
+        if (-not $verified.Contains($required)) {
+            throw "Local preview manifest does not cover required file: $required"
+        }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'data') -PathType Container)) {
+        throw 'Local preview missing Flutter data.'
+    }
+    # Only a fully checked local preview is unblocked. No global policy changes.
+    Get-ChildItem -LiteralPath $PSScriptRoot -File -Recurse |
+        Unblock-File -ErrorAction Stop
+    Write-Host 'Launching this verified local preview, not the pinned public release.'
+    Start-Continuum -Executable $localExecutable
+    return
+}
+
 if ($BuildFromSource) {
     if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.git') -PathType Container)) {
         throw 'Building requires a Git checkout, not a GitHub source ZIP. See docs/GETTING-STARTED.md.'
