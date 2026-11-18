@@ -4,6 +4,8 @@ The [Windows engineering preview](https://github.com/Dukxud/Continuum/releases/t
 
 ## Download and run
 
+If you downloaded the **repository source ZIP**, double-click `Run-Continuum.cmd` at its root. It downloads the pinned public Windows preview once, verifies the release's published SHA-256 digest, extracts the complete package to `%LOCALAPPDATA%\Continuum\Previews\v0.1.0-preview.1`, and starts it. The launcher unblocks only files from that verified package; it does not modify PowerShell execution-policy settings. Later runs open the cached preview without downloading again. **This runs the published preview, not the repository's current source.**
+
 1. Download `Continuum-Windows-v0.1.0+1-UNSIGNED-PREVIEW.zip` from the [preview release](https://github.com/Dukxud/Continuum/releases/tag/v0.1.0-preview.1).
 2. Extract the complete ZIP to a new folder. Keep its DLLs, `data`, `src`, and `components` folders beside the executable.
 3. Open `codex_resume_flutter.exe`. Windows x64, PowerShell 7 in its standard installation location, Node.js, Git, the [Microsoft Visual C++ v14 Redistributable (x64)](https://aka.ms/vc14/vc_redist.x64.exe), and an installed, signed-in npm Codex CLI are required.
