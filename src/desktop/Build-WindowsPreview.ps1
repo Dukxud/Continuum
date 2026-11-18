@@ -84,6 +84,15 @@ try{
     Copy-Item -LiteralPath (Join-Path $project 'windows_bridge.ps1') -Destination $bridgeFolder -ErrorAction Stop
     Copy-Item -LiteralPath (Join-Path $project 'bridge') -Destination $bridgeFolder -Recurse -ErrorAction Stop
     Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $destination -ErrorAction Stop
+    # Ship the same root-level launcher that source-ZIP users already know.
+    # When packaged beside an EXE it verifies and launches this exact build.
+    foreach($entry in @('Run-Continuum.cmd','Run-Continuum.ps1')){
+        $from=Join-Path $root $entry
+        if(-not (Test-Path -LiteralPath $from -PathType Leaf)){
+            throw "Required preview launcher missing: $entry"
+        }
+        Copy-Item -LiteralPath $from -Destination (Join-Path $destination $entry) -ErrorAction Stop
+    }
     $sourceCommit=(& git -C $root rev-parse HEAD).Trim()
     if($LASTEXITCODE -ne 0){throw 'Cannot identify the source checkout for this preview.'}
     $sourceChanges=@(& git -C $root status --porcelain --untracked-files=no)
@@ -104,7 +113,7 @@ Also requires Microsoft Visual C++ v14 Redistributable (x64):
 https://aka.ms/vc14/vc_redist.x64.exe
 Uses Windows Task Scheduler and the bundled backend under src/backend.
 Build identity is recorded in build-info.json; keep the complete package together.
-Run codex_resume_flutter.exe. A working signed-in desktop is required.
+Run Run-Continuum.cmd in this folder. It verifies and launches this exact preview.`nDirectly running codex_resume_flutter.exe is also possible.`nA working signed-in desktop is required.
 No publisher authentication or full device acceptance is asserted.
 '@ | Set-Content -LiteralPath (Join-Path $destination 'PREVIEW-NOTES.txt') -Encoding utf8
     $files=@(Get-ChildItem -LiteralPath $destination -File -Recurse |
