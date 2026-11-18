@@ -113,7 +113,9 @@ Also requires Microsoft Visual C++ v14 Redistributable (x64):
 https://aka.ms/vc14/vc_redist.x64.exe
 Uses Windows Task Scheduler and the bundled backend under src/backend.
 Build identity is recorded in build-info.json; keep the complete package together.
-Run Run-Continuum.cmd in this folder. It verifies and launches this exact preview.`nDirectly running codex_resume_flutter.exe is also possible.`nA working signed-in desktop is required.
+Run Run-Continuum.cmd in this folder. It verifies and launches this exact preview.
+Directly running codex_resume_flutter.exe is also possible.
+A working signed-in desktop is required.
 No publisher authentication or full device acceptance is asserted.
 '@ | Set-Content -LiteralPath (Join-Path $destination 'PREVIEW-NOTES.txt') -Encoding utf8
     $files=@(Get-ChildItem -LiteralPath $destination -File -Recurse |
