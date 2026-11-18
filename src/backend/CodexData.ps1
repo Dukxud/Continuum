@@ -127,6 +127,22 @@ function Find-SessionRepository {
     $direct = Get-RepositoryRoot ([string]$Session.Cwd)
     if ($direct) { $candidates.Add($direct) }
 
+    # Recover a previously verified association for this exact CLI session.
+    # The current Codex-reported directory still wins below; a competing
+    # checkout is surfaced rather than silently selected.
+    $preferences=Read-JsonSettings -Path (Join-Path $AppDirectory 'settings.json')
+    if($preferences -and $preferences.sessionRepositories){
+        $saved=$preferences.sessionRepositories.PSObject.Properties[[string]$Session.Id]
+        if($saved -and $saved.Value -is [string]){
+            $remembered=[string]$saved.Value
+            $rememberedRoot=Get-RepositoryRoot $remembered
+            if($rememberedRoot -and
+               $rememberedRoot.TrimEnd([char[]]@('/','\')) -ieq $remembered.TrimEnd([char[]]@('/','\'))){
+                $candidates.Add($rememberedRoot)
+            }
+        }
+    }
+
     # A prior schedule is evidence, not proof that it targeted the right checkout.
     if (Test-Path -LiteralPath $AppDirectory -PathType Container) {
         foreach ($saved in @(Get-CodexJobPayloadFiles -Directory $AppDirectory)) {
