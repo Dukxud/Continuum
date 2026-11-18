@@ -51,7 +51,55 @@ try {
         if (-not $rejected) { throw 'Mismatched preview ZIP was accepted.' }
     }
     if ($script:launches.Count -ne 0) { throw 'Hash mismatch caused a launch.' }
-    Write-Host 'PASS — cached launch skips download; tampered download is rejected before extraction and launch.'
+    # A CI preview includes this same launcher, and must run the packaged
+    # candidate rather than the pinned, older public release or cache.
+    $local = Join-Path $tempRoot 'pr-preview'
+    $localExe = Join-Path $local 'codex_resume_flutter.exe'
+    $localBridge = Join-Path $local 'src\desktop\windows_bridge.ps1'
+    $localWorker = Join-Path $local 'src\backend\Invoke-CodexJob.ps1'
+    [void](New-Item -ItemType Directory -Path (Join-Path $local 'data'),(Split-Path -Parent $localBridge),(Split-Path -Parent $localWorker) -Force)
+    Copy-Item -LiteralPath $launcher,$batch -Destination $local -ErrorAction Stop
+    Set-Content -LiteralPath $localExe -Value 'CI preview fixture binary'
+    Set-Content -LiteralPath (Join-Path $local 'flutter_windows.dll') -Value 'CI preview fixture DLL'
+    Set-Content -LiteralPath $localBridge -Value 'CI preview fixture bridge'
+    Set-Content -LiteralPath $localWorker -Value 'CI preview fixture worker'
+    $manifest = @(
+        Get-ChildItem -LiteralPath $local -Recurse -File |
+            Sort-Object FullName |
+            ForEach-Object {
+                $relative = [IO.Path]::GetRelativePath($local,$_.FullName).Replace('\','/')
+                "$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)  $relative"
+            }
+    )
+    $manifest | Set-Content -LiteralPath (Join-Path $local 'SHA256SUMS.txt') -Encoding utf8
+
+    $script:launches.Clear()
+    & {
+        function Invoke-WebRequest { throw 'Packaged preview unexpectedly downloaded a release.' }
+        function Start-Process {
+            param([string]$FilePath,[string]$WorkingDirectory)
+            $script:launches.Add($FilePath)
+        }
+        . (Join-Path $local 'Run-Continuum.ps1')
+    }
+    if($script:launches.Count -ne 1 -or $script:launches[0] -cne $localExe){
+        throw 'Packaged launch did not prefer its local verified executable.'
+    }
+
+    Set-Content -LiteralPath $localBridge -Value 'TAMPERED'
+    $script:launches.Clear()
+    & {
+        function Start-Process { throw 'A tampered packaged preview must never launch.' }
+        $rejected = $false
+        try { . (Join-Path $local 'Run-Continuum.ps1') }
+        catch {
+            if($_.Exception.Message -notmatch 'Local preview checksum failed'){throw}
+            $rejected = $true
+        }
+        if(-not $rejected){throw 'A tampered local preview was accepted.'}
+    }
+    if($script:launches.Count -ne 0){throw 'Tampered packaged preview caused a launch.'}
+    Write-Host 'PASS — cached launch, packaged PR launch, and tampered release/package rejection.'
 }
 finally {
     $env:LOCALAPPDATA = $originalLocalAppData
