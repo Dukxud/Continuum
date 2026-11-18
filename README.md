@@ -55,6 +55,10 @@ Shared sessions must be started by Continuum. Retained terminals and later turns
 
 ## Try it
 
+**Downloaded the source ZIP?** Double-click `Run-Continuum.cmd` in the repository root on Windows. On first use it downloads the pinned [0.1.0 Preview 1](https://github.com/Dukxud/Continuum/releases/tag/v0.1.0-preview.1), verifies its published SHA-256 digest, extracts it into `%LOCALAPPDATA%\Continuum\Previews`, unblocks only the verified package files, and launches the application. Later launches reuse that installation. **This runs the published preview, not the source code in this ZIP.** It does not change system execution policy.
+
+To build **the checked-out source** instead, use a Git clone (not the GitHub source ZIP) with Flutter and Visual Studio build tools installed, then run `pwsh -NoProfile -STA -File .\Run-Continuum.ps1 -BuildFromSource`. See [Getting started](docs/GETTING-STARTED.md).
+
 **[Download Continuum for Windows x64 →](https://github.com/Dukxud/Continuum/releases/download/v0.1.0-preview.1/Continuum-Windows-v0.1.0%2B1-UNSIGNED-PREVIEW.zip)**
 
 Extract the complete ZIP and open `codex_resume_flutter.exe`. Running it requires PowerShell 7, Node.js, Git, the [Microsoft Visual C++ v14 Redistributable (x64)](https://aka.ms/vc14/vc_redist.x64.exe), and an installed, signed-in Codex CLI. Flutter and Visual Studio are only needed when building from source.
