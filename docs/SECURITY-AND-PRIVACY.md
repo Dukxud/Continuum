@@ -8,6 +8,8 @@ Flutter delegates to the PowerShell JSON bridge and pinned scheduled worker. Cod
 
 Job instructions/preferences/results and runtime snapshots live under `%LOCALAPPDATA%\CodexResumeScheduler`; job JSON identifies transcript paths. These files may contain private prompts, paths or command output. Runtime SHA-256 checks detect changes but are not publisher signatures or protection against the same Windows user deliberately modifying both metadata and files.
 
+Verified repository associations are stored separately in `session-repositories/<session-id>.json`. These records contain the full conversation ID and local Git root, survive replacement of the UI draft and cancellation of a future task, and can disclose private project paths. Discovery reads supported conversation metadata and structured user/tool evidence, verifies existing local Git roots, and does not execute stored tool code or clone referenced repositories. See the [discovery contract](REPOSITORY-DISCOVERY.md).
+
 The worker verifies workspace identity, repository/branch, model/effort, quota and a per-conversation scheduler mutex. The mutex cannot detect/control every unrelated CLI instance. Do not schedule a thread already actively owned elsewhere. Read-only/workspace-write/unrestricted modes retain their actual Codex permission boundaries; unrestricted/YOLO can affect files outside the checkout and must never be used merely to bypass a failing test.
 
 ## Shared credentials and lifecycle

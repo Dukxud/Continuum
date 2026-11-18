@@ -26,7 +26,7 @@ try {
      'legacy/winforms/CodexUiHistory.ps1','src/backend/CodexJobStore.ps1',
      'legacy/winforms/CodexDashboard.ps1','legacy/winforms/CodexScheduleTime.ps1','legacy/winforms/CodexFlowingBar.ps1',
      'legacy/winforms/CodexAeroBar.ps1','legacy/winforms/CodexBarAppearance.ps1','legacy/winforms/CodexUiPixelTheme.ps1','src/backend/CodexData.ps1',
-     'src/backend/CodexSessionRepository.ps1','src/backend/CodexUsage.js','src/backend/CodexQuotaContinuation.ps1','src/backend/CodexTerminalRun.ps1','legacy/winforms/Start-Codex-Scheduler.vbs',
+     'src/backend/CodexSessionRepository.ps1','src/backend/CodexRepositoryEvidence.ps1','src/backend/CodexUsage.js','src/backend/CodexQuotaContinuation.ps1','src/backend/CodexTerminalRun.ps1','legacy/winforms/Start-Codex-Scheduler.vbs',
      'legacy/winforms/Start-Codex-Scheduler.cmd','src/backend/CodexRunJob.vbs','LICENSE','legacy/winforms/VERSION'
     )
     foreach($file in $files){

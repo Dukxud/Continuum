@@ -16,6 +16,7 @@ Continuum schedules and monitors saved Codex conversations on Windows. Start wit
 | Guide | What you will find |
 | --- | --- |
 | [Architecture](ARCHITECTURE.md) | UI, bridge, worker, and persistence boundaries |
+| [Repository discovery investigation](REPOSITORY-DISCOVERY.md) | Complete selection trace, reproduced failures, corrected evidence formats, and verification |
 | [Flutter developer guide](../src/desktop/README.md) | Source layout, local checks, and Windows builds |
 | [Testing](../tests/README.md) | Portable and Windows checks, isolation, coverage, and CI |
 | [Reusable components](../components/README.md) | Independent PowerShell modules and example consumers |

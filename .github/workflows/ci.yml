@@ -111,7 +111,9 @@ jobs:
         uses: actions/upload-artifact@v7.0.2
         with:
           name: continuum-windows-${{ env.SOURCE_SHA }}
-          path: src/desktop/build/review-out/*.zip
+          # Upload the verified extracted package, not a ZIP inside an artifact ZIP.
+          # Reviewers can extract once and double-click Run-Continuum.cmd.
+          path: src/desktop/build/review-out/Continuum-Windows-v*-UNSIGNED-PREVIEW/
           if-no-files-found: error
           retention-days: 7
       - name: Upload failure logs

@@ -21,6 +21,23 @@ Get-Process -Name codex_resume_flutter -ErrorAction SilentlyContinue |
 
 New packages include `build-info.json` beside the executable with the application version, source commit, build time, and whether tracked source files were modified. For an older package, use its recorded source SHA and checksum. In a source checkout, `git log -1 --format="%H %s"` identifies the commit; `git status --short` shows local changes.
 
+The root launcher uses a complete application package beside it when present. From a source archive without the executable, its default path opens the pinned public preview. Replacing only the launcher scripts therefore does not install a backend or UI correction. Check the running executable and its package identity, and use the complete corrected package or the [source-build instructions](GETTING-STARTED.md).
+
+## Repository unresolved, Outside Git, or conflicting checkouts
+
+Select the conversation and check the repository field after lookup finishes. The chooser's `Outside Git:` label can describe its starting folder before a later checkout is found. A saved association takes precedence in that label when available. A startup path such as the user home directory does not prove the conversation never worked in a repository.
+
+The corrected reader uses exact-ID Codex metadata and supported legacy/modern conversation records, including old records in long conversations. A referenced GitHub repository can match an existing checkout by a configured remote even when the local folder has a different name. The search uses conventional development directories and previously verified locations; it does not search every drive or clone a missing repository. **Browse** can select a checkout in another location.
+
+| Message | Meaning and next step |
+| --- | --- |
+| Repository unresolved | No supported evidence identified an existing Git checkout. Use Browse to choose it. |
+| Conflicting checkouts | More than one checkout matches. Use Browse to choose the active checkout. |
+| Repository lookup incomplete | A read, identity check, or search limit stopped discovery. Inspect the displayed reason and use Browse for an explicit choice. Partial results are not selected automatically. |
+| Repository lookup unavailable | The lookup operation failed. Inspect the accompanying error; an unresolved selection can retry on refresh. |
+
+Verified choices are stored under `%LOCALAPPDATA%\CodexResumeScheduler\session-repositories\<session-id>.json`, independently of the current draft and scheduled job. Switching conversations or cancelling a future task should preserve that exact conversation's association. A moved or deleted checkout still needs a new valid choice. If a choice disappears again, record the running package identity and which action preceded it; do not publish raw session IDs, private paths, or rollout contents. The [investigation](REPOSITORY-DISCOVERY.md) records the reproduced defects and verification limits.
+
 ## Missing Visual C++ runtime
 
 If Windows reports a missing `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`, or `MSVCP140.dll`, install the [Microsoft Visual C++ v14 Redistributable (x64)](https://aka.ms/vc14/vc_redist.x64.exe) from Microsoft, then reopen the app. These runtime libraries are required by the compiled Windows application; installing the full Visual Studio build tools is unnecessary for the downloaded preview.

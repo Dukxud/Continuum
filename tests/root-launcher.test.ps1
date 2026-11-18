@@ -51,7 +51,83 @@ try {
         if (-not $rejected) { throw 'Mismatched preview ZIP was accepted.' }
     }
     if ($script:launches.Count -ne 0) { throw 'Hash mismatch caused a launch.' }
-    Write-Host 'PASS — cached launch skips download; tampered download is rejected before extraction and launch.'
+    # A CI preview includes this same launcher, and must run the packaged
+    # candidate rather than the pinned, older public release or cache.
+    $local = Join-Path $tempRoot 'pr-preview'
+    $localExe = Join-Path $local 'codex_resume_flutter.exe'
+    $localBridge = Join-Path $local 'src\desktop\windows_bridge.ps1'
+    $localWorker = Join-Path $local 'src\backend\Invoke-CodexJob.ps1'
+    [void](New-Item -ItemType Directory -Path (Join-Path $local 'data'),(Split-Path -Parent $localBridge),(Split-Path -Parent $localWorker) -Force)
+    Copy-Item -LiteralPath $launcher,$batch -Destination $local -ErrorAction Stop
+    Set-Content -LiteralPath $localExe -Value 'CI preview fixture binary'
+    Set-Content -LiteralPath (Join-Path $local 'flutter_windows.dll') -Value 'CI preview fixture DLL'
+    Set-Content -LiteralPath $localBridge -Value 'CI preview fixture bridge'
+    Set-Content -LiteralPath $localWorker -Value 'CI preview fixture worker'
+    $manifest = @(
+        Get-ChildItem -LiteralPath $local -Recurse -File |
+            Sort-Object FullName |
+            ForEach-Object {
+                $relative = [IO.Path]::GetRelativePath($local,$_.FullName).Replace('\','/')
+                "$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)  $relative"
+            }
+    )
+    $manifest | Set-Content -LiteralPath (Join-Path $local 'SHA256SUMS.txt') -Encoding utf8
+
+    # Capture the subprocess target on disk; script-scoped mocks can resolve
+    # different $script: variables when the launcher lives in another folder.
+    $capture = Join-Path $tempRoot 'launched-executable.txt'
+    $env:CONTINUUM_TEST_LAUNCH_CAPTURE = $capture
+    try {
+        & {
+            function Invoke-WebRequest { throw 'Packaged preview unexpectedly downloaded a release.' }
+            function Start-Process {
+                param([string]$FilePath,[string]$WorkingDirectory)
+                [IO.File]::WriteAllText($env:CONTINUUM_TEST_LAUNCH_CAPTURE,$FilePath)
+            }
+            . (Join-Path $local 'Run-Continuum.ps1')
+        }
+        $actual=if(Test-Path -LiteralPath $capture){[IO.File]::ReadAllText($capture)}else{''}
+        if(-not $actual -or [IO.Path]::GetFullPath($actual) -ine [IO.Path]::GetFullPath($localExe)){
+            throw "Packaged launch chose '$actual', expected '$localExe'."
+        }
+
+        # Earlier PR artifacts omit the later-added launcher from their
+        # manifest. Adding the sidecar must not redirect them to old releases.
+        $withoutSidecars=@($manifest | Where-Object {
+            $_ -notmatch '  Run-Continuum[.](?:cmd|ps1)$'
+        })
+        $withoutSidecars | Set-Content -LiteralPath (Join-Path $local 'SHA256SUMS.txt') -Encoding utf8
+        Remove-Item -LiteralPath $capture
+        & {
+            function Invoke-WebRequest { throw 'Legacy review sidecar unexpectedly downloaded a release.' }
+            function Start-Process {
+                param([string]$FilePath,[string]$WorkingDirectory)
+                [IO.File]::WriteAllText($env:CONTINUUM_TEST_LAUNCH_CAPTURE,$FilePath)
+            }
+            . (Join-Path $local 'Run-Continuum.ps1')
+        }
+        $actual=if(Test-Path -LiteralPath $capture){[IO.File]::ReadAllText($capture)}else{''}
+        if(-not $actual -or [IO.Path]::GetFullPath($actual) -ine [IO.Path]::GetFullPath($localExe)){
+            throw "Legacy review artifact with launcher sidecar chose '$actual', expected '$localExe'."
+        }
+    } finally {
+        Remove-Item Env:CONTINUUM_TEST_LAUNCH_CAPTURE -ErrorAction SilentlyContinue
+    }
+
+    Set-Content -LiteralPath $localBridge -Value 'TAMPERED'
+    $script:launches.Clear()
+    & {
+        function Start-Process { throw 'A tampered packaged preview must never launch.' }
+        $rejected = $false
+        try { . (Join-Path $local 'Run-Continuum.ps1') }
+        catch {
+            if($_.Exception.Message -notmatch 'Local preview checksum failed'){throw}
+            $rejected = $true
+        }
+        if(-not $rejected){throw 'A tampered local preview was accepted.'}
+    }
+    if($script:launches.Count -ne 0){throw 'Tampered packaged preview caused a launch.'}
+    Write-Host 'PASS — cached launch, packaged PR launch, and tampered release/package rejection.'
 }
 finally {
     $env:LOCALAPPDATA = $originalLocalAppData

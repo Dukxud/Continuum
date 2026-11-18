@@ -31,7 +31,7 @@ try {
         'load' {
             $tasks=@(Get-UpcomingCodexTasks -AppDirectory $appDir)
             $result=@{
-                sessions=@(Get-FlutterSessionChoices -SourceDirectory $source)
+                sessions=@(Get-FlutterSessionChoices -SourceDirectory $source -AppDirectory $appDir)
                 pending=$tasks
                 activities=(Get-FlutterRunActivities -AppDirectory $appDir -Tasks $tasks)
                 history=@(Get-FlutterHistory -AppDirectory $appDir -Tasks $tasks)
@@ -40,7 +40,7 @@ try {
             }
         }
         'labels' {
-            $result=@{sessions=@(Get-FlutterSessionChoices -SourceDirectory $source -IncludeActivity)}
+            $result=@{sessions=@(Get-FlutterSessionChoices -SourceDirectory $source -AppDirectory $appDir -IncludeActivity)}
         }
         'pending' {
             $tasks=@(Get-UpcomingCodexTasks -AppDirectory $appDir)
@@ -64,18 +64,31 @@ try {
             $result=$snapshot
         }
         'select' {
+            if(-not (Get-Command git -ErrorAction SilentlyContinue)){throw 'Git is not available to Continuum. Install Git or restart Continuum after updating PATH.'}
             $id=[string]$request.sessionId
-            $session=@(Get-RecentCliSessions | Where-Object { $_.Id -ceq $id }) | Select-Object -First 1
+            $metadata=Get-CodexThreadMetadata -SessionId $id -SourceDirectory $source
+            $session=Get-VerifiedCliSession -SessionId $id -SourceDirectory $source -Metadata $metadata -MetadataQueried
             if(-not $session){throw 'Selected CLI conversation could not be verified.'}
-            $cwd=Get-ReportedThreadDirectory -SessionId $id -SourceFolder $source
-            $found=Find-SessionRepository -Session $session -ReportedCwd $cwd -AppDirectory $appDir
-            if(-not $found){
-                # The title query already knows which CLI session is selected;
-                # the picker preview may retain its explicit project heading
-                # when the rollout format lacks event_msg/user_message records.
+            $cwd=if($metadata){[string]$metadata.cwd}else{''}
+            $preview=if($metadata){[string]$metadata.preview}else{''}
+            $origin=if($metadata -and $metadata.gitInfo){[string]$metadata.gitInfo.originUrl}else{''}
+            $found=Find-SessionRepository -Session $session -ReportedCwd $cwd -AppDirectory $appDir -CodexPreview $preview -ReportedRepositoryUrl $origin
+            if(-not $found -and -not $preview){
+                # Compatibility fallback when an older server's exact read
+                # omits preview. Do not substitute another session or a title.
                 $preview=Get-CodexPickerPreview -SourceDirectory $source -SessionId $id
                 if($preview){
                     $found=Find-SessionRepository -Session $session -ReportedCwd $cwd -AppDirectory $appDir -CodexPreview $preview
+                }
+            }
+            if($request.repository){
+                # A restored manual choice is revalidated, not silently
+                # replaced by an automatic hint. Invalid paths fall through.
+                $selected=Get-RepositoryRoot ([string]$request.repository)
+                if($selected){
+                    $alternatives=@($found.Candidates | Where-Object {$_ -and $_ -ine $selected})
+                    $found=[pscustomobject]@{Root=$selected;Source='saved repository selection'
+                        Candidates=@($selected)+$alternatives;AlternativeRoots=$alternatives}
                 }
             }
             $result=@{sessionId=$id;model=Read-SessionModel $session;found=$found}
@@ -93,18 +106,7 @@ try {
             $result=Send-FlutterSharedAnswer -Request $request -SourceDirectory $source -AppDirectory $appDir
         }
         'cancel' {
-            $name=[string]$request.name
-            if($name -cnotmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[0-9a-fA-F]{8}$'){throw 'Invalid Scheduler task name.'}
-            Remove-OneTimeTask -Name $name -OnlyBeforeStart
-            $warning=''
-            $payloadPath=Join-Path $appDir ($name+'.json')
-            if(Test-Path -LiteralPath $payloadPath -PathType Leaf){
-                try {
-                    [void](Write-JobOutcome -Path ([IO.Path]::ChangeExtension($payloadPath,'.result.json')) -Status 'cancelled' -Message 'Cancelled by operator before execution.')
-                    Remove-Item -LiteralPath $payloadPath -Force -ErrorAction Stop
-                }catch{$warning=$_.Exception.Message}
-            }
-            $result=@{name=$name;status='Cancelled';warning=$warning}
+            $result=Remove-FlutterSchedule -Name ([string]$request.name) -AppDirectory $appDir
         }
         'evidence' {
             $name=[string]$request.name

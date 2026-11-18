@@ -54,6 +54,14 @@ class StubAdapter implements SchedulerAdapter {
     if (action == 'labels') {
       return pendingLabels?.future ?? {'sessions': []};
     }
+    if (action == 'select') {
+      return {
+        'sessionId': payload['sessionId'],
+        'found': payload['repository'] == null
+            ? null
+            : {'Root': payload['repository']},
+      };
+    }
     if (action == 'cancel') {
       cancellations.add(payload['name'] as String);
       return {'status': 'Cancelled', 'warning': ''};

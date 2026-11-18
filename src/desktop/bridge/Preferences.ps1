@@ -46,14 +46,48 @@ function Save-FlutterPreferences {
         if([int]$appearance.speed -lt 25 -or [int]$appearance.speed -gt 300){throw 'Invalid reflection speed.'}
         if($appearance.aero -isnot [bool]){throw 'Invalid Aero Liquid setting.'}
     }
+    # A saved draft is not the repository history. Preserve verified
+    # associations by exact conversation ID when the operator changes threads.
+    $sessionRepositories=@{}
+    if($previous -and $previous.sessionRepositories){
+        foreach($entry in $previous.sessionRepositories.PSObject.Properties){
+            $id=[string]$entry.Name
+            $path=[string]$entry.Value
+            if($id -match '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$' -and
+               $path -and [IO.Path]::IsPathFullyQualified($path)){
+                $sessionRepositories[$id]=$path
+            }
+        }
+    }
+    # The previous draft may predate this new map. Migrate it on the first
+    # save after upgrade, even when that save selects a different conversation.
+    foreach($choice in @($previous.draft,$draft)){
+        if(-not $choice){continue}
+        $id=[string]$choice.sessionId
+        $path=[string]$choice.repo
+        if($id -notmatch '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$' -or
+           [string]::IsNullOrWhiteSpace($path)){continue}
+        # Only a verified Git checkout becomes reusable evidence; incomplete
+        # path edits may still be retained in the single current draft.
+        $verified=Get-RepositoryRoot $path
+        if($verified){$sessionRepositories[$id]=$verified}
+    }
     $settings=[pscustomobject]@{
         version=1;lastAccess=$access
+        sessionRepositories=$sessionRepositories
         compactMode=($Request.compactMode -eq $true -or $Request.microMode -eq $true)
         microMode=($Request.microMode -eq $true)
         alwaysOnTop=($Request.alwaysOnTop -eq $true)
         barAppearance=$appearance
         draft=$safeDraft
     }
+    # The replaceable UI draft is not the durable association store. Migrate
+    # older maps without overwriting newer per-session choices, then record
+    # this request's verified choice independently of other sessions' saves.
+    foreach($id in @($sessionRepositories.Keys)){
+        Save-SessionRepositoryAssociation -SessionId $id -Repository $sessionRepositories[$id] -AppDirectory $AppDirectory -OnlyIfMissing
+    }
+    # The common settings facade records the current draft for both UIs.
     Write-CodexUiSettings -Directory $AppDirectory -State $settings
     return @{saved=$true}
 }

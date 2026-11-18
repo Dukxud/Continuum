@@ -12,37 +12,115 @@ function Get-RepositoryRoot {
     # fall through to session-local Git evidence, not reach the generic
     # GitRepository module's mandatory Path parameter and abort discovery.
     if([string]::IsNullOrWhiteSpace($Path)){return $null}
+    $Path=$Path.Trim()
+    if($Path.Length -ge 2 -and $Path.StartsWith('"') -and $Path.EndsWith('"')){
+        $Path=$Path.Substring(1,$Path.Length-2)
+    }
     return Get-GitRepositoryRoot -Path $Path
 }
 
 function Get-RecentCliSessions {
+    param([string]$SourceDirectory='',[string]$SessionId='')
     $sessionIdPattern = '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$'
     $sessionRoot = Join-Path $(if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }) 'sessions'
     $sessions = @()
+    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    if($SourceDirectory -and -not $SessionId){
+        # Codex owns compressed rollouts, fork ancestry and reverted paths.
+        # Its read-only inventory supplements the plain-file offline fallback.
+        $inventory=Invoke-CodexMetadataQuery -SourceDirectory $SourceDirectory -Arguments @('--sessions')
+        if($inventory -and $inventory.ok -eq $true){
+            foreach($thread in @($inventory.sessions)){
+                if($thread.threadId -notmatch $sessionIdPattern -or $thread.source -notin @('cli','exec')){continue}
+                if(-not $seen.Add([string]$thread.threadId)){continue}
+                $when=if($thread.updatedAt){[DateTimeOffset]::FromUnixTimeSeconds([long]$thread.updatedAt).LocalDateTime}else{[datetime]::MinValue}
+                $sessions += [pscustomobject]@{
+                    Id=[string]$thread.threadId;Cwd=[string]$thread.cwd;File=[string]$thread.path
+                    Source=[string]$thread.source;UpdatedAt=$when;Metadata=$thread
+                    Display=('{0} | {1:MM/dd HH:mm} | {2}' -f [string]$thread.cwd,$when,$thread.threadId)
+                }
+            }
+        }
+    }
     if (Test-Path -LiteralPath $sessionRoot -PathType Container) {
         $rollouts = @(Get-ChildItem -LiteralPath $sessionRoot -File -Recurse -Filter 'rollout-*.jsonl' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending)
-        $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        $localCount=0
         foreach ($item in $rollouts) {
             try {
                 $line = Get-Content -LiteralPath $item.FullName -TotalCount 1 -ErrorAction Stop
-                $meta = ($line | ConvertFrom-Json).payload
+                $record = $line | ConvertFrom-Json -ErrorAction Stop
+                if($record.type -ne 'session_meta'){continue}
+                $meta = $record.payload
                 # Both interactive CLI and non-interactive exec sessions can
                 # be resumed by the scheduled "codex exec resume <id>" worker.
                 # Do not include IDE, subagent or unknown session sources.
                 if ($meta.source -notin @('cli','exec') -or $meta.id -notmatch $sessionIdPattern) { continue }
+                if ($SessionId -and [string]$meta.id -ine $SessionId) { continue }
                 if (-not $seen.Add([string]$meta.id)) { continue }
                 $name = if ($meta.cwd) { Split-Path -Leaf ([string]$meta.cwd) } else { 'CLI session' }
                 $sessions += [pscustomobject]@{
                     Id = [string]$meta.id
                     Cwd = [string]$meta.cwd
                     File = [string]$item.FullName
+                    Source = [string]$meta.source
+                    UpdatedAt = $item.LastWriteTime
+                    Metadata = $null
                     Display = ('{0} | {1:MM/dd HH:mm} | {2}' -f $name,$item.LastWriteTime,$meta.id)
                 }
-                if ($sessions.Count -ge 30) { break }
+                $localCount++
+                if ($SessionId -or $localCount -ge 30) { break }
             } catch { continue }
         }
     }
-    return $sessions
+    return @($sessions | Sort-Object UpdatedAt -Descending | Select-Object -First 30)
+}
+
+function Invoke-CodexMetadataQuery {
+    param([Parameter(Mandatory)][string]$SourceDirectory,
+          [Parameter(Mandatory)][string[]]$Arguments)
+    try{
+        $shim=(Get-Command codex.cmd -ErrorAction Stop).Source
+        $cli=Join-Path (Split-Path -Parent $shim) 'node_modules/@openai/codex/bin/codex.js'
+        $helper=Join-Path $SourceDirectory 'src/backend/CodexUsage.js'
+        if(-not (Test-Path -LiteralPath $cli -PathType Leaf) -or
+           -not (Test-Path -LiteralPath $helper -PathType Leaf)){return $null}
+        $lines=@(& node.exe $helper --cli-js $cli @Arguments)
+        if($LASTEXITCODE -ne 0 -or -not $lines.Count){return $null}
+        $result=$lines[-1] | ConvertFrom-Json -ErrorAction Stop
+        if($result.ok -eq $true){return $result}
+    }catch{}
+    return $null
+}
+
+function Get-CodexThreadMetadata {
+    param([string]$SessionId,[Parameter(Mandatory)][string]$SourceDirectory)
+    if($SessionId -notmatch '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$'){return $null}
+    $result=Invoke-CodexMetadataQuery -SourceDirectory $SourceDirectory -Arguments @('--thread-id',$SessionId)
+    if($result -and [string]$result.threadId -ieq $SessionId){return $result}
+    return $null
+}
+
+function Get-VerifiedCliSession {
+    param([string]$SessionId,[Parameter(Mandatory)][string]$SourceDirectory,
+          $Metadata=$null,[switch]$MetadataQueried)
+    if($SessionId -notmatch '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$'){return $null}
+    if(-not $MetadataQueried){$Metadata=Get-CodexThreadMetadata -SessionId $SessionId -SourceDirectory $SourceDirectory}
+    if($Metadata -and [string]$Metadata.threadId -ieq $SessionId){
+        if($Metadata.source -in @('cli','exec')){
+            $file=[string]$Metadata.path
+            if(-not $file){
+                $local=@(Get-RecentCliSessions -SessionId $SessionId) | Select-Object -First 1
+                if($local){$file=[string]$local.File}
+            }
+            return [pscustomobject]@{Id=$SessionId;Cwd=[string]$Metadata.cwd;File=$file
+                Source=[string]$Metadata.source;Metadata=$Metadata}
+        }
+        # A positive unsupported source must not be overridden by stale files.
+        if($Metadata.source){return $null}
+    }
+    # Older servers can omit source; an actual local CLI/exec header remains
+    # verifiable even if the thread aged out of the 30-row display inventory.
+    return @(Get-RecentCliSessions -SessionId $SessionId | Where-Object { $_.Id -ieq $SessionId }) | Select-Object -First 1
 }
 
 
@@ -64,7 +142,8 @@ function Format-CodexSessionTitle {
 
 function Get-CodexSessionActivity {
     param([Parameter(Mandatory)][string]$SessionFile)
-    if(-not (Test-Path -LiteralPath $SessionFile -PathType Leaf)){return $null}
+    if([string]::IsNullOrWhiteSpace($SessionFile) -or $SessionFile -match '[.]zst$' -or
+       -not (Test-Path -LiteralPath $SessionFile -PathType Leaf)){return $null}
     foreach($sample in @('recent','initial')){
         try {
             $lines=if($sample -eq 'recent'){
@@ -99,86 +178,75 @@ function Get-CodexSessionActivity {
 # offers when resuming a conversation. A missing/error response is not evidence
 # that the conversation lacks a repository; callers retain local fallbacks.
 function Get-ReportedThreadDirectory {
-    param([string]$SessionId, [string]$SourceFolder)
-    if ($SessionId -notmatch '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$') { return $null }
-    try {
-        $shim = (Get-Command codex.cmd -ErrorAction Stop).Source
-        $cli = Join-Path (Split-Path -Parent $shim) 'node_modules\@openai\codex\bin\codex.js'
-        $helper = Join-Path $SourceFolder 'src/backend/CodexUsage.js'
-        if (-not (Test-Path -LiteralPath $cli -PathType Leaf) -or -not (Test-Path -LiteralPath $helper -PathType Leaf)) { return $null }
-        $lines = & node.exe $helper --cli-js $cli --thread-id $SessionId
-        if ($LASTEXITCODE -ne 0 -or -not $lines) { return $null }
-        $result = ($lines | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
-        if ($result.ok -eq $true -and $result.threadId -eq $SessionId -and $result.cwd -is [string]) {
-            return ([string]$result.cwd).Trim()
-        }
-    } catch { }
+    param([string]$SessionId,[string]$SourceFolder)
+    $metadata=Get-CodexThreadMetadata -SessionId $SessionId -SourceDirectory $SourceFolder
+    if($metadata){return [string]$metadata.cwd}
     return $null
 }
 
 function Find-SessionRepository {
-    param($Session, [string]$ReportedCwd = $null,
+    param($Session,[string]$ReportedCwd=$null,
           [Parameter(Mandatory)][string]$AppDirectory,
-          [string]$CheckoutHome = $HOME,
-          [string]$CodexPreview = $null)
-    if (-not $Session) { return $null }
-    $candidates = [System.Collections.Generic.List[string]]::new()
-    $reportedRoot = Get-RepositoryRoot $ReportedCwd
-    $direct = Get-RepositoryRoot ([string]$Session.Cwd)
-    if ($direct) { $candidates.Add($direct) }
+          [string]$CheckoutHome=$HOME,[string]$CodexPreview=$null,
+          [string]$ReportedRepositoryUrl=$null)
+    if(-not $Session){return $null}
+    $candidates=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $reportedRoot=Get-RepositoryRoot $ReportedCwd
+    $direct=Get-RepositoryRoot ([string]$Session.Cwd)
+    if($direct){[void]$candidates.Add($direct)}
+    $remembered=Get-SavedSessionRepository -SessionId ([string]$Session.Id) -AppDirectory $AppDirectory
+    if($remembered){[void]$candidates.Add($remembered)}
 
-    # A prior schedule is evidence, not proof that it targeted the right checkout.
-    if (Test-Path -LiteralPath $AppDirectory -PathType Container) {
-        foreach ($saved in @(Get-CodexJobPayloadFiles -Directory $AppDirectory)) {
-            try {
-                $job = Get-Content -LiteralPath $saved.FullName -Raw -ErrorAction Stop | ConvertFrom-Json
-                if ([string]$job.sessionId -ne [string]$Session.Id) { continue }
-                $root = Get-RepositoryRoot ([string]$job.repo)
-                if ($root -and $root.TrimEnd([char[]]@('/','\')) -ieq ([string]$job.repo).TrimEnd([char[]]@('/','\'))) {
-                    $candidates.Add($root)
-                }
-            } catch { continue }
+    # Task payloads remain legacy evidence, but cancelling a task no longer
+    # owns/deletes the durable conversation-to-checkout association.
+    foreach($saved in @(Get-CodexJobPayloadFiles -Directory $AppDirectory)){
+        try{
+            $job=Get-Content -LiteralPath $saved.FullName -Raw -ErrorAction Stop | ConvertFrom-Json
+            if([string]$job.sessionId -ine [string]$Session.Id){continue}
+            $root=Get-RepositoryRoot ([string]$job.repo)
+            if($root -and $root.Replace('\','/').TrimEnd('/') -ieq ([string]$job.repo).Replace('\','/').TrimEnd('/')){
+                [void]$candidates.Add($root)
+            }
+        }catch{continue}
+    }
+
+    $evidence=Get-CodexSessionRepositoryEvidence -Session $Session -CodexPreview $CodexPreview -ReportedRepositoryUrl $ReportedRepositoryUrl
+    $verificationClock=[Diagnostics.Stopwatch]::StartNew()
+    foreach($path in $evidence.Paths){
+        if($verificationClock.Elapsed.TotalSeconds -gt 8){
+            $evidence.Complete=$false
+            $evidence.Reason='Repository path verification exceeded its time budget.'
+            break
+        }
+        $root=Get-RepositoryRoot $path
+        if($root){[void]$candidates.Add($root)}
+    }
+    if($reportedRoot){[void]$candidates.Add($reportedRoot)}
+    $roots=@($candidates | Sort-Object -Unique)
+    if($reportedRoot){
+        return [pscustomobject]@{Root=$reportedRoot;Source='Codex thread/read';ReportedCwd=$ReportedCwd
+            Candidates=$roots;AlternativeRoots=@($roots | Where-Object {$_ -ine $reportedRoot})}
+    }
+    if(-not $evidence.Complete){
+        return [pscustomobject]@{Root=$null;Source=$evidence.Reason;Candidates=$roots;AlternativeRoots=$roots;Incomplete=$true}
+    }
+    if($roots.Count -eq 1){
+        return [pscustomobject]@{Root=$roots[0];Source='saved conversation fallback';Candidates=$roots;AlternativeRoots=@()}
+    }
+    if($roots.Count -gt 1){
+        return [pscustomobject]@{Root=$null;Source='conflicting fallback worktrees';Candidates=$roots;AlternativeRoots=$roots}
+    }
+    # Previously verified locations can be searched by this session's explicit
+    # remote/name evidence without borrowing another session's association.
+    $known=[Collections.Generic.List[string]]::new()
+    $associationDirectory=Join-Path $AppDirectory 'session-repositories'
+    if(Test-Path -LiteralPath $associationDirectory -PathType Container){
+        foreach($file in @(Get-ChildItem -LiteralPath $associationDirectory -File -Filter '*.json')){
+            $entry=Read-JsonSettings -Path $file.FullName
+            if($entry -and $entry.schema -eq 1 -and $entry.root -is [string]){$known.Add($entry.root)}
         }
     }
-
-    # Use only structured cwd/workdir fields belonging to this session.
-    # CLI sessions can move from their starting repository to an isolated worktree.
-    if (Test-Path -LiteralPath $Session.File -PathType Leaf) {
-        $contexts = [System.Collections.Generic.List[string]]::new()
-        $toolDirs = [System.Collections.Generic.List[string]]::new()
-        try {
-            foreach ($line in @(Get-Content -LiteralPath $Session.File -Tail 800 -ErrorAction Stop)) {
-                if ($line -notmatch '"(?:cwd|workdir|arguments)"') { continue }
-                try {
-                    $record = $line | ConvertFrom-Json -ErrorAction Stop
-                    if ($record.type -eq 'turn_context' -and -not [string]::IsNullOrWhiteSpace([string]$record.payload.cwd)) {
-                        $contexts.Add([string]$record.payload.cwd)
-                    } elseif ($record.type -eq 'response_item' -and $record.payload.type -eq 'function_call' -and $record.payload.arguments) {
-                        $arguments = $record.payload.arguments | ConvertFrom-Json -ErrorAction Stop
-                        if ($arguments.workdir -is [string] -and $arguments.workdir) { $toolDirs.Add([string]$arguments.workdir) }
-                    }
-                } catch { continue }
-            }
-            foreach ($directory in @($contexts.ToArray() | Select-Object -Last 8) + @($toolDirs.ToArray() | Select-Object -Last 12)) {
-                $root = Get-RepositoryRoot $directory
-                if ($root) { $candidates.Add($root) }
-            }
-        } catch {
-            # Preserve other evidence, but never infer a root from malformed rollout text.
-        }
-    }
-
-    $roots = @($candidates.ToArray() + @($reportedRoot | Where-Object { $_ }) | Sort-Object -Unique)
-    if ($reportedRoot) {
-        # The reported cwd is authoritative for Codex's resume prompt. Preserve
-        # competing roots for the user instead of ignoring them or clearing it.
-        $alternatives = @($roots | Where-Object { $_ -ine $reportedRoot })
-        return [pscustomobject]@{ Root = $reportedRoot; Source = 'Codex thread/read'; ReportedCwd = $ReportedCwd;
-            Candidates = $roots; AlternativeRoots = $alternatives }
-    }
-    if ($roots.Count -eq 1) { return [pscustomobject]@{ Root = $roots[0]; Source = 'saved conversation fallback'; Candidates = $roots; AlternativeRoots = @() } }
-    if ($roots.Count -gt 1) { return [pscustomobject]@{ Root = $null; Source = 'conflicting fallback worktrees'; Candidates = $roots; AlternativeRoots = $roots } }
-    return Find-ReferencedSessionRepository -Session $Session -HomeDirectory $CheckoutHome -CodexPreview $CodexPreview
+    return Find-ReferencedSessionRepository -Session $Session -HomeDirectory $CheckoutHome -Evidence $evidence -KnownRoots $known.ToArray()
 }
 
 
@@ -290,7 +358,8 @@ function Get-UpcomingCodexTasks {
 
 function Read-SessionModel {
     param($Session)
-    if (-not $Session -or -not (Test-Path -LiteralPath $Session.File -PathType Leaf)) { return $null }
+    if (-not $Session -or [string]::IsNullOrWhiteSpace([string]$Session.File) -or
+        [string]$Session.File -match '[.]zst$' -or -not (Test-Path -LiteralPath $Session.File -PathType Leaf)) { return $null }
     try {
         foreach ($line in @(Get-Content -LiteralPath $Session.File -Tail 600) | Select-Object -Last 600) {
             if ($line -notmatch '"model"') { continue }
@@ -308,6 +377,15 @@ function Read-CodexUiSettings {
 }
 function Write-CodexUiSettings {
     param([string]$Directory, $State)
+    # The retained WinForms UI also writes drafts through this facade. Keep
+    # its exact-ID associations durable without requiring a Flutter schema.
+    $previous=Read-CodexUiSettings $Directory
+    if($previous -and $previous.draft){
+        Save-SessionRepositoryAssociation -SessionId ([string]$previous.draft.sessionId) -Repository ([string]$previous.draft.repo) -AppDirectory $Directory -OnlyIfMissing
+    }
+    if($State.draft){
+        Save-SessionRepositoryAssociation -SessionId ([string]$State.draft.sessionId) -Repository ([string]$State.draft.repo) -AppDirectory $Directory
+    }
     Write-JsonSettings -Path (Join-Path $Directory 'settings.json') -Value $State
 }
 

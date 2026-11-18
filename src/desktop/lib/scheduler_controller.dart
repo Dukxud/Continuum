@@ -54,12 +54,18 @@ class SchedulerController extends ChangeNotifier {
   int _repositoryEditEpoch = 0;
   Future<void>? _repositoryLookup;
   String? _lookupSessionId;
+  int? _lookupSelectionEpoch;
+  String? _restoredRepository;
+  Future<void>? _selectionSaveBarrier;
   bool _keepRestoredModel = false;
   Timer? _statusTimer;
   Timer? _refreshTimer;
   Timer? _clockTimer;
   Timer? _saveTimer;
   Future<void> _saveTail = Future<void>.value();
+  final List<Map<String, dynamic>> _pendingPreferences = [];
+  Map<String, dynamic>? _writingPreferences;
+  bool _saving = false;
   bool _polling = false;
   bool _loading = false;
   bool _disposed = false;
@@ -185,6 +191,7 @@ class SchedulerController extends ChangeNotifier {
         sessionId = savedChoiceExists ? savedId : _firstSessionId();
         // Never pair an unrelated fallback session with the old session's root.
         repo = savedChoiceExists ? stringField(draft, 'repo') : '';
+        _restoredRepository = repo.trim().isEmpty ? null : repo;
         model = stringField(draft, 'model').isEmpty
             ? null
             : stringField(draft, 'model');
@@ -232,9 +239,13 @@ class SchedulerController extends ChangeNotifier {
         _lastPersistedSettings = jsonEncode(_settingsSnapshot());
       } else if (sessionId == null ||
           !sessions.any((s) => stringField(s, 'Id') == sessionId)) {
+        // Capture the outgoing conversation before a refresh changes the
+        // draft. The next lookup waits for its association to reach disk.
+        _selectionSaveBarrier = save();
         ++_selectionEpoch;
         sessionId = _firstSessionId();
         repo = '';
+        _restoredRepository = null;
         repositoryWarning = null;
         repositoryAlternatives = [];
         _keepRestoredModel = false;
@@ -432,6 +443,7 @@ class SchedulerController extends ChangeNotifier {
     if (repository != null) {
       ++_repositoryEditEpoch;
       repo = repository;
+      _restoredRepository = null;
       repositoryWarning = null;
       repositoryAlternatives = [];
     }
@@ -488,9 +500,13 @@ class SchedulerController extends ChangeNotifier {
 
   Future<void> selectSession(String? id) async {
     if (id != sessionId) {
+      // Enqueue the exact outgoing draft before clearing its path. A debounced
+      // save which reads the later draft cannot preserve this association.
+      _selectionSaveBarrier = save();
       ++_selectionEpoch;
       sessionId = id;
       repo = '';
+      _restoredRepository = null;
       repositoryWarning = null;
       repositoryAlternatives = [];
       _keepRestoredModel = false;
@@ -505,33 +521,48 @@ class SchedulerController extends ChangeNotifier {
   /// CodexData reader supplies Git evidence; Flutter never guesses a path.
   Future<void> _ensureRepositoryLookup() async {
     final id = sessionId;
+    final selection = _selectionEpoch;
+    final edited = _repositoryEditEpoch;
+    final outgoingSave = _selectionSaveBarrier;
+    if (outgoingSave != null) {
+      await outgoingSave;
+      if (identical(_selectionSaveBarrier, outgoingSave)) {
+        _selectionSaveBarrier = null;
+      }
+    }
     if (_disposed ||
+        selection != _selectionEpoch ||
+        edited != _repositoryEditEpoch ||
+        sessionId != id ||
         id == null ||
-        repo.trim().isNotEmpty ||
+        (repo.trim().isNotEmpty && _restoredRepository == null) ||
         !sessions.any((s) => stringField(s, 'Id') == id)) {
       return;
     }
-    if (_lookupSessionId == id && _repositoryLookup != null) {
+    if (_lookupSessionId == id &&
+        _lookupSelectionEpoch == selection &&
+        _repositoryLookup != null) {
       await _repositoryLookup;
       return;
     }
-    final selection = _selectionEpoch;
-    final edited = _repositoryEditEpoch;
     final modelBeforeLookup = model;
     final request = _resolveRepository(
       id,
       selection,
       edited,
       modelBeforeLookup,
+      _restoredRepository,
     );
     _repositoryLookup = request;
     _lookupSessionId = id;
+    _lookupSelectionEpoch = selection;
     try {
       await request;
     } finally {
       if (identical(request, _repositoryLookup)) {
         _repositoryLookup = null;
         _lookupSessionId = null;
+        _lookupSelectionEpoch = null;
       }
     }
   }
@@ -541,15 +572,24 @@ class SchedulerController extends ChangeNotifier {
     int selection,
     int edited,
     String? modelBeforeLookup,
+    String? restoredRepository,
   ) async {
     try {
-      final result = await adapter.call('select', {'sessionId': id});
+      final result = await adapter.call('select', {
+        'sessionId': id,
+        // Reverify a persisted manual choice without replacing it merely
+        // because automatic evidence points somewhere else.
+        'repository': ?restoredRepository,
+      });
       if (_disposed || selection != _selectionEpoch || sessionId != id) return;
       // A manual Browse or text edit wins even if the user cleared the field.
-      if (edited == _repositoryEditEpoch && repo.trim().isEmpty) {
+      if (edited == _repositoryEditEpoch &&
+          (repo.trim().isEmpty || repo == restoredRepository)) {
+        _restoredRepository = null;
         final source = field(result, 'found');
         final found = source is Map ? Map<String, dynamic>.from(source) : null;
-        repo = stringField(found, 'Root');
+        final incomplete = field(found, 'Incomplete') == true;
+        repo = incomplete ? '' : stringField(found, 'Root');
         final alternatives = field(found, 'AlternativeRoots');
         final candidates = field(found, 'Candidates');
         repositoryAlternatives = alternatives is List
@@ -558,7 +598,12 @@ class SchedulerController extends ChangeNotifier {
         if (repo.isEmpty && candidates is List && candidates.length > 1) {
           repositoryAlternatives = candidates.whereType<String>().toList();
         }
-        repositoryWarning = repositoryAlternatives.isNotEmpty
+        final reason = stringField(found, 'Source').trim();
+        repositoryWarning = incomplete
+            ? reason.isEmpty
+                  ? 'Repository lookup incomplete; use Browse.'
+                  : 'Repository lookup incomplete: $reason Use Browse.'
+            : repositoryAlternatives.isNotEmpty
             ? repo.isEmpty
                   ? 'Conflicting checkouts: choose Browse to select the active repository.'
                   : 'Other checkouts found: verify the selected repository.'
@@ -630,39 +675,72 @@ class SchedulerController extends ChangeNotifier {
     },
   };
 
-  /// Coalesce queued writes into the current state at execution time. This
-  /// preserves ordering while eliminating redundant PowerShell launches.
+  /// Capture the request now. Coalesce only unwritten drafts for the same
+  /// conversation, retaining every outgoing session's final repository.
   Future<void> save() {
     if (!ready || _disposed) return Future<void>.value();
-    _saveTail = _saveTail.then((_) async {
-      if (_disposed || !_hasUnsavedChanges) return;
+    if (_hasUnsavedChanges) {
       final snapshot = _settingsSnapshot();
       final fingerprint = jsonEncode(snapshot);
-      if (fingerprint == _lastPersistedSettings) {
-        _hasUnsavedChanges = false;
-        _saveFailed = false;
-        return;
-      }
-      // Edits arriving during the await re-mark this flag. A future save
-      // writes that newer state; it cannot be overwritten by an older draft.
       _hasUnsavedChanges = false;
-      try {
-        await adapter.call('save', snapshot);
-        _lastPersistedSettings = fingerprint;
+      if (_pendingPreferences.isEmpty &&
+          fingerprint == _lastPersistedSettings) {
         _saveFailed = false;
-        if (error?.startsWith('Preferences save could not be confirmed:') ==
-            true) {
-          error = null;
-          _changed();
-        }
-      } catch (e) {
-        _hasUnsavedChanges = true;
-        _saveFailed = true;
-        error = 'Preferences save could not be confirmed: $e';
-        _changed();
+      } else if (_pendingPreferences.isNotEmpty &&
+          jsonEncode(_pendingPreferences.last) == fingerprint) {
+        // An identical request is already in flight or queued.
+      } else if (_pendingPreferences.isNotEmpty &&
+          !identical(_pendingPreferences.last, _writingPreferences) &&
+          (_pendingPreferences.last['draft'] as Map)['sessionId'] ==
+              (snapshot['draft'] as Map)['sessionId']) {
+        _pendingPreferences[_pendingPreferences.length - 1] = snapshot;
+      } else {
+        _pendingPreferences.add(snapshot);
       }
-    });
+    }
+    if (!_saving && _pendingPreferences.isNotEmpty) {
+      _saving = true;
+      _saveTail = _drainPreferences();
+    }
     return _saveTail;
+  }
+
+  Future<void> _drainPreferences() async {
+    try {
+      while (!_disposed && _pendingPreferences.isNotEmpty) {
+        final snapshot = _pendingPreferences.first;
+        final fingerprint = jsonEncode(snapshot);
+        if (fingerprint == _lastPersistedSettings) {
+          _pendingPreferences.removeAt(0);
+          _saveFailed = false;
+          continue;
+        }
+        _writingPreferences = snapshot;
+        try {
+          await adapter.call('save', snapshot);
+          _lastPersistedSettings = fingerprint;
+          _pendingPreferences.removeAt(0);
+          _saveFailed = false;
+          if (error?.startsWith('Preferences save could not be confirmed:') ==
+              true) {
+            error = null;
+            _changed();
+          }
+        } catch (e) {
+          // Keep the failed outgoing snapshot. Retrying only the current
+          // draft would otherwise lose the previous session's repository.
+          _hasUnsavedChanges = true;
+          _saveFailed = true;
+          error = 'Preferences save could not be confirmed: $e';
+          _changed();
+          return;
+        } finally {
+          _writingPreferences = null;
+        }
+      }
+    } finally {
+      _saving = false;
+    }
   }
 
   Future<String> schedule({
