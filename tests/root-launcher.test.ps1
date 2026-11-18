@@ -82,8 +82,11 @@ try {
         }
         . (Join-Path $local 'Run-Continuum.ps1')
     }
-    if($script:launches.Count -ne 1 -or $script:launches[0] -cne $localExe){
-        throw 'Packaged launch did not prefer its local verified executable.'
+    $actualLaunches=@($script:launches.ToArray())
+    $normalizedActual=if($actualLaunches.Count -eq 1){[IO.Path]::GetFullPath($actualLaunches[0])}else{''}
+    $normalizedExpected=[IO.Path]::GetFullPath($localExe)
+    if($actualLaunches.Count -ne 1 -or $normalizedActual -ine $normalizedExpected){
+        throw "Packaged launch must use only its local verified executable. Expected '$normalizedExpected'; actual: '$($actualLaunches -join '; ')'."
     }
 
     Set-Content -LiteralPath $localBridge -Value 'TAMPERED'
