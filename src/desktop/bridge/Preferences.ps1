@@ -46,45 +46,31 @@ function Save-FlutterPreferences {
         if([int]$appearance.speed -lt 25 -or [int]$appearance.speed -gt 300){throw 'Invalid reflection speed.'}
         if($appearance.aero -isnot [bool]){throw 'Invalid Aero Liquid setting.'}
     }
-    # Keep a per-conversation association after changing the selected draft.
-    # Cancelling a scheduled task deletes its job payload, so job files must
-    # not be the sole durable evidence of an already verified checkout.
+    # A saved draft is not the repository history. Preserve verified
+    # associations by exact conversation ID when the operator changes threads.
     $sessionRepositories=@{}
     if($previous -and $previous.sessionRepositories){
         foreach($entry in $previous.sessionRepositories.PSObject.Properties){
             $id=[string]$entry.Name
             $path=[string]$entry.Value
-            if($id -match '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}        compactMode=($Request.compactMode -eq $true -or $Request.microMode -eq $true)
-        microMode=($Request.microMode -eq $true)
-        alwaysOnTop=($Request.alwaysOnTop -eq $true)
-        barAppearance=$appearance
-        draft=$safeDraft
-    }
-    Write-CodexUiSettings -Directory $AppDirectory -State $settings
-    return @{saved=$true}
-}
- -and
+            if($id -match '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$' -and
                $path -and [IO.Path]::IsPathFullyQualified($path)){
                 $sessionRepositories[$id]=$path
             }
         }
     }
-    $selectedId=[string]$draft.sessionId
-    if($selectedId -match '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}        compactMode=($Request.compactMode -eq $true -or $Request.microMode -eq $true)
-        microMode=($Request.microMode -eq $true)
-        alwaysOnTop=($Request.alwaysOnTop -eq $true)
-        barAppearance=$appearance
-        draft=$safeDraft
-    }
-    Write-CodexUiSettings -Directory $AppDirectory -State $settings
-    return @{saved=$true}
-}
- -and
-       -not [string]::IsNullOrWhiteSpace([string]$draft.repo)){
-        # Non-root and incomplete user input may be saved as a draft; only
-        # persist a separately reusable association after Git verification.
-        $verified=Get-RepositoryRoot ([string]$draft.repo)
-        if($verified){$sessionRepositories[$selectedId]=$verified}
+    # The previous draft may predate this new map. Migrate it on the first
+    # save after upgrade, even when that save selects a different conversation.
+    foreach($choice in @($previous.draft,$draft)){
+        if(-not $choice){continue}
+        $id=[string]$choice.sessionId
+        $path=[string]$choice.repo
+        if($id -notmatch '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$' -or
+           [string]::IsNullOrWhiteSpace($path)){continue}
+        # Only a verified Git checkout becomes reusable evidence; incomplete
+        # path edits may still be retained in the single current draft.
+        $verified=Get-RepositoryRoot $path
+        if($verified){$sessionRepositories[$id]=$verified}
     }
     $settings=[pscustomobject]@{
         version=1;lastAccess=$access
