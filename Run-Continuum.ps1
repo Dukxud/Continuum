@@ -28,6 +28,7 @@ if (-not $BuildFromSource -and (Test-Path -LiteralPath $localExecutable -PathTyp
     $entries = @(Get-Content -LiteralPath $manifest -ErrorAction Stop)
     if ($entries.Count -eq 0) { throw 'Local preview checksum manifest is empty.' }
     $verified = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $verifiedPaths = [Collections.Generic.List[string]]::new()
     foreach ($entry in $entries) {
         $match = [regex]::Match($entry, '^([0-9A-Fa-f]{64})  ([^\\]+)$')
         if (-not $match.Success) { throw 'Malformed local preview checksum entry.' }
@@ -41,10 +42,10 @@ if (-not $BuildFromSource -and (Test-Path -LiteralPath $localExecutable -PathTyp
             (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash -ine $match.Groups[1].Value) {
             throw "Local preview checksum failed: $relative. Nothing was launched."
         }
+        $verifiedPaths.Add($full)
     }
     foreach ($required in @('codex_resume_flutter.exe','flutter_windows.dll',
-        'Run-Continuum.ps1','Run-Continuum.cmd','src\desktop\windows_bridge.ps1',
-        'src\backend\Invoke-CodexJob.ps1')) {
+        'src\desktop\windows_bridge.ps1','src\backend\Invoke-CodexJob.ps1')) {
         if (-not $verified.Contains($required)) {
             throw "Local preview manifest does not cover required file: $required"
         }
@@ -52,9 +53,11 @@ if (-not $BuildFromSource -and (Test-Path -LiteralPath $localExecutable -PathTyp
     if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'data') -PathType Container)) {
         throw 'Local preview missing Flutter data.'
     }
-    # Only a fully checked local preview is unblocked. No global policy changes.
-    Get-ChildItem -LiteralPath $PSScriptRoot -File -Recurse |
-        Unblock-File -ErrorAction Stop
+    # Unblock exactly the manifest-verified payload, not arbitrary extra files.
+    # A previous CI artifact may have the launcher added as an external sidecar.
+    foreach ($file in $verifiedPaths) {
+        Unblock-File -LiteralPath $file -ErrorAction Stop
+    }
     Write-Host 'Launching this verified local preview, not the pinned public release.'
     Start-Continuum -Executable $localExecutable
     return
