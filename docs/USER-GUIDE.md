@@ -16,6 +16,12 @@ For a first trial, use a disposable saved Codex conversation and Git checkout. T
 4. Keep Windows awake, online and signed in when the task is due. A countdown reaching zero is not evidence Codex started.
 5. Click a running card for live activity, or use **History** for saved responses, worker logs, and execution outcomes.
 
+### Choosing the repository
+
+The conversation's starting folder can be outside Git even when later messages or tool calls identify the checkout. The chooser's `Git:` label uses a saved association when available, then that starting folder; check the resolved repository field after selecting the conversation. Discovery uses verified Codex metadata, supported conversation evidence, and existing local Git checkouts.
+
+If the app reports **Conflicting checkouts**, choose the intended checkout with **Browse**. **Repository unresolved** means no supported evidence identified a local checkout. **Repository lookup incomplete** means the search could not finish; its reason is displayed. Browse supplies an explicit choice in each case. An unavailable lookup can retry on refresh. See [repository troubleshooting](TROUBLESHOOTING.md#repository-unresolved-outside-git-or-conflicting-checkouts).
+
 ## Execution modes
 
 | Mode | Execution owner | User interaction | Quota-only continuation |
@@ -38,7 +44,9 @@ The same behavior applies to Plus and Pro accounts. Missing windows do not imply
 
 ## Persistence and safety
 
-Preferences, job files and pinned runtime snapshots are local under `%LOCALAPPDATA%\CodexResumeScheduler`. Job JSON supplies its transcript path; `*.result.json` supplies the outcome. Prompts and logs can contain private information. Do not upload raw `.shared.json`, transcripts or credentials.
+Preferences, job files, repository associations and pinned runtime snapshots are local under `%LOCALAPPDATA%\CodexResumeScheduler`. Job JSON supplies its transcript path; `*.result.json` supplies the outcome. Prompts and logs can contain private information. Do not upload raw `.shared.json`, transcripts or credentials.
+
+A verified repository choice is saved separately for each full conversation ID in `session-repositories/<session-id>.json`. It survives changing the current draft, switching conversations, and cancelling a future task. The app verifies that the saved checkout still exists when it is reused; another conversation's saved choice is not assigned to the selected thread.
 
 Existing scheduled jobs retain their original runtime when the GUI is upgraded. Closing the GUI or pausing development does not cancel them. Cancellation of a future task is not termination of an already-running Codex process. Worker identity, branch, model and mutex checks remain authoritative.
 
@@ -46,4 +54,4 @@ Quota-only continuation applies only to new opted-in Background tasks with eligi
 
 ## Known preview limitations
 
-Automated tests and Windows package checks pass, while live verification of the latest quota display, Shared terminal retention, and simultaneous approvals remains pending. Shared mode does not continuously mirror later terminal turns after the scheduled turn completes. The [Windows acceptance ledger](CONTINUUM-WINDOWS-ACCEPTANCE.md) records completed checks and open scenarios.
+Earlier Windows package checks are recorded in the [Windows acceptance ledger](CONTINUUM-WINDOWS-ACCEPTANCE.md). The repository-discovery correction has automated source, bridge and Flutter coverage on Linux; its native Windows build and UI have not been verified on that host. Live verification of the latest quota display, Shared terminal retention, and simultaneous approvals remains pending. Shared mode does not continuously mirror later terminal turns after the scheduled turn completes. See the [repository verification scope](REPOSITORY-DISCOVERY.md#verification-scope) for the current correction.

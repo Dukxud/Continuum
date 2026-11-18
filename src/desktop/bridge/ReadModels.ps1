@@ -3,10 +3,15 @@
 # Presentation-only labels: preserve the WinForms session reader and its
 # full stable IDs, while making the Flutter chooser distinguish projects.
 function Get-FlutterSessionChoices {
-    param([Parameter(Mandatory)][string]$SourceDirectory, [switch]$IncludeActivity)
-    $choices=@(Get-RecentCliSessions)
+    param([Parameter(Mandatory)][string]$SourceDirectory,[string]$AppDirectory='',
+          [switch]$IncludeActivity)
+    $choices=@(Get-RecentCliSessions -SourceDirectory $SourceDirectory)
     $threads=@{}
-    if($IncludeActivity -and $choices.Count){
+    foreach($choice in $choices){
+        if($choice.Metadata){$threads[[string]$choice.Id]=$choice.Metadata}
+    }
+    $missing=@($choices | Where-Object {-not $threads.ContainsKey([string]$_.Id)})
+    if($IncludeActivity -and $missing.Count){
         # Use one metadata-only Codex App Server for all session titles.
         # This is optional presentation work, never a scheduling authority.
         try {
@@ -15,13 +20,13 @@ function Get-FlutterSessionChoices {
             $helper=Join-Path $SourceDirectory 'src/backend/CodexUsage.js'
             if((Test-Path -LiteralPath $cli -PathType Leaf) -and
                (Test-Path -LiteralPath $helper -PathType Leaf)){
-                $ids=@($choices | ForEach-Object { [string]$_.Id })
+                $ids=@($missing | ForEach-Object { [string]$_.Id })
                 $lines=@(& node.exe $helper --cli-js $cli --thread-ids ($ids -join ','))
                 if($LASTEXITCODE -eq 0 -and $lines.Count){
                     $reply=($lines | Select-Object -Last 1) |
                         ConvertFrom-Json -AsHashtable -ErrorAction Stop
                     if($reply.ok -eq $true -and $reply.threads -is [System.Collections.IDictionary]){
-                        $threads=$reply.threads
+                        foreach($id in $reply.threads.Keys){$threads[$id]=$reply.threads[$id]}
                     }
                 }
             }
@@ -34,31 +39,37 @@ function Get-FlutterSessionChoices {
         try {
             $cwd=[string]$session.Cwd
             $root=$null
+            if($AppDirectory){
+                $root=Get-SavedSessionRepository -SessionId ([string]$session.Id) -AppDirectory $AppDirectory
+            }
             if(-not [string]::IsNullOrWhiteSpace($cwd)){
                 if(-not $rootCache.ContainsKey($cwd)){
                     $rootCache[$cwd]=Get-RepositoryRoot $cwd
                 }
-                $root=$rootCache[$cwd]
+                if(-not $root){$root=$rootCache[$cwd]}
             }
             $folder=if($cwd){Split-Path -Leaf ($cwd.TrimEnd([char[]]@('/','\')))}else{'unknown folder'}
             $title=if($root){
                 'Git: '+(Split-Path -Leaf ($root.TrimEnd([char[]]@('/','\'))))
             }else{'Outside Git: '+$folder}
-            $when=(Get-Item -LiteralPath $session.File -ErrorAction Stop).LastWriteTime
+            $when=if($session.UpdatedAt){[datetime]$session.UpdatedAt}
+                elseif($session.File -and (Test-Path -LiteralPath $session.File -PathType Leaf)){
+                    (Get-Item -LiteralPath $session.File -ErrorAction Stop).LastWriteTime
+                }else{[datetime]::MinValue}
             $id=[string]$session.Id
             $date=$when.ToString('d MMM HH:mm',[Globalization.CultureInfo]::InvariantCulture)
             # Activity excerpts are optional. Never scan large live Codex
             # rollouts as part of the critical startup data load.
             $activity=$null
             if($IncludeActivity){
-                $detail=if($threads.Contains($id)){$threads[$id]}else{$null}
+                $detail=if($threads.Contains($id)){$threads[$id]}else{$session.Metadata}
                 if($detail -and $detail.name){
                     $activity=Format-CodexSessionTitle -Title ([string]$detail.name) -AllowShort
                 }
                 if(-not $activity -and $detail -and $detail.preview){
                     $activity=Format-CodexSessionTitle -Title ([string]$detail.preview) -AllowShort
                 }
-                if(-not $activity){
+                if(-not $activity -and $session.File){
                     $activity=Get-CodexSessionActivity -SessionFile ([string]$session.File)
                 }
             }

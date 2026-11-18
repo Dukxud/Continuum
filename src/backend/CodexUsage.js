@@ -217,7 +217,7 @@ function readCodexState(
     function requestThread() {
       stage = 'thread';
       requestId++;
-      send({ id: requestId, method: 'thread/read', params: { threadId } });
+      send({ id: requestId, method: 'thread/read', params: { threadId, includeTurns: false } });
     }
     child.on('error', (e) => finish(e));
     child.stdin.on('error', (e) => finish(e));
@@ -307,18 +307,48 @@ function readCodexState(
 function readRateLimits(cliJs, timeoutMs = 18000) {
   return readCodexState(cliJs, { timeoutMs, catalog: false });
 }
+function normalizeThreadSource(source) {
+  // Only omitted/null sources are eligible for legacy local-header fallback.
+  // Codex also returns structured custom and subAgent variants; collapsing an
+  // explicit unsupported source to null would let stale CLI evidence win.
+  if (source == null) return null;
+  if (typeof source === 'string') return source.trim() || 'unknown';
+  if (typeof source === 'object' && !Array.isArray(source)) {
+    if (Object.prototype.hasOwnProperty.call(source, 'custom')) return 'custom';
+    if (Object.prototype.hasOwnProperty.call(source, 'subAgent')) return 'subAgent';
+  }
+  return 'unknown';
+}
 function normalizeThreadRead(result, expectedId) {
   const thread = result?.thread;
   if (!thread || thread.id !== expectedId)
     throw new Error('Codex returned unexpected thread metadata.');
+  const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
   // thread/read does not resume a conversation or subscribe to turns.
-  const cwd = typeof thread.cwd === 'string' && thread.cwd.trim() ? thread.cwd.trim() : null;
+  const cwd = text(thread.cwd);
   // Use the Codex-owned title, not a guessed title from rollout messages.
   // thread/read is a metadata-only operation (includeTurns is false).
-  const name = typeof thread.name === 'string' && thread.name.trim() ? thread.name.trim() : null;
-  const preview =
-    typeof thread.preview === 'string' && thread.preview.trim() ? thread.preview.trim() : null;
-  return { ok: true, threadId: expectedId, cwd, name, preview };
+  const name = text(thread.name);
+  const preview = text(thread.preview);
+  // A persisted thread can have a compressed or reference-backed rollout.
+  // Keep Codex's exact metadata rather than requiring a readable JSONL first.
+  // These are discovery hints; callers still verify every local Git root.
+  const git = thread.gitInfo;
+  const gitInfo =
+    git && typeof git === 'object'
+      ? { originUrl: text(git.originUrl), branch: text(git.branch), sha: text(git.sha) }
+      : null;
+  return {
+    ok: true,
+    threadId: expectedId,
+    cwd,
+    name,
+    preview,
+    source: normalizeThreadSource(thread.source),
+    path: text(thread.path),
+    updatedAt: validEpoch(thread.updatedAt),
+    gitInfo,
+  };
 }
 function readThreadDirectory(cliJs, threadId, timeoutMs = 10000) {
   if (
@@ -339,8 +369,19 @@ function readThreadSummaries(cliJs, threadIds, timeoutMs = 12000) {
     threadIds.some((id) => typeof id !== 'string' || !valid.test(id))
   )
     return Promise.reject(new Error('Invalid thread summary request.'));
+  if (!threadIds.length) return Promise.resolve({ ok: true, threads: {}, partial: false });
+  return readThreadMetadata(cliJs, { threadIds, timeoutMs });
+}
+
+// Codex owns the current rollout path and can read compressed histories. The
+// local filesystem remains a fallback in PowerShell, not the entire inventory.
+function readRecentCliThreads(cliJs, timeoutMs = 12000) {
+  return readThreadMetadata(cliJs, { timeoutMs, inventory: true });
+}
+
+function readThreadMetadata(cliJs, { threadIds = [], timeoutMs, inventory = false }) {
+  const valid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
   const wanted = new Set(threadIds);
-  if (!wanted.size) return Promise.resolve({ ok: true, threads: {} });
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [cliJs, 'app-server', '--listen', 'stdio://'], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -348,17 +389,28 @@ function readThreadSummaries(cliJs, threadIds, timeoutMs = 12000) {
     });
     const lines = readline.createInterface({ input: child.stdout });
     const threads = {};
+    const sessions = [];
+    const seenThreads = new Set();
     const seenCursors = new Set();
+    const reads = new Map();
     let settled = false,
       initialized = false,
       stderr = '',
       requestId = 1,
-      pages = 0;
-    const timer = setTimeout(() => finish(null, { ok: true, threads, partial: true }), timeoutMs);
+      pages = 0,
+      listRequestId = null,
+      listTimer = null,
+      reading = false,
+      readQueue = [];
+    const result = (partial) =>
+      inventory ? { ok: true, sessions, partial } : { ok: true, threads, partial: wanted.size > 0 };
+    const timer = setTimeout(() => finish(null, result(true)), timeoutMs);
     function finish(error, value) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearTimeout(listTimer);
+      for (const entry of reads.values()) clearTimeout(entry.timer);
       lines.close();
       child.stdin.on('error', () => {});
       child.stdin.end();
@@ -372,9 +424,46 @@ function readThreadSummaries(cliJs, threadIds, timeoutMs = 12000) {
     function requestPage(cursor = null) {
       pages++;
       requestId++;
-      const params = { limit: 100, sourceKinds: ['cli', 'exec'], archived: false };
+      listRequestId = requestId;
+      const params = {
+        limit: inventory ? 30 : 100,
+        sourceKinds: ['cli', 'exec'],
+        archived: false,
+        sortKey: 'updated_at',
+      };
       if (cursor) params.cursor = cursor;
       send({ id: requestId, method: 'thread/list', params });
+    }
+    function finishListing(partial = false) {
+      if (inventory) return finish(null, result(partial));
+      if (reading || settled) return;
+      clearTimeout(listTimer);
+      listRequestId = null;
+      reading = true;
+      readQueue = [...wanted];
+      requestReads();
+    }
+    function requestReads() {
+      if (settled) return;
+      // One metadata process, at most four in-flight exact reads and one attempt
+      // per missing ID. A stuck thread cannot consume the entire chooser budget.
+      while (reads.size < 4 && readQueue.length) {
+        const threadId = readQueue.shift();
+        const id = ++requestId;
+        const entry = {
+          threadId,
+          timer: setTimeout(
+            () => {
+              reads.delete(id);
+              requestReads();
+            },
+            Math.min(2000, Math.max(50, Math.floor(timeoutMs / 2))),
+          ),
+        };
+        reads.set(id, entry);
+        send({ id, method: 'thread/read', params: { threadId, includeTurns: false } });
+      }
+      if (!reads.size && !readQueue.length) finish(null, result(wanted.size > 0));
     }
     child.on('error', (error) => finish(error));
     child.stdin.on('error', (error) => finish(error));
@@ -397,32 +486,54 @@ function readThreadSummaries(cliJs, threadIds, timeoutMs = 12000) {
         if (msg.error) return finish(new Error(msg.error.message || 'Initialization failed.'));
         initialized = true;
         send({ method: 'initialized', params: {} });
+        // Reserve time for selected IDs that lie beyond the list's bounded
+        // pages, or when an optional listing stalls. Inventory has no known IDs.
+        if (!inventory)
+          listTimer = setTimeout(() => finishListing(true), Math.floor(timeoutMs / 2));
         requestPage();
         return;
       }
-      if (msg.id !== requestId) return;
-      if (msg.error)
-        return pages === 1
-          ? finish(new Error(msg.error.message || 'Codex thread listing failed.'))
-          : finish(null, { ok: true, threads, partial: true });
-      const result = msg.result || {};
-      for (const thread of Array.isArray(result.data) ? result.data : []) {
-        if (!thread || !wanted.has(thread.id)) continue;
-        const value = (key) =>
-          typeof thread[key] === 'string' && thread[key].trim() ? thread[key].trim() : null;
-        threads[thread.id] = {
-          ok: true,
-          threadId: thread.id,
-          cwd: value('cwd'),
-          name: value('name'),
-          preview: value('preview'),
-        };
-        wanted.delete(thread.id);
+      if (reading) {
+        const entry = reads.get(msg.id);
+        if (!entry) return;
+        clearTimeout(entry.timer);
+        reads.delete(msg.id);
+        if (!msg.error) {
+          try {
+            // Never overwrite a list-derived name with a possibly stale read.
+            threads[entry.threadId] = normalizeThreadRead(msg.result, entry.threadId);
+            wanted.delete(entry.threadId);
+          } catch {
+            // Wrong identity or malformed metadata remains unresolved.
+          }
+        }
+        requestReads();
+        return;
       }
-      const cursor = result.nextCursor;
-      if (!wanted.size || !cursor) return finish(null, { ok: true, threads, partial: false });
+      if (msg.id !== listRequestId) return;
+      if (msg.error) {
+        if (inventory && pages === 1)
+          return finish(new Error(msg.error.message || 'Codex thread listing failed.'));
+        return finishListing(true);
+      }
+      const page = msg.result || {};
+      for (const thread of Array.isArray(page.data) ? page.data : []) {
+        if (!thread || typeof thread.id !== 'string' || !valid.test(thread.id)) continue;
+        if (inventory) {
+          if (!['cli', 'exec'].includes(thread.source) || seenThreads.has(thread.id)) continue;
+          seenThreads.add(thread.id);
+          sessions.push(normalizeThreadRead({ thread }, thread.id));
+          if (sessions.length === 30) return finish(null, result(false));
+        } else if (wanted.has(thread.id)) {
+          threads[thread.id] = normalizeThreadRead({ thread }, thread.id);
+          wanted.delete(thread.id);
+        }
+      }
+      const cursor = page.nextCursor;
+      if (!inventory && !wanted.size) return finish(null, result(false));
+      if (!cursor) return finishListing(false);
       if (typeof cursor !== 'string' || seenCursors.has(cursor) || pages >= 6)
-        return finish(null, { ok: true, threads, partial: true });
+        return finishListing(true);
       seenCursors.add(cursor);
       requestPage(cursor);
     });
@@ -450,8 +561,9 @@ async function main() {
   const threadFlag = process.argv.indexOf('--thread-id');
   const threadId = threadFlag >= 0 ? process.argv[threadFlag + 1] : null;
   const threadsFlag = process.argv.indexOf('--thread-ids');
-  const state =
-    threadsFlag >= 0
+  const state = process.argv.includes('--sessions')
+    ? await readRecentCliThreads(path.resolve(cliJs))
+    : threadsFlag >= 0
       ? await readThreadSummaries(
           path.resolve(cliJs),
           (process.argv[threadsFlag + 1] || '').split(',').filter(Boolean),
@@ -480,5 +592,6 @@ module.exports = {
   normalizeThreadRead,
   readThreadDirectory,
   readThreadSummaries,
+  readRecentCliThreads,
   identifyAccount,
 };

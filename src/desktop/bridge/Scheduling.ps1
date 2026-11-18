@@ -33,7 +33,7 @@ function Register-FlutterSchedule {
     if([TimeZoneInfo]::Local.IsAmbiguousTime($when) -or [TimeZoneInfo]::Local.IsInvalidTime($when)){
         throw 'Run time is ambiguous or nonexistent due to daylight saving time.'
     }
-    if(-not @(Get-RecentCliSessions | Where-Object { $_.Id -ceq $sessionId }).Count){throw 'Selected CLI session not verified.'}
+    if(-not (Get-VerifiedCliSession -SessionId $sessionId -SourceDirectory $SourceDirectory)){throw 'Selected CLI session not verified.'}
     $root=Get-RepositoryRoot ([string]$Request.repo).Trim().Trim('"')
     if(-not $root){throw 'Choose an existing Git repository.'}
     $branchName=Get-RepositoryBranch $root
@@ -71,6 +71,8 @@ function Register-FlutterSchedule {
         throw "Repository has $($overlap.Count) upcoming job(s). Confirm possible overlap first."
     }
     [void](New-Item -Path $AppDirectory -ItemType Directory -Force)
+    # Registration must not depend on a later debounced UI preference save.
+    Save-SessionRepositoryAssociation -SessionId $sessionId -Repository $root -AppDirectory $AppDirectory
     $runtime=Publish-ImmutableRuntime -SourceDirectory $SourceDirectory -DestinationDirectory (Join-Path $AppDirectory 'runtimes') -RelativeFiles (Get-CodexRuntimeFiles)
     $name='CodexResume-' + $when.ToString('yyyyMMdd-HHmm') + '-' + ([guid]::NewGuid().ToString('N').Substring(0,8))
     $jobFilePath=Join-Path $AppDirectory ($name+'.json')
@@ -94,4 +96,28 @@ function Register-FlutterSchedule {
         throw
     }
     return @{name=$name;status='Scheduled'}
+}
+
+function Remove-FlutterSchedule {
+    param([Parameter(Mandatory)][string]$Name,
+          [Parameter(Mandatory)][string]$AppDirectory)
+    if($Name -cnotmatch '^CodexResume-[0-9]{8}-[0-9]{4}-[0-9a-fA-F]{8}$'){throw 'Invalid Scheduler task name.'}
+    $payloadPath=Join-Path $AppDirectory ($Name+'.json')
+    if(Test-Path -LiteralPath $payloadPath -PathType Leaf){
+        $job=Read-JsonSettings -Path $payloadPath
+        if($job){
+            # Old tasks may predate association storage. Retain their evidence
+            # before deletion, without replacing a newer explicit choice.
+            Save-SessionRepositoryAssociation -SessionId ([string]$job.sessionId) -Repository ([string]$job.repo) -AppDirectory $AppDirectory -OnlyIfMissing
+        }
+    }
+    Remove-OneTimeTask -Name $Name -OnlyBeforeStart
+    $warning=''
+    if(Test-Path -LiteralPath $payloadPath -PathType Leaf){
+        try{
+            [void](Write-JobOutcome -Path ([IO.Path]::ChangeExtension($payloadPath,'.result.json')) -Status 'cancelled' -Message 'Cancelled by operator before execution.')
+            Remove-Item -LiteralPath $payloadPath -Force -ErrorAction Stop
+        }catch{$warning=$_.Exception.Message}
+    }
+    return @{name=$Name;status='Cancelled';warning=$warning}
 }

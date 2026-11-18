@@ -81,6 +81,13 @@ function Save-FlutterPreferences {
         barAppearance=$appearance
         draft=$safeDraft
     }
+    # The replaceable UI draft is not the durable association store. Migrate
+    # older maps without overwriting newer per-session choices, then record
+    # this request's verified choice independently of other sessions' saves.
+    foreach($id in @($sessionRepositories.Keys)){
+        Save-SessionRepositoryAssociation -SessionId $id -Repository $sessionRepositories[$id] -AppDirectory $AppDirectory -OnlyIfMissing
+    }
+    # The common settings facade records the current draft for both UIs.
     Write-CodexUiSettings -Directory $AppDirectory -State $settings
     return @{saved=$true}
 }

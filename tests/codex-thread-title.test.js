@@ -1,6 +1,6 @@
 'use strict';
-// The Codex resume picker uses thread/list; a thread/read or rollout
-// preview is not authoritative for a renamed conversation.
+// The Codex resume picker uses thread/list. Exact reads may recover missing
+// entries, but must not replace names already returned by the picker.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -24,7 +24,17 @@ test('individual read remains metadata-only and validates session identity', () 
       },
       A,
     ),
-    { ok: true, threadId: A, cwd: 'C:\\Users\\Example', name: 'AIV', preview: 'Opening prompt' },
+    {
+      ok: true,
+      threadId: A,
+      cwd: 'C:\\Users\\Example',
+      name: 'AIV',
+      preview: 'Opening prompt',
+      source: null,
+      path: null,
+      updatedAt: null,
+      gitInfo: null,
+    },
   );
   assert.throws(() => normalizeThreadRead({ thread: { id: B } }, A), /unexpected thread/);
 });
@@ -62,9 +72,10 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
     assert.equal(result.ok, true);
     assert.equal(result.threads[A].name, 'AIV');
     assert.match(result.threads[A].preview, /AIVault/);
-    assert.equal(result.threads[B], undefined);
+    assert.equal(result.threads[B].name, null);
+    assert.match(result.threads[B].preview, /AIVault/);
     assert.equal(result.threads[C].name, 'Restore frontend quality gate');
-    assert.equal(Object.keys(result.threads).length, 2);
+    assert.equal(Object.keys(result.threads).length, 3);
     await assert.rejects(() => readThreadSummaries(stub, ['invalid']), /Invalid thread/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

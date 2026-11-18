@@ -44,9 +44,19 @@ The usage reader selects a model-attributed bucket, normalizes primary/secondary
 
 The bridge registers one-time Windows tasks. Jobs retain their original immutable content-addressed runtime; upgrades do not rewrite existing jobs. The worker validates the pinned runtime, Git root/branch, selected workspace/model/effort, available quota and per-conversation scheduler mutex before execution. The mutex prevents competing scheduler workers, not every independently launched Codex process.
 
-Local state lives under `%LOCALAPPDATA%\CodexResumeScheduler`: settings, saved job JSON, runtime snapshots, result records and references to transcripts. `*.result.json` distinguishes completed, finished, failed, blocked, deferred and cancelled. Settings and logs may contain private data. Closing the UI or pausing development does not cancel registered tasks.
+Local state lives under `%LOCALAPPDATA%\CodexResumeScheduler`: settings, saved job JSON, runtime snapshots, result records, repository associations and references to transcripts. `*.result.json` distinguishes completed, finished, failed, blocked, deferred and cancelled. Settings and logs may contain private data. Closing the UI or pausing development does not cancel registered tasks.
+
+Each verified conversation-to-repository association is stored in `session-repositories/<session-id>.json`, keyed by the full conversation UUID. These atomic files are independent of the replaceable draft in `settings.json` and of cancellable job payloads. Legacy maps and drafts migrate without replacing an existing association; an explicit verified selection can replace its own session's record. Save, scheduling, and cancellation handlers preserve the association, and every reused root is verified with Git again.
 
 Only Background mode supports explicit, off-by-default quota-only continuation, capped at three follow-ups with verified reset/account/model evidence. Native and Shared do not silently inherit it. [Design](QUOTA-CONTINUATION-DESIGN.md).
+
+## Conversation and repository discovery
+
+The inventory combines metadata-only Codex `thread/list` results for CLI/exec sources, ordered by update time, with local rollout-header fallback. Selection verifies the exact conversation ID with `thread/read` or a supported local header. Supported server metadata can identify a conversation whose local rollout is compressed or unavailable; a positively identified unsupported source is rejected.
+
+Repository resolution combines reported CWD, the exact-ID saved association, matching job evidence, and supported user/tool records from an initial-byte rollout snapshot. The parser includes legacy and paginated Codex records. Reference-only evidence searches bounded conventional development directories and previously verified locations, checking all configured remotes against explicit identities or whole project names. It does not execute stored code or use assistant/tool-result prose as repository evidence.
+
+A verified reported root has precedence and retains alternatives. Otherwise conflicting roots remain unresolved. A scan stopped by a resource bound or read/identity failure returns an incomplete result, with no automatic fallback root. Flutter distinguishes incomplete, conflicting, unresolved and unavailable discovery, preserves manual edits against late results, and saves an outgoing session's choice before switching. The [repository investigation](REPOSITORY-DISCOVERY.md) records the full path trace, bounds, schemas, and verification scope.
 
 ## Shared owner lifetime
 

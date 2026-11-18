@@ -25,7 +25,10 @@ try{
         (@{type='event_msg';payload=@{type='user_message';message='Resume the existing work.'}} | ConvertTo-Json -Compress -Depth 6)
     ) | Set-Content -LiteralPath $rollout -Encoding utf8
     $first=[pscustomobject]@{Id=$firstId;Cwd=$outside;File=$rollout}
-    $second=[pscustomobject]@{Id=$secondId;Cwd=$outside;File=$rollout}
+    $secondRollout=Join-Path $fixture 'second-rollout.jsonl'
+    @{type='session_meta';payload=@{id=$secondId;source='cli';cwd=$outside}} |
+        ConvertTo-Json -Depth 6 -Compress | Set-Content -LiteralPath $secondRollout -Encoding utf8
+    $second=[pscustomobject]@{Id=$secondId;Cwd=$outside;File=$secondRollout}
     Require ($null -eq (Find-SessionRepository $first -AppDirectory $app -CheckoutHome $homeFolder)) 'Fixture must begin with an undiscoverable checkout.'
 
     function Save-Choice([string]$Id,[string]$Repo,[string]$Directory=$app){
@@ -52,13 +55,21 @@ try{
     # A one-draft installation must migrate the previous saved pairing on
     # its first switch after upgrading, without first resaving the old thread.
     $legacy=Join-Path $fixture 'legacy-app'
-    Write-CodexUiSettings -Directory $legacy -State ([pscustomobject]@{
+    Write-JsonSettings -Path (Join-Path $legacy 'settings.json') -Value ([pscustomobject]@{
         version=1
         draft=[pscustomobject]@{sessionId=$firstId;repo=$repo}
     })
     Save-Choice $secondId '' $legacy
     $legacyFound=Find-SessionRepository $first -AppDirectory $legacy -CheckoutHome $homeFolder
     Require ($null -ne $legacyFound -and (Normalize $legacyFound.Root) -ieq (Normalize $repo)) 'Switching after upgrade lost the earlier single-draft association.'
+
+    # Legacy UI writers replace settings.json without Flutter's map. Separate
+    # association files must retain the root across that replacement as well.
+    Write-CodexUiSettings -Directory $app -State ([pscustomobject]@{
+        version=1;draft=[pscustomobject]@{sessionId=$secondId;repo=''}
+    })
+    $afterLegacyWrite=Find-SessionRepository $first -AppDirectory $app -CheckoutHome $homeFolder
+    Require ((Normalize $afterLegacyWrite.Root) -ieq (Normalize $repo)) 'A legacy settings writer erased the durable session association.'
 
     # Simulate cancellation deleting the only scheduled job payload.
     $job=Join-Path $app 'CodexResume-20261118-1534-abcdef12.json'

@@ -61,6 +61,13 @@ class FakeScheduler implements SchedulerAdapter {
         };
       case 'pending':
         return {'pending': [], 'history': []};
+      case 'select':
+        return {
+          'sessionId': payload['sessionId'],
+          'found': payload['repository'] == null
+              ? null
+              : {'Root': payload['repository']},
+        };
       case 'schedule':
         schedules.add(payload);
         return {
@@ -234,6 +241,7 @@ class StartupRepositoryScheduler extends FakeScheduler {
     if (action == 'select') {
       lookups++;
       if (deferredSelection != null) return deferredSelection!.future;
+      if (payload['repository'] != null) return original;
       final index = (lookups - 1).clamp(0, roots.length - 1).toInt();
       final root = roots[index];
       return {
@@ -933,7 +941,7 @@ void main() {
   );
 
   test(
-    'saved manual repository wins on startup, with no redundant lookup',
+    'saved manual repository is reverified on startup and retained',
     () async {
       final fake = StartupRepositoryScheduler(
         savedRepository: r'C:\manual\verified',
@@ -941,7 +949,7 @@ void main() {
       final controller = SchedulerController(fake);
       await controller.start();
       expect(controller.repo, r'C:\manual\verified');
-      expect(fake.lookups, 0);
+      expect(fake.lookups, 1);
       controller.dispose();
     },
   );
