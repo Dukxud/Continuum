@@ -28,7 +28,7 @@ try{
     $second=[pscustomobject]@{Id=$secondId;Cwd=$outside;File=$rollout}
     Require ($null -eq (Find-SessionRepository $first -AppDirectory $app -CheckoutHome $homeFolder)) 'Fixture must begin with an undiscoverable checkout.'
 
-    function Save-Choice([string]$Id,[string]$Repo){
+    function Save-Choice([string]$Id,[string]$Repo,[string]$Directory=$app){
         $draft=[pscustomobject]@{
             sessionId=$Id;repo=$Repo;model='gpt-test';effort='high'
             access='read-only';message='Resume.';runAt='2026-11-20T15:40:00'
@@ -36,7 +36,7 @@ try{
         }
         [void](Save-FlutterPreferences -Request ([pscustomobject]@{
             draft=$draft;compactMode=$false;microMode=$false;alwaysOnTop=$false
-        }) -AppDirectory $app)
+        }) -AppDirectory $Directory)
     }
     Save-Choice $firstId $repo
     $stored=Read-CodexUiSettings $app
@@ -48,6 +48,17 @@ try{
     $stored=Read-CodexUiSettings $app
     Require ([string]::IsNullOrEmpty([string]$stored.draft.repo)) 'Current empty repository draft was not preserved.'
     Require ((Normalize ([string]$stored.sessionRepositories.$firstId)) -ieq (Normalize $repo)) 'Switching conversations erased the prior association.'
+
+    # A one-draft installation must migrate the previous saved pairing on
+    # its first switch after upgrading, without first resaving the old thread.
+    $legacy=Join-Path $fixture 'legacy-app'
+    Write-CodexUiSettings -Directory $legacy -State ([pscustomobject]@{
+        version=1
+        draft=[pscustomobject]@{sessionId=$firstId;repo=$repo}
+    })
+    Save-Choice $secondId '' $legacy
+    $legacyFound=Find-SessionRepository $first -AppDirectory $legacy -CheckoutHome $homeFolder
+    Require ($null -ne $legacyFound -and (Normalize $legacyFound.Root) -ieq (Normalize $repo)) 'Switching after upgrade lost the earlier single-draft association.'
 
     # Simulate cancellation deleting the only scheduled job payload.
     $job=Join-Path $app 'CodexResume-20261118-1534-abcdef12.json'
