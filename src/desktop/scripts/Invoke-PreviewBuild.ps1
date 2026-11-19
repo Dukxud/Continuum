@@ -102,13 +102,13 @@ function Invoke-ContinuumBuildProcess {
     # The owned PowerShell host executes batch files itself. A second nested
     # encoded PowerShell command is unnecessary and is blocked by some Windows
     # application-control policies. All arguments remain a structured array.
-    $controlDirectory=Join-Path ([IO.Path]::GetTempPath()) ('continuum-build-owner-'+[guid]::NewGuid().ToString('N'))
-    [void][IO.Directory]::CreateDirectory($controlDirectory)
-    $statusPath=Join-Path $controlDirectory 'exit.status'
     $ownerScript=Join-Path $PSScriptRoot 'BuildProcessOwner.ps1'
     if(-not (Test-Path -LiteralPath $ownerScript -PathType Leaf)){
         throw "The audited build-process owner is missing: $ownerScript"
     }
+    $controlDirectory=Join-Path ([IO.Path]::GetTempPath()) ('continuum-build-owner-'+[guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory($controlDirectory)
+    $statusPath=Join-Path $controlDirectory 'exit.status'
     $info=[Diagnostics.ProcessStartInfo]::new()
     $info.FileName=$powerShell
     if(-not $IsWindows){
