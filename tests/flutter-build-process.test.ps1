@@ -12,7 +12,7 @@ try{
     Check 'owned process host uses an auditable script file rather than an encoded command' {
         $implementation=[IO.File]::ReadAllText((Join-Path $root 'src/desktop/scripts/Invoke-PreviewBuild.ps1'))
         Assert-That ($implementation.Contains("'owner.ps1'") -and
-            $implementation.Contains("'-File',$ownerScript") -and
+            $implementation.Contains("'-File',"+'$ownerScript') -and
             -not $implementation.Contains('-EncodedCommand')) 'Build process host still uses an opaque command.'
     }
     if($IsWindows){
