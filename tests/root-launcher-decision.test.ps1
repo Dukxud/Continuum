@@ -44,6 +44,7 @@ function New-SourceFixture([string]$Name){
         'src/desktop/scripts/Install-WindowsIcon.ps1',
         'src/desktop/scripts/Test-WindowsBuildPrerequisites.ps1',
         'src/desktop/scripts/Invoke-PreviewBuild.ps1',
+        'src/desktop/scripts/BuildProcessOwner.ps1',
         'src/desktop/scripts/Assert-PreviewPackage.ps1',
         'src/desktop/windows_bridge.ps1','src/backend/CodexRunEngine.ps1',
         'tests/flutter-port-source.test.ps1','tests/flutter-port-bridge.test.ps1',
@@ -108,7 +109,8 @@ try{
         $scripts=@(Get-ContinuumBuildScripts $trusted)
         Require ($scripts -contains (Join-Path $trusted 'src/backend/CodexRunEngine.ps1')) 'Required backend script was not included.'
         foreach($relative in @('src/desktop/scripts/Test-WindowsBuildPrerequisites.ps1',
-            'src/desktop/scripts/Invoke-PreviewBuild.ps1','src/desktop/scripts/Assert-PreviewPackage.ps1',
+            'src/desktop/scripts/Invoke-PreviewBuild.ps1','src/desktop/scripts/BuildProcessOwner.ps1',
+            'src/desktop/scripts/Assert-PreviewPackage.ps1',
             'tests/windows-task-host.test.ps1','tests/flutter-windows-icon.test.ps1')){
             Require ($scripts -contains (Join-Path $trusted $relative)) "Required build stage is still blocked for source ZIPs: $relative"
         }
