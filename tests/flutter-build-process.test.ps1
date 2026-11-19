@@ -11,9 +11,11 @@ function Assert-That([bool]$Condition,[string]$Message){if(-not $Condition){thro
 try{
     Check 'owned process host uses an auditable script file rather than an encoded command' {
         $implementation=[IO.File]::ReadAllText((Join-Path $root 'src/desktop/scripts/Invoke-PreviewBuild.ps1'))
-        Assert-That ($implementation.Contains("'owner.ps1'") -and
+        $owner=Join-Path $root 'src/desktop/scripts/BuildProcessOwner.ps1'
+        Assert-That ((Test-Path -LiteralPath $owner -PathType Leaf) -and
+            $implementation.Contains("'BuildProcessOwner.ps1'") -and
             $implementation.Contains("'-File',"+'$ownerScript') -and
-            -not $implementation.Contains('-EncodedCommand')) 'Build process host still uses an opaque command.'
+            -not $implementation.Contains('-EncodedCommand')) 'Build process host still uses an opaque command or missing owner.'
     }
     if($IsWindows){
         Check 'actual Windows batch file runs inside the owned host with its exit code' {
