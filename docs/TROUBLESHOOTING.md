@@ -46,6 +46,31 @@ Verified choices are stored under `%LOCALAPPDATA%\CodexResumeScheduler\session-r
 
 If Windows reports a missing `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`, or `MSVCP140.dll`, install the [Microsoft Visual C++ v14 Redistributable (x64)](https://aka.ms/vc14/vc_redist.x64.exe) from Microsoft, then reopen the app. These runtime libraries are required by the compiled Windows application; installing the full Visual Studio build tools is unnecessary for the downloaded preview.
 
+## Several prerequisites fail with the same PowerShell Access denied error
+
+A native Windows test on 18 Nov 2026 stopped **before** dependency validation:
+all five reported failures tried to launch the same child
+C:\Program Files\PowerShell\7\pwsh.exe, and Windows returned **Access is denied**.
+That is **one subprocess-start failure**, not evidence of five missing
+installations. It does not establish that Windows Script Host or Visual Studio
+is absent.
+
+The older build runner launched each check through an encoded PowerShell
+command. The revised runner uses an inspectable source-controlled script via
+pwsh -File and probes this shared subprocess boundary once before checking
+individual dependencies. PowerShell's [App Control documentation](https://learn.microsoft.com/en-us/powershell/scripting/security/app-control/how-to-use-app-control)
+documents a policy that may disallow encoded commands but permit files.
+**The user's exact security policy or denial source is not yet known.**
+
+If the subprocess check still reports Access denied, leave security protections
+enabled. Inspect the contemporaneous **Microsoft-Windows-CodeIntegrity/Operational**
+and **AppLocker** event logs and the endpoint-security product's block history
+for the attempted pwsh.exe launch. [Microsoft's App Control troubleshooting
+guide](https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/operations/appcontrol-debugging-and-troubleshooting)
+describes those logs. The preflight does not bypass a deliberate system
+restriction. Only after subprocess launch succeeds can Git, Node, Flutter,
+C++ and Windows Script Host be evaluated individually.
+
 ## Build prerequisites
 
 Current source builds require Windows x64, PowerShell 7.4 or newer, Node.js 22 or newer, Git 2.28 or newer, and Flutter 3.47.9 with its bundled Dart 3.13.7. The preflight checks the pinned Flutter version and the application's Dart `>=3.13.0 <4.0.0` requirement. Keep the committed dependency lock in place.

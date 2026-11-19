@@ -32,7 +32,8 @@ foreach($relative in @('pubspec.yaml','pubspec.lock','lib/main.dart','lib/aero_b
     if(-not (Test-Path -LiteralPath (Join-Path $folder $relative) -PathType Leaf)){throw "Missing Flutter file: $relative"}
 }
 foreach($relative in @('Run-WindowsReview.ps1','Build-WindowsPreview.ps1','scripts/Get-PreviewMetadata.ps1','scripts/Initialize-WindowsRunner.ps1','scripts/Install-WindowsIcon.ps1',
-    'scripts/Invoke-PreviewBuild.ps1','scripts/Test-WindowsBuildPrerequisites.ps1','scripts/Assert-PreviewPackage.ps1',
+    'scripts/Invoke-PreviewBuild.ps1','scripts/BuildProcessOwner.ps1',
+    'scripts/Test-WindowsBuildPrerequisites.ps1','scripts/Assert-PreviewPackage.ps1',
     '../../tests/flutter-windows-icon.test.ps1','../../tests/flutter-port-bridge.test.ps1')){
     $path=Join-Path $folder $relative
     $pTokens=$null;$pErrors=$null

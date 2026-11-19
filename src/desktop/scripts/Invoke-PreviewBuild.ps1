@@ -97,57 +97,18 @@ function Invoke-ContinuumBuildProcess {
     }
     Initialize-ContinuumBuildOwnership
     $powerShell=Join-Path $PSHOME ($IsWindows ? 'pwsh.exe' : 'pwsh')
-    $toolExecutable=$FilePath
-    $toolArguments=$ArgumentList
-    if([IO.Path]::GetExtension($FilePath) -in @('.bat','.cmd')){
-        # PowerShell's native-command binder handles Windows batch entrypoints.
-        # Encode literal arguments rather than interpolating a cmd.exe command.
-        if(-not $IsWindows){throw 'Windows batch build tools require Windows.'}
-        $toolExecutable=$powerShell
-        $literals=@($FilePath)+$ArgumentList | ForEach-Object {"'"+$_.Replace("'","''")+"'"}
-        $command='$ErrorActionPreference=''Stop''; try { & '+($literals -join ' ')+
-            '; exit $LASTEXITCODE } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }'
-        $toolArguments=@('-NoLogo','-NoProfile','-NonInteractive','-OutputFormat','Text','-EncodedCommand',
-            [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command)))
+    $batch=([IO.Path]::GetExtension($FilePath) -in @('.bat','.cmd'))
+    if($batch -and -not $IsWindows){throw 'Windows batch build tools require Windows.'}
+    # The owned PowerShell host executes batch files itself. A second nested
+    # encoded PowerShell command is unnecessary and is blocked by some Windows
+    # application-control policies. All arguments remain a structured array.
+    $ownerScript=Join-Path $PSScriptRoot 'BuildProcessOwner.ps1'
+    if(-not (Test-Path -LiteralPath $ownerScript -PathType Leaf)){
+        throw "The audited build-process owner is missing: $ownerScript"
     }
     $controlDirectory=Join-Path ([IO.Path]::GetTempPath()) ('continuum-build-owner-'+[guid]::NewGuid().ToString('N'))
     [void][IO.Directory]::CreateDirectory($controlDirectory)
     $statusPath=Join-Path $controlDirectory 'exit.status'
-    $wrapper=@'
-$ErrorActionPreference='Stop'
-[Console]::InputEncoding=[Text.UTF8Encoding]::new($false)
-[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
-$request=$null;$child=$null;$code=1
-try{
-    $request=[Console]::In.ReadLine() | ConvertFrom-Json -ErrorAction Stop
-    if(-not $request){throw 'Build owner received no launch request.'}
-    $start=[Diagnostics.ProcessStartInfo]::new()
-    $start.FileName=[string]$request.executable
-    $start.WorkingDirectory=[string]$request.directory
-    $start.UseShellExecute=$false
-    $start.CreateNoWindow=$true
-    $start.RedirectStandardInput=$true
-    foreach($argument in $request.arguments){$start.ArgumentList.Add([string]$argument)}
-    $child=[Diagnostics.Process]::Start($start)
-    $child.StandardInput.Close()
-    $child.WaitForExit()
-    $code=$child.ExitCode
-}catch{[Console]::Error.WriteLine($_.Exception.Message)}
-finally{
-    if($child){$child.Dispose()}
-    try{
-        [Console]::Out.Flush();[Console]::Error.Flush()
-        if($request){
-            [IO.File]::WriteAllText(([string]$request.status+'.tmp'),[string]$code)
-            [IO.File]::Move(([string]$request.status+'.tmp'),[string]$request.status)
-        }
-    }finally{
-        # The parent terminates our owned job/group. Keeping the owner alive
-        # prevents group/PID reuse while descendants may still hold output.
-        [void][Console]::In.ReadLine()
-    }
-}
-'@
     $info=[Diagnostics.ProcessStartInfo]::new()
     $info.FileName=$powerShell
     if(-not $IsWindows){
@@ -156,8 +117,8 @@ finally{
         $info.FileName=$setsid.Source
         $info.ArgumentList.Add($powerShell)
     }
-    foreach($arg in @('-NoLogo','-NoProfile','-NonInteractive','-OutputFormat','Text','-EncodedCommand',
-        [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($wrapper)))){
+    # A checked-in, auditable -File entrypoint avoids opaque process arguments.
+    foreach($arg in @('-NoLogo','-NoProfile','-NonInteractive','-File',$ownerScript)){
         $info.ArgumentList.Add($arg)
     }
     $info.WorkingDirectory=[IO.Path]::GetFullPath($WorkingDirectory)
@@ -191,7 +152,7 @@ finally{
             }
             $ownedGroup=$true
         }
-        $request=@{executable=$toolExecutable;arguments=@($toolArguments);directory=$info.WorkingDirectory;status=$statusPath} | ConvertTo-Json -Depth 4 -Compress
+        $request=@{executable=$FilePath;arguments=@($ArgumentList);batch=$batch;directory=$info.WorkingDirectory;status=$statusPath} | ConvertTo-Json -Depth 4 -Compress
         $process.StandardInput.WriteLine($request)
         $process.StandardInput.Flush()
         $readers[0].Stream=$process.StandardOutput.BaseStream
