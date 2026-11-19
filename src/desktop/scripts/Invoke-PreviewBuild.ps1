@@ -105,50 +105,10 @@ function Invoke-ContinuumBuildProcess {
     $controlDirectory=Join-Path ([IO.Path]::GetTempPath()) ('continuum-build-owner-'+[guid]::NewGuid().ToString('N'))
     [void][IO.Directory]::CreateDirectory($controlDirectory)
     $statusPath=Join-Path $controlDirectory 'exit.status'
-    $wrapper=@'
-$ErrorActionPreference='Stop'
-[Console]::InputEncoding=[Text.UTF8Encoding]::new($false)
-[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
-$request=$null;$child=$null;$code=1
-try{
-    $request=[Console]::In.ReadLine() | ConvertFrom-Json -ErrorAction Stop
-    if(-not $request){throw 'Build owner received no launch request.'}
-    if($request.batch -eq $true){
-        # PowerShell 7 handles .bat/.cmd argument binding; stdout and stderr
-        # flow through this same owner, already assigned to the build job.
-        $batchArguments=@($request.arguments | ForEach-Object {[string]$_})
-        & ([string]$request.executable) @batchArguments
-        if($null -eq $LASTEXITCODE){throw 'Batch tool returned no exit status.'}
-        $code=[int]$LASTEXITCODE
-    }else{
-        $start=[Diagnostics.ProcessStartInfo]::new()
-        $start.FileName=[string]$request.executable
-        $start.WorkingDirectory=[string]$request.directory
-        $start.UseShellExecute=$false
-        $start.CreateNoWindow=$true
-        $start.RedirectStandardInput=$true
-        foreach($argument in $request.arguments){$start.ArgumentList.Add([string]$argument)}
-        $child=[Diagnostics.Process]::Start($start)
-        $child.StandardInput.Close()
-        $child.WaitForExit()
-        $code=$child.ExitCode
+    $ownerScript=Join-Path $PSScriptRoot 'BuildProcessOwner.ps1'
+    if(-not (Test-Path -LiteralPath $ownerScript -PathType Leaf)){
+        throw "The audited build-process owner is missing: $ownerScript"
     }
-}catch{[Console]::Error.WriteLine($_.Exception.Message)}
-finally{
-    if($child){$child.Dispose()}
-    try{
-        [Console]::Out.Flush();[Console]::Error.Flush()
-        if($request){
-            [IO.File]::WriteAllText(([string]$request.status+'.tmp'),[string]$code)
-            [IO.File]::Move(([string]$request.status+'.tmp'),[string]$request.status)
-        }
-    }finally{
-        # The parent terminates our owned job/group. Keeping the owner alive
-        # prevents group/PID reuse while descendants may still hold output.
-        [void][Console]::In.ReadLine()
-    }
-}
-'@
     $info=[Diagnostics.ProcessStartInfo]::new()
     $info.FileName=$powerShell
     if(-not $IsWindows){
@@ -157,10 +117,7 @@ finally{
         $info.FileName=$setsid.Source
         $info.ArgumentList.Add($powerShell)
     }
-    # Use an inspectable local script instead of an opaque command line.
-    # Windows App Control can permit -File while rejecting encoded commands.
-    $ownerScript=Join-Path $controlDirectory 'owner.ps1'
-    [IO.File]::WriteAllText($ownerScript,$wrapper,[Text.UTF8Encoding]::new($false))
+    # A checked-in, auditable -File entrypoint avoids opaque process arguments.
     foreach($arg in @('-NoLogo','-NoProfile','-NonInteractive','-File',$ownerScript)){
         $info.ArgumentList.Add($arg)
     }
