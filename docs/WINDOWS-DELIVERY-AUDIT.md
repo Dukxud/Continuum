@@ -1,5 +1,32 @@
 # Windows delivery and runtime audit
 
+## Post-merge Windows finding — 18 Nov 2026
+
+Native execution of merge commit 8d66da3b707010686af8a176568353edbcea9472
+stopped before the build or tool checks. The shared subprocess helper attempted
+to start C:\Program Files\PowerShell\7\pwsh.exe from src\desktop and received
+Access denied. This happened once for each requested tool and was incorrectly
+reported as five unrelated prerequisites (Git, Node, Flutter, Visual Studio,
+and Windows Script Host). No package compilation occurred.
+
+Source trace: Get-ContinuumWindowsBuildTools calls
+Invoke-ContinuumBuildProcess for every tool; the helper always first starts a
+PowerShell owner with an encoded command, including when the actual target is
+an EXE. Flutter batch files incurred an additional encoded PowerShell child.
+Windows refused the first owner at process creation. The exact Windows
+security/ACL cause is not proven from this log.
+
+Follow-up candidate changes the owner to a static, source-trusted .ps1 invoked
+with -File, executes batch files within that owner, and first verifies the
+shared process boundary. If it is still denied, the launcher reports **one
+underlying blocker** and explicitly does not attribute it to missing tools.
+No security controls are disabled or changed.
+
+The earlier three clean rounds were **portable source checks on Linux**, and
+did not cover this Windows process-start scenario. They must not be presented
+as native Windows acceptance. This post-merge issue remains open until a
+fresh native Windows run verifies the new candidate.
+
 Baseline: `ab94244d260cd02c66989620307c62e2ec206ab2`, after PR #32.
 The reported source launch reached Flutter package restoration, then failed while
 creating Windows plugin symbolic links. Continuum added the generic message
