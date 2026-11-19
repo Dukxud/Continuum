@@ -430,6 +430,31 @@ function Assert-ContinuumWindowsScriptHost {
     return $HostExecutable
 }
 
+# All external probes share one owned process launcher. Prove that it can
+# start before reporting individual tools as broken. If Windows denies its
+# PowerShell child, five identical tool errors are one infrastructure failure.
+function Assert-ContinuumBuildSubprocessAvailable {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$ProjectDirectory)
+    $powerShell=Join-Path $PSHOME ($IsWindows ? 'pwsh.exe' : 'pwsh')
+    $probe=Join-Path $PSScriptRoot 'Test-WindowsBuildPrerequisites.ps1'
+    try {
+        $result=Invoke-ContinuumBuildProcess -FilePath $powerShell `
+            -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-File',$probe) `
+            -WorkingDirectory $ProjectDirectory -TimeoutSeconds 20
+        if($result.ExitCode -ne 0){
+            throw "Child PowerShell exited with code $($result.ExitCode): $($result.Stderr.Trim())"
+        }
+    }catch{
+        throw ("Continuum's shared process runner cannot launch a child PowerShell. " +
+            "Git, Node.js, Flutter, Visual Studio C++ and Windows Script Host have NOT been validated; " +
+            "their absence is not established. Windows or security software may be denying this process. " +
+            "Inspect the Windows CodeIntegrity/Operational, AppLocker and endpoint-security event logs " +
+            "for this exact attempt. No security settings were changed. Original error: " +
+            $_.Exception.Message)
+    }
+}
+
 function Get-ContinuumWindowsBuildTools {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$ProjectDirectory,[string]$OutputDirectory='')
@@ -438,6 +463,9 @@ function Get-ContinuumWindowsBuildTools {
     $issues=[Collections.Generic.List[string]]::new()
     $project=[IO.Path]::GetFullPath($ProjectDirectory)
     try{$project=Assert-ContinuumBuildPath $project}catch{$issues.Add('[Source path] '+$_.Exception.Message)}
+    if($IsWindows -and $issues.Count -eq 0){
+        Assert-ContinuumBuildSubprocessAvailable -ProjectDirectory $project
+    }
     $tools=@{}
     foreach($name in @('flutter.bat','git.exe','node.exe')){
         $command=Get-Command $name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
