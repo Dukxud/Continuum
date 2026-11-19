@@ -5,25 +5,19 @@ Import-Module (Join-Path $PSScriptRoot '../../components/GitRepository/GitReposi
 Import-Module (Join-Path $PSScriptRoot '../../components/JobOutcomes/JobOutcomes.psm1') -Force -ErrorAction Stop
 . (Join-Path $PSScriptRoot 'CodexQuotaContinuation.ps1')
 . (Join-Path $PSScriptRoot 'CodexTerminalRun.ps1')
+. (Join-Path $PSScriptRoot 'CodexCli.ps1')
 
 function Get-RepositoryBranch {
     param([string]$Path)
     return Get-GitCurrentBranch -Path $Path
 }
 
-function Get-CodexCliJs {
-    $shim = (Get-Command codex.cmd -ErrorAction Stop).Source
-    $entry = Join-Path (Split-Path -Parent $shim) 'node_modules\@openai\codex\bin\codex.js'
-    if (-not (Test-Path -LiteralPath $entry -PathType Leaf)) { throw 'Cannot locate npm Codex App Server entrypoint.' }
-    return $entry
-}
-
 function Read-UsageState {
     param([string]$Model)
     $helper = Join-Path $PSScriptRoot 'CodexUsage.js'
     if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) { throw 'CodexUsage.js missing.' }
-    $cli = Get-CodexCliJs
-    $params = @($helper,'--cli-js',$cli,'--rates-only')
+    $cli = Get-CodexCliEntry
+    $params = @($helper)+@(Get-CodexMetadataArguments -Entry $cli)+@('--rates-only')
     if ($Model) { $params += @('--model',$Model) }
     $response = & node @params
     if ($LASTEXITCODE -ne 0) { throw 'Could not read Codex usage.' }
@@ -37,8 +31,9 @@ function Read-UsageState {
 function Assert-CodexConversationAvailable {
     param([Parameter(Mandatory)][string]$SessionId)
     $helper=Join-Path $PSScriptRoot 'CodexUsage.js'
-    $cli=Get-CodexCliJs
-    $lines=@(& node.exe $helper --cli-js $cli --thread-id $SessionId)
+    $cli=Get-CodexCliEntry
+    $arguments=@($helper)+@(Get-CodexMetadataArguments -Entry $cli)+@('--thread-id',$SessionId)
+    $lines=@(& node.exe @arguments)
     if($LASTEXITCODE -ne 0 -or $lines.Count -eq 0){
         throw 'Codex conversation could not be read; automatic continuation refused.'
     }
@@ -60,8 +55,9 @@ function Assert-ModelEffortSupported {
 
 function Read-CodexModelCatalog {
     $helper = Join-Path $PSScriptRoot 'CodexUsage.js'
-    $cli = Get-CodexCliJs
-    $lines = & node $helper --cli-js $cli --models-only
+    $cli = Get-CodexCliEntry
+    $arguments=@($helper)+@(Get-CodexMetadataArguments -Entry $cli)+@('--models-only')
+    $lines = & node @arguments
     if ($LASTEXITCODE -ne 0 -or -not $lines) { throw 'Could not verify current Codex model capabilities.' }
     $state = ($lines | Select-Object -Last 1) | ConvertFrom-Json
     if (-not $state.ok -or -not $state.models -or $state.models.Count -eq 0) { throw 'Codex model catalog unavailable.' }
@@ -71,7 +67,7 @@ function Read-CodexModelCatalog {
 function Get-CodexRuntimeFiles {
     return @(
         'src/backend/Invoke-CodexJob.ps1','src/backend/CodexRunEngine.ps1',
-        'src/backend/CodexUsage.js','src/backend/CodexRunJob.vbs','src/backend/CodexQuotaContinuation.ps1',
+        'src/backend/CodexUsage.js','src/backend/CodexCli.ps1','src/backend/CodexRunJob.vbs','src/backend/CodexQuotaContinuation.ps1',
         'src/backend/CodexTerminalRun.ps1',
         'components/SharedCodexSession/protocol.mjs',
         'components/SharedCodexSession/host.mjs',
@@ -252,7 +248,11 @@ function Invoke-CodexScheduledJob {
         }
         # Both execution modes inherit the same verified identity, branch,
         # quota and session mutex. Only the Codex UI/transport differs.
-        $codex = (Get-Command codex.cmd -ErrorAction Stop).Source
+        $cli = Get-CodexCliEntry
+        $codex = if([IO.Path]::GetExtension($cli) -ieq '.js'){
+            (Get-Command node.exe -ErrorAction Stop).Source
+        }else{$cli}
+        $entryArguments=if([IO.Path]::GetExtension($cli) -ieq '.js'){@($cli)}else{@()}
         [void](New-Item -Path $AppDirectory -ItemType Directory -Force -ErrorAction Stop)
         $PSNativeCommandUseErrorActionPreference = $false
         if($executionMode -eq 'shared'){
@@ -262,7 +262,7 @@ function Invoke-CodexScheduledJob {
             # has truly finished, not until a launcher exits.
             $hostFile=Join-Path $RuntimeDirectory 'components/SharedCodexSession/main.mjs'
             $node=(Get-Command node.exe -ErrorAction Stop).Source
-            & $node $hostFile host $JobFile (Get-CodexCliJs)
+            & $node $hostFile host $JobFile $cli
             $result=$LASTEXITCODE
             if([int]$result -eq 0){
                 Set-CodexRunOutcome -JobFile $JobFile -Status 'completed' -ExitCode 0 -Attempt ([int]$job.retryAttempt)
@@ -282,7 +282,7 @@ function Invoke-CodexScheduledJob {
             }
             $argsList+=@([string]$job.sessionId,[string]$job.message)
             Write-Host 'Starting interactive Codex in this terminal. Questions and approvals appear here.' -ForegroundColor Cyan
-            $result=Invoke-CodexTerminal -CliEntry (Get-CodexCliJs) -Arguments $argsList
+            $result=Invoke-CodexTerminal -CliEntry $cli -Arguments $argsList
             Write-Host "Codex terminal exit code: $result" -ForegroundColor $(if($result -eq 0){'Green'}else{'Yellow'})
             if([int]$result -eq 0){
                 # A TUI can exit voluntarily before the user-requested work
@@ -304,7 +304,7 @@ function Invoke-CodexScheduledJob {
         }
         $argsList += @('resume', [string]$job.sessionId, [string]$job.message)
         $events = Join-Path $appDir (([IO.Path]::GetFileNameWithoutExtension($JobFile)) + '.jsonl')
-        & $codex @argsList 2>&1 | Tee-Object -FilePath $events | Out-Host
+        & $codex @entryArguments @argsList 2>&1 | Tee-Object -FilePath $events | Out-Host
         $result = $LASTEXITCODE
         Write-Host "Codex exit code: $result" -ForegroundColor $(if ($result -eq 0) { 'Green' } else { 'Yellow' })
         # An interactive Codex process does not hold our Scheduler mutex.

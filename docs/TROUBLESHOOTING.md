@@ -21,7 +21,9 @@ Get-Process -Name codex_resume_flutter -ErrorAction SilentlyContinue |
 
 New packages include `build-info.json` beside the executable with the application version, source commit, build time, and whether tracked source files were modified. For an older package, use its recorded source SHA and checksum. In a source checkout, `git log -1 --format="%H %s"` identifies the commit; `git status --short` shows local changes.
 
-The root launcher uses a complete application package beside it when present. From a source archive without the executable, its default path opens the pinned public preview. Replacing only the launcher scripts therefore does not install a backend or UI correction. Check the running executable and its package identity, and use the complete corrected package or the [source-build instructions](GETTING-STARTED.md).
+The current `Run-Continuum.cmd` builds a complete source folder by default, including a source ZIP without Git metadata, then opens a fresh verified package under `%LOCALAPPDATA%\Continuum\SourceBuilds`. A runtime-only package opens its own sibling executable after manifest verification. A source folder wins over a stray executable, and an incomplete source/runtime folder fails explicitly. Only a launcher-only folder still selects the pinned public preview. Replacing just the two launcher scripts cannot install a backend or UI correction; use the complete source or application package.
+
+Before launch, the console prints the executable, build identity and effective backend path. If `CODEX_SCHEDULER_SOURCE` is set, the launcher displays that explicit backend override; confirm it identifies the intended source. A source ZIP records `sourceArchive: true` with no invented commit ID. A checkout/worktree records its own Git root and revision, never the revision of an unrelated parent repository. See the [source-build instructions](GETTING-STARTED.md).
 
 ## Repository unresolved, Outside Git, or conflicting checkouts
 
@@ -34,7 +36,7 @@ The corrected reader uses exact-ID Codex metadata and supported legacy/modern co
 | Repository unresolved | No supported evidence identified an existing Git checkout. Use Browse to choose it. |
 | Conflicting checkouts | More than one checkout matches. Use Browse to choose the active checkout. |
 | Repository lookup incomplete | A read, identity check, or search limit stopped discovery. Inspect the displayed reason and use Browse for an explicit choice. Partial results are not selected automatically. |
-| Repository lookup unavailable | The lookup operation failed. Inspect the accompanying error; an unresolved selection can retry on refresh. |
+| Repository lookup unavailable | The bridge or its subprocess failed. The repository warning retains the specific error through subsequent usage refreshes; hover for the full message. An unresolved selection can retry on refresh. |
 
 Verified choices are stored under `%LOCALAPPDATA%\CodexResumeScheduler\session-repositories\<session-id>.json`, independently of the current draft and scheduled job. Switching conversations or cancelling a future task should preserve that exact conversation's association. A moved or deleted checkout still needs a new valid choice. If a choice disappears again, record the running package identity and which action preceded it; do not publish raw session IDs, private paths, or rollout contents. The [investigation](REPOSITORY-DISCOVERY.md) records the reproduced defects and verification limits.
 
@@ -65,10 +67,14 @@ PR #21 corrected the native icon by installing the Continuum ICO after Windows r
 Check dependencies without running a model turn:
 
 ```powershell
-Get-Command node,pwsh,git,codex.cmd -ErrorAction Stop | Select-Object Name,Source
+Get-Command node,pwsh,git -ErrorAction Stop | Select-Object Name,Source
+Get-Command codex.exe,codex.cmd -CommandType Application -ErrorAction SilentlyContinue |
+    Select-Object Name,Source
 ```
 
-Confirm that the installed npm Codex CLI is signed in to the intended account. The app needs a verified workspace, a supported model and reasoning effort, and a current model-matched quota response. Exhausted quota can still permit scheduling for a future time; the worker checks availability again when the job starts. An unavailable or ambiguous metadata response can block scheduling. Inspect the displayed reason and allow the ordinary refresh to complete.
+Current source accepts the official native `codex.exe` and the npm `codex.cmd` installation. At least one must appear in the second command's output; restart Continuum after installing Codex or changing `PATH`. Node.js remains required for Continuum's helpers. Confirm that Codex is signed in to the intended account. The app needs a verified workspace, a supported model and reasoning effort, and a current model-matched quota response. Exhausted quota can still permit scheduling for a future time; the worker checks availability again when the job starts. An unavailable or ambiguous metadata response can block scheduling. Inspect the displayed reason and allow the ordinary refresh to complete.
+
+Codex reads its state from `CODEX_HOME` when set, otherwise the Windows user's `.codex` directory. WSL uses a separate Linux home by default. Continuum's Windows process must see the intended installation and state location; it does not search other users' homes or every WSL distribution. See the official [environment variables](https://learn.chatgpt.com/docs/config-file/environment-variables) and [Windows guidance](https://learn.chatgpt.com/docs/windows/windows-app).
 
 ## Shared terminal reconnects
 

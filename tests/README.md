@@ -1,6 +1,6 @@
 # Testing
 
-Continuum tests the desktop, Windows bridge, worker, protocol, and reusable modules separately. Tests use fixture data, fake task providers, and a mock App Server; they do not request live Codex turns.
+Continuum tests the desktop, Windows bridge, worker, protocol, and reusable modules separately. Standard tests use fixture data, fake task providers, and a mock App Server. The optional genuine-Codex probe uses a separately supplied native runtime. Neither route requests live Codex turns.
 
 ## Portable checks
 
@@ -42,13 +42,30 @@ For an auditable clean-checkout run, pass `-ExpectedCommit <full-sha>`. This che
 | --- | --- |
 | Desktop state and views | `src/desktop/test/`: schedule logic, quota shapes, view changes, errors, history selection races, appearance, Shared panel |
 | JSON/Windows bridge | `flutter-port-bridge.test.ps1`: real subprocess responses with isolated application state |
+| Repository runtime paths | `repository-runtime-paths.test.ps1`: real Git checkouts with official Codex opaque path URIs, malformed path hints, persisted shell calls and thread settings; no Codex turn or scheduled task |
+| Desktop subprocess transport | `src/desktop/test/scheduler_process_test.dart`: actual PowerShell child and JSON dispatcher, error retention, Unicode Git paths, invalid stream bytes and stale-response protection |
+| Codex launch and shutdown | `codex-launch-runtime.test.js` and `shared-codex-launch.test.mjs`: native/npm entrypoints, bounded subprocess shutdown and inherited-pipe cleanup |
 | Scheduled execution | Worker identity, immutable runtime, task registration, cancellation, model/effort, quota continuation, and durable results |
 | Shared session protocol | Mock App Server, authenticated clients, routing, native client leases, completion and cleanup |
 | Reusable modules | Unit contracts, independent consumers, native renderers, and standalone package integrity |
 | Distribution | Native icon, version-derived preview names, preserved output, ZIP manifests, and bundled dependencies |
+| Root launch routing | `root-launcher-decision.test.ps1`: source ZIP/checkout/worktree versus packaged runtime, incomplete folders and launcher-only fallback; uses production decision functions without running the Windows launch path |
+| Build source identity | `flutter-preview-source-identity.test.ps1`: actual Git root, worktree, modified/untracked source, archive inside an unrelated repository and malformed Git metadata |
 | Repository quality | JavaScript and Dart formatting, strict analysis, documentation links, and architecture boundaries |
 
 The `visual-capture` Flutter tag produces fixture images and is excluded from ordinary correctness tests. Fixture images are not live product acceptance.
+
+The desktop subprocess suite uses `pwsh` on `PATH` or `CONTINUUM_TEST_PWSH`, and explicitly skips when neither is available. The native Windows adapter test explicitly skips on other operating systems. Running the shared subprocess helper against a real PowerShell bridge on Linux does not establish native Windows UI or Task Scheduler acceptance.
+
+## Optional genuine Codex probe
+
+`genuine-codex-repository-probe.ps1` is deliberately outside automatic `*.test.ps1` discovery. Supply a genuine installed native Codex executable explicitly:
+
+```powershell
+pwsh -NoProfile -File .\tests\genuine-codex-repository-probe.ps1 -CodexExecutable 'C:\absolute\path\to\codex.exe'
+```
+
+It runs the actual PowerShell dispatcher, installation resolver, Node helper, Codex App Server and Git against disposable local sessions and checkouts. It covers metadata, chooser load, selection, preferences and remote-based checkout matching. Codex gets a disposable home, empty file-based credential storage and no inherited tokens. Windows task enumeration is fixture-backed; the probe does not call account, model-turn, resume or scheduling operations. This is protocol/process verification, not target-device acceptance.
 
 ## CI and manual acceptance
 

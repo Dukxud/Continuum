@@ -3,15 +3,16 @@
 # message loop. The UI polls only for process completion; no persistent service.
 function Start-UsageRead {
     $node = (Get-Command node.exe -ErrorAction Stop).Source
-    $cliJs = Get-CodexCliJs
+    $cli = Get-CodexCliEntry
     $helper = Join-Path $PSScriptRoot '../../src/backend/CodexUsage.js'
-    if (-not (Test-Path -LiteralPath $cliJs -PathType Leaf)) { throw 'Codex npm entrypoint not found. Update/install Codex via npm.' }
+    if (-not (Test-Path -LiteralPath $cli -PathType Leaf)) { throw 'Codex entrypoint not found. Install Codex and restart Continuum.' }
     if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) { throw 'CodexUsage.js is missing. Extract the complete release.' }
     $start = [System.Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $node
     [void]$start.ArgumentList.Add($helper)
-    [void]$start.ArgumentList.Add('--cli-js')
-    [void]$start.ArgumentList.Add($cliJs)
+    foreach($argument in @(Get-CodexMetadataArguments -Entry $cli)){
+        [void]$start.ArgumentList.Add($argument)
+    }
     $chosen = Get-DashboardUsageModel
     if ($chosen) { [void]$start.ArgumentList.Add('--model'); [void]$start.ArgumentList.Add($chosen) }
     $start.RedirectStandardOutput = $true

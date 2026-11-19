@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, basename, isAbsolute } from 'node:path';
 import { spawn } from 'node:child_process';
 import { nativeTuiArguments, REMOTE_TOKEN_ENV } from './remote.mjs';
-import { SharedSessionHost, locationFor } from './host.mjs';
+import { SharedSessionHost, locationFor, codexProcessCommand } from './host.mjs';
 import { connectToSession, terminalWatch } from './client.mjs';
 
 const [mode, jobPath, codexEntry] = process.argv.slice(2);
@@ -12,7 +12,7 @@ if (
   (['host', 'native'].includes(mode) && !isAbsolute(codexEntry ?? ''))
 ) {
   console.error(
-    'Usage: node main.mjs <host|watch|status|answer|native> ABSOLUTE_JOB_JSON [ABSOLUTE_CODEX_CLI_JS]',
+    'Usage: node main.mjs <host|watch|status|answer|native> ABSOLUTE_JOB_JSON [ABSOLUTE_CODEX_ENTRY]',
   );
   process.exit(2);
 }
@@ -96,7 +96,8 @@ async function run() {
       )
         throw new Error('Invalid shared owner credentials');
       const args = nativeTuiArguments(codexEntry, credentials.endpoint, credentials.threadId);
-      const terminal = spawn(process.execPath, args, {
+      const command = codexProcessCommand(codexEntry, args.slice(1));
+      const terminal = spawn(command.executable, command.args, {
         cwd: credentials.cwd,
         stdio: 'inherit',
         windowsHide: false,

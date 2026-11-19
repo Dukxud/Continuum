@@ -446,6 +446,7 @@ class SchedulerController extends ChangeNotifier {
       _restoredRepository = null;
       repositoryWarning = null;
       repositoryAlternatives = [];
+      if (error?.startsWith('Repository lookup:') ?? false) error = null;
     }
     if (instruction != null) message = instruction;
     if (accessMode != null) access = accessMode;
@@ -509,6 +510,7 @@ class SchedulerController extends ChangeNotifier {
       _restoredRepository = null;
       repositoryWarning = null;
       repositoryAlternatives = [];
+      if (error?.startsWith('Repository lookup:') ?? false) error = null;
       _keepRestoredModel = false;
       _changed();
       _queueSave();
@@ -586,6 +588,7 @@ class SchedulerController extends ChangeNotifier {
       if (edited == _repositoryEditEpoch &&
           (repo.trim().isEmpty || repo == restoredRepository)) {
         _restoredRepository = null;
+        if (error?.startsWith('Repository lookup:') ?? false) error = null;
         final source = field(result, 'found');
         final found = source is Map ? Map<String, dynamic>.from(source) : null;
         final incomplete = field(found, 'Incomplete') == true;
@@ -621,10 +624,17 @@ class SchedulerController extends ChangeNotifier {
       }
       _changed();
     } catch (e) {
-      if (_disposed || selection != _selectionEpoch || sessionId != id) return;
-      repositoryWarning =
-          'Repository lookup unavailable; retrying automatically.';
-      error = 'Repository lookup: $e';
+      if (_disposed ||
+          selection != _selectionEpoch ||
+          edited != _repositoryEditEpoch ||
+          sessionId != id) {
+        return;
+      }
+      // Usage and list refreshes can clear the general error independently.
+      // Keep the actual lookup failure beside its field until that lookup
+      // succeeds, the conversation changes, or the user edits the repository.
+      repositoryWarning = 'Repository lookup: $e';
+      error = repositoryWarning;
       _changed();
     }
   }

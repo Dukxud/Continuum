@@ -11,7 +11,7 @@ foreach($relative in @(
     'src/desktop/bridge/SharedSessions.ps1', 'src/desktop/bridge/Preferences.ps1',
     'src/backend/CodexRunEngine.ps1',
     'src/backend/CodexQuotaContinuation.ps1','src/backend/CodexTerminalRun.ps1','src/backend/CodexData.ps1','src/backend/CodexSessionRepository.ps1',
-    'src/backend/CodexRepositoryEvidence.ps1',
+    'src/backend/CodexRepositoryEvidence.ps1','src/backend/CodexCli.ps1',
     'src/backend/CodexRunActivity.ps1',
     'src/backend/Invoke-CodexJob.ps1','components/JobOutcomes/JobOutcomes.psm1'
 )){
@@ -49,7 +49,7 @@ $source=(Get-Content -LiteralPath $bridge -Raw) + [Environment]::NewLine +
         ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join [Environment]::NewLine)
 foreach($contract in @('Test-CanonicalWorkspaceIdentity','Assert-ModelEffortSupported',
     'Publish-ImmutableRuntime','Register-OneTimeTask','Remove-OneTimeTask',
-    'Get-CodexRunEvidence','Get-CodexRunHistory','Get-CodexCliJs')){
+    'Get-CodexRunEvidence','Get-CodexRunHistory','Get-CodexCliEntry','Get-CodexMetadataArguments')){
     if(-not $source.Contains($contract)){throw "Flutter Windows adapter lost safety contract: $contract"}
 }
 if($source -match 'Register-ScheduledTask|codex exec resume|autoResume\s*='){throw 'Flutter bridge duplicated worker policy.'}

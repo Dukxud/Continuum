@@ -169,11 +169,14 @@ extension _DashboardWorkbench on _SchedulerHomeState {
           ),
           if (state.repositoryWarning != null) ...[
             const SizedBox(height: 4),
-            Text(
-              state.repositoryWarning!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10.5, color: DeckColor.gold),
+            Tooltip(
+              message: state.repositoryWarning!,
+              child: Text(
+                state.repositoryWarning!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 10.5, color: DeckColor.gold),
+              ),
             ),
           ],
         ],

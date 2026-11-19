@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'bridge.dart';
 
@@ -75,12 +76,10 @@ class WindowsSchedulerAdapter implements SchedulerAdapter {
       throw SchedulerException('PowerShell 7 is required.');
     }
     final encoded = base64Encode(utf8.encode(jsonEncode(payload)));
-    // Process.run(...).timeout() only stops waiting; it leaves a live
-    // PowerShell process that could still register/cancel a Windows task.
-    // Process.start permits terminating the direct child on timeout.
-    Process process;
-    try {
-      process = await Process.start(executable, [
+    return invokeSchedulerProcess(
+      action,
+      executable: executable,
+      arguments: [
         '-NoLogo',
         '-NoProfile',
         '-NonInteractive',
@@ -93,45 +92,106 @@ class WindowsSchedulerAdapter implements SchedulerAdapter {
         action,
         '-Payload',
         encoded,
-      ], workingDirectory: sourceDirectory);
-    } catch (error) {
-      throw SchedulerException('Unable to start Scheduler adapter: $error');
-    }
-    final stdout = process.stdout.transform(utf8.decoder).join();
-    final stderr = process.stderr.transform(utf8.decoder).join();
-    await process.stdin.close();
-    late final int exitCode;
-    late final String output;
-    late final String errors;
-    try {
-      exitCode = await process.exitCode.timeout(
-        action == 'browse'
-            ? const Duration(minutes: 10)
-            : const Duration(seconds: 55),
-      );
-      output = await stdout.timeout(const Duration(seconds: 5));
-      errors = await stderr.timeout(const Duration(seconds: 5));
-    } on TimeoutException {
-      process.kill();
-      throw adapterTimeoutError(action);
-    }
-    final lines = output
-        .split(RegExp(r'\r?\n'))
-        .where((line) => line.trim().isNotEmpty)
-        .toList();
-    if (lines.isEmpty) throw SchedulerException('No adapter response. $errors');
-    Map<String, dynamic> response;
-    try {
-      response = Map<String, dynamic>.from(jsonDecode(lines.last) as Map);
-    } catch (_) {
-      throw SchedulerException('Invalid adapter response. $errors');
-    }
-    if (exitCode != 0 || response['ok'] != true) {
-      throw SchedulerException(
-        (response['error'] ?? 'Adapter failed.').toString(),
-      );
-    }
-    final body = response['result'];
-    return body is Map ? Map<String, dynamic>.from(body) : {'value': body};
+      ],
+      workingDirectory: sourceDirectory,
+    );
   }
+}
+
+/// The production subprocess boundary, separate from Windows installation
+/// discovery so read-only bridge calls can be verified with real child processes.
+Future<Map<String, dynamic>> invokeSchedulerProcess(
+  String action, {
+  required String executable,
+  required List<String> arguments,
+  required String workingDirectory,
+  Map<String, String>? environment,
+  Duration? responseTimeout,
+}) async {
+  // Process.run(...).timeout() only stops waiting; it leaves a live
+  // PowerShell process that could still register/cancel a Windows task.
+  // Process.start permits terminating the direct child on timeout.
+  Process process;
+  try {
+    process = await Process.start(
+      executable,
+      arguments,
+      workingDirectory: workingDirectory,
+      environment: environment,
+    );
+  } on ProcessException catch (error) {
+    // ProcessException.toString includes the argument list, which can contain
+    // an encoded user instruction. Report the OS error without the payload.
+    throw SchedulerException(
+      'Unable to start Scheduler $action adapter: ${error.message}',
+    );
+  }
+  // Attach handlers to all streams immediately. Decoding before exit was
+  // awaited could raise an unhandled FormatException in the meantime. Stderr
+  // is diagnostic output, not part of the JSON contract; drain it as bytes.
+  final completed = Future.wait<Object?>([
+    process.exitCode,
+    process.stdout.fold<BytesBuilder>(
+      BytesBuilder(copy: false),
+      (buffer, bytes) => buffer..add(bytes),
+    ),
+    process.stderr.drain<void>(),
+    process.stdin.close(),
+  ], eagerError: true);
+  late final List<Object?> values;
+  try {
+    values = await completed.timeout(
+      responseTimeout ??
+          (action == 'browse'
+              ? const Duration(minutes: 10)
+              : const Duration(seconds: 55)),
+    );
+  } on TimeoutException {
+    process.kill();
+    throw adapterTimeoutError(action);
+  } on IOException catch (error) {
+    process.kill();
+    throw SchedulerException(
+      'Scheduler $action transport failed (${error.runtimeType}). '
+      'Source: $workingDirectory',
+    );
+  }
+  final exitCode = values[0] as int;
+  late final String output;
+  try {
+    output = utf8.decode((values[1] as BytesBuilder).takeBytes());
+  } on FormatException {
+    throw SchedulerException(
+      'Invalid UTF-8 in Scheduler $action response (exit $exitCode). '
+      'Source: $workingDirectory',
+    );
+  }
+  final lines = output
+      .split(RegExp(r'\r?\n'))
+      .where((line) => line.trim().isNotEmpty)
+      .toList();
+  if (lines.isEmpty) {
+    throw SchedulerException(
+      'No Scheduler $action response (exit $exitCode). '
+      'Source: $workingDirectory',
+    );
+  }
+  Map<String, dynamic> response;
+  try {
+    response = Map<String, dynamic>.from(jsonDecode(lines.last) as Map);
+  } catch (_) {
+    throw SchedulerException(
+      'Invalid Scheduler $action JSON response (exit $exitCode). '
+      'Source: $workingDirectory',
+    );
+  }
+  if (exitCode != 0 || response['ok'] != true) {
+    throw SchedulerException(
+      (response['error'] ??
+              'Scheduler $action adapter failed (exit $exitCode).')
+          .toString(),
+    );
+  }
+  final body = response['result'];
+  return body is Map ? Map<String, dynamic>.from(body) : {'value': body};
 }

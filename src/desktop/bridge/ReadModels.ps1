@@ -15,13 +15,13 @@ function Get-FlutterSessionChoices {
         # Use one metadata-only Codex App Server for all session titles.
         # This is optional presentation work, never a scheduling authority.
         try {
-            $shim=(Get-Command codex.cmd -ErrorAction Stop).Source
-            $cli=Join-Path (Split-Path -Parent $shim) 'node_modules\@openai\codex\bin\codex.js'
+            $cli=Get-CodexCliEntry
             $helper=Join-Path $SourceDirectory 'src/backend/CodexUsage.js'
             if((Test-Path -LiteralPath $cli -PathType Leaf) -and
                (Test-Path -LiteralPath $helper -PathType Leaf)){
                 $ids=@($missing | ForEach-Object { [string]$_.Id })
-                $lines=@(& node.exe $helper --cli-js $cli --thread-ids ($ids -join ','))
+                $arguments=@($helper)+@(Get-CodexMetadataArguments -Entry $cli)+@('--thread-ids',($ids -join ','))
+                $lines=@(& node.exe @arguments)
                 if($LASTEXITCODE -eq 0 -and $lines.Count){
                     $reply=($lines | Select-Object -Last 1) |
                         ConvertFrom-Json -AsHashtable -ErrorAction Stop
@@ -87,12 +87,12 @@ function Get-CodexPickerPreview {
     # Non-mutating metadata. This is optional and must never bypass Git
     # verification or a conflicting repository result.
     try {
-        $shim=(Get-Command codex.cmd -ErrorAction Stop).Source
-        $cli=Join-Path (Split-Path -Parent $shim) 'node_modules\@openai\codex\bin\codex.js'
+        $cli=Get-CodexCliEntry
         $helper=Join-Path $SourceDirectory 'src/backend/CodexUsage.js'
         if(-not (Test-Path -LiteralPath $cli -PathType Leaf) -or
            -not (Test-Path -LiteralPath $helper -PathType Leaf)){return $null}
-        $lines=@(& node.exe $helper --cli-js $cli --thread-ids $SessionId)
+        $arguments=@($helper)+@(Get-CodexMetadataArguments -Entry $cli)+@('--thread-ids',$SessionId)
+        $lines=@(& node.exe @arguments)
         if($LASTEXITCODE -ne 0 -or -not $lines.Count){return $null}
         $data=($lines | Select-Object -Last 1) | ConvertFrom-Json -AsHashtable -ErrorAction Stop
         if($data.ok -ne $true -or -not $data.threads.Contains($SessionId)){return $null}

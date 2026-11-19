@@ -2,8 +2,9 @@
 function Get-GitRepositoryRoot {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Path)
-    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path -PathType Container)) { return $null }
     try {
+        if ([string]::IsNullOrWhiteSpace($Path) -or $Path.IndexOf([char]0) -ge 0 -or
+            -not (Test-Path -LiteralPath $Path -PathType Container -ErrorAction Stop)) { return $null }
         $output = & git -C $Path rev-parse --show-toplevel 2>$null
         if ($LASTEXITCODE -ne 0 -or -not $output) { return $null }
         return ([string]($output | Select-Object -First 1)).Trim()
