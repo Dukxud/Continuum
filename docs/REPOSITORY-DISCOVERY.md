@@ -325,6 +325,11 @@ metadata. The existing preview-version metadata suite also passed. Updated
 Windows launcher fixtures parse, but their execution and a compiled Windows EXE
 remain untested on this Linux host.
 
+The subsequent [Windows delivery audit](WINDOWS-DELIVERY-AUDIT.md) records the
+source-build prerequisite correction and later packaging/launcher changes. Its
+current fallback requires the supplied package verifier; the two launcher files
+alone are insufficient, and cached pinned packages are verified on every launch.
+
 ### Official contracts checked
 
 The authoritative Codex source remains pinned to

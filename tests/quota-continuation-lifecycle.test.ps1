@@ -9,6 +9,7 @@ $temp=Join-Path ([IO.Path]::GetTempPath()) ('quota-lifecycle-'+[guid]::NewGuid()
 $originalPath=$env:PATH
 $oldDeny=$env:CODEX_STUB_DENY
 $oldMarker=$env:CODEX_STUB_EXECUTIONS
+$originalWindowsDirectory=$env:WINDIR
 $startingDirectory=(Get-Location).Path
 try {
     $bin=Join-Path $temp 'bin'
@@ -41,7 +42,14 @@ if (process.argv.includes('app-server')) {
 node "%~dp0node_modules\@openai\codex\bin\codex.js" %*
 exit /b %errorlevel%
 '@ | Set-Content -LiteralPath (Join-Path $bin 'codex.cmd') -Encoding ascii
-    $env:PATH="$bin;$originalPath"
+    if(-not $IsWindows){
+        # Only adapt executable names and the fake Scheduler's path string;
+        # the real Node metadata client and worker remain under test.
+        $node=(Get-Command node -CommandType Application -ErrorAction Stop).Source
+        [void](New-Item -ItemType SymbolicLink -Path (Join-Path $bin 'node.exe') -Target $node)
+        if(-not $env:WINDIR){$env:WINDIR=Join-Path $temp 'windows-fixture'}
+    }
+    $env:PATH=$bin+[IO.Path]::PathSeparator+$originalPath
     $env:CODEX_STUB_EXECUTIONS=(Join-Path $temp 'codex-executions.txt')
 
     $repo=Join-Path $temp 'workspace'
@@ -108,5 +116,6 @@ exit /b %errorlevel%
     $env:PATH=$originalPath
     $env:CODEX_STUB_DENY=$oldDeny
     $env:CODEX_STUB_EXECUTIONS=$oldMarker
+    $env:WINDIR=$originalWindowsDirectory
     if(Test-Path -LiteralPath $temp){Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue}
 }

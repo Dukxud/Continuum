@@ -21,7 +21,7 @@ Both `.test.js` and `.test.mjs` files are included. The documentation checker pa
 
 ## Windows checks
 
-Use PowerShell 7, Windows x64, Node.js, Git, and the [desktop build prerequisites](../docs/GETTING-STARTED.md#prerequisites). From a complete checkout:
+Use PowerShell 7.4 or newer, Windows x64, Node.js, Git, and the [desktop build prerequisites](../docs/GETTING-STARTED.md#prerequisites). From a complete checkout:
 
 ```powershell
 pwsh -NoProfile -STA -File .\src\desktop\Run-WindowsReview.ps1 -TestsOnly
@@ -51,6 +51,12 @@ For an auditable clean-checkout run, pass `-ExpectedCommit <full-sha>`. This che
 | Distribution | Native icon, version-derived preview names, preserved output, ZIP manifests, and bundled dependencies |
 | Root launch routing | `root-launcher-decision.test.ps1`: source ZIP/checkout/worktree versus packaged runtime, incomplete folders and launcher-only fallback; uses production decision functions without running the Windows launch path |
 | Build source identity | `flutter-preview-source-identity.test.ps1`: actual Git root, worktree, modified/untracked source, archive inside an unrelated repository and malformed Git metadata |
+| Windows source prerequisites | `windows-build-prerequisites.test.ps1`: version/configuration contracts, Visual Studio result cardinality, actual bundled-Dart YAML and symbolic-link probes, distinct permission/filesystem failures |
+| Windows runner generation | `flutter-runner-generation.test.ps1`: genuine pinned Flutter generation in a bracketed/Unicode path, unchanged application source and dependency lock, overlapping-generator rejection and restoration after a real failed tool process; does not compile Windows code |
+| Bounded build processes | `flutter-build-process.test.ps1`: real subprocess output, no-newline bounds, concurrent streams, deadlines, descendant lifetime and stage/environment handling |
+| Package paths and ZIP bytes | `flutter-package-paths.test.ps1`: real literal-path copies and archive extraction, spaces/brackets/Unicode/hidden payload, invalid release input, no overwrite and exact cleanup ownership |
+| Complete runtime distribution | `flutter-preview-package.test.ps1`: one-to-one manifest coverage, required import/runtime payload, actual extracted bridge and the exact pinned legacy manifest |
+| PowerShell host propagation | `powershell-host-selection.test.ps1` and `windows-task-host.test.ps1`: active-host task arguments and a harmless real WScript fixture where Windows is available |
 | Repository quality | JavaScript and Dart formatting, strict analysis, documentation links, and architecture boundaries |
 
 The `visual-capture` Flutter tag produces fixture images and is excluded from ordinary correctness tests. Fixture images are not live product acceptance.

@@ -19,8 +19,12 @@ function Get-ContinuumLaunchPlan {
             'src/desktop/scripts/Get-PreviewMetadata.ps1',
             'src/desktop/scripts/Initialize-WindowsRunner.ps1',
             'src/desktop/scripts/Install-WindowsIcon.ps1',
+            'src/desktop/scripts/Test-WindowsBuildPrerequisites.ps1',
+            'src/desktop/scripts/Invoke-PreviewBuild.ps1',
+            'src/desktop/scripts/Assert-PreviewPackage.ps1',
             'src/desktop/windows_bridge.ps1','src/backend/CodexRunEngine.ps1',
-            'tests/flutter-port-source.test.ps1','tests/flutter-port-bridge.test.ps1')
+            'tests/flutter-port-source.test.ps1','tests/flutter-port-bridge.test.ps1',
+            'tests/windows-task-host.test.ps1','tests/flutter-windows-icon.test.ps1')
         $missing=@($required | Where-Object {-not (Test-Path -LiteralPath (Join-Path $base $_) -PathType Leaf)})
         if($missing.Count){
             throw "Incomplete source tree. Restore the complete source ZIP or checkout. Missing: $($missing -join ', ')."
@@ -61,7 +65,11 @@ function Get-ContinuumBuildScripts {
         'src/desktop/scripts/Get-PreviewMetadata.ps1',
         'src/desktop/scripts/Initialize-WindowsRunner.ps1',
         'src/desktop/scripts/Install-WindowsIcon.ps1',
-        'tests/flutter-port-source.test.ps1','tests/flutter-port-bridge.test.ps1')){
+        'src/desktop/scripts/Test-WindowsBuildPrerequisites.ps1',
+        'src/desktop/scripts/Invoke-PreviewBuild.ps1',
+        'src/desktop/scripts/Assert-PreviewPackage.ps1',
+        'tests/flutter-port-source.test.ps1','tests/flutter-port-bridge.test.ps1',
+        'tests/windows-task-host.test.ps1','tests/flutter-windows-icon.test.ps1')){
         [void]$files.Add((Assert-LocalSourcePath $relative))
     }
     foreach($relative in @('src/backend','src/desktop/bridge','components/RuntimeBundle',
@@ -80,7 +88,42 @@ function Get-ContinuumBuildScripts {
     return @($files | Sort-Object)
 }
 
+function Get-ContinuumPackageVerifier {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Directory,[switch]$RequireManifest)
+    $base=[IO.Path]::GetFullPath($Directory)
+    $relative='src/desktop/scripts/Assert-PreviewPackage.ps1'
+    $current=$base
+    foreach($part in @('')+@($relative.Split('/'))){
+        if($part){$current=Join-Path $current $part}
+        if(-not (Test-Path -LiteralPath $current)){
+            throw "The launcher package verifier is missing: $relative. Extract the complete source or application package together; do not copy the launcher files alone."
+        }
+        $item=Get-Item -LiteralPath $current -Force -ErrorAction Stop
+        if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){
+            throw "The launcher will not load a verifier through a linked path: $current"
+        }
+    }
+    if($item.PSIsContainer -or $item.Length -eq 0){throw 'The launcher package verifier is empty or invalid. Extract the complete package again.'}
+    if($RequireManifest){
+        $manifest=Join-Path $base 'SHA256SUMS.txt'
+        if(-not (Test-Path -LiteralPath $manifest -PathType Leaf)){throw 'Preview checksum manifest missing; extract the complete package.'}
+        if(((Get-Item -LiteralPath $manifest -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){
+            throw 'The launcher will not read a linked checksum manifest.'
+        }
+        $matches=@([IO.File]::ReadAllLines($manifest) | Where-Object {$_ -match ('^[0-9A-Fa-f]{64}  '+[regex]::Escape($relative)+'$')})
+        if($matches.Count -ne 1){throw 'Preview checksum manifest must cover the package verifier exactly once.'}
+        if((Get-FileHash -LiteralPath $current -Algorithm SHA256).Hash -ine $matches[0].Substring(0,64)){
+            throw 'Preview package checksum failed: src/desktop/scripts/Assert-PreviewPackage.ps1. Nothing was launched.'
+        }
+    }
+    return $current
+}
+
 if (-not $IsWindows) { throw 'Continuum runs on Windows x64.' }
+if($PSVersionTable.PSVersion -lt [version]'7.4'){
+    throw "Continuum requires PowerShell 7.4 or newer; this launcher is running $($PSVersionTable.PSVersion) from $PSHOME. Put a current x64 PowerShell 7 installation first on PATH and reopen Run-Continuum.cmd."
+}
 $plan=Get-ContinuumLaunchPlan -Directory $PSScriptRoot -BuildFromSource:$BuildFromSource
 
 function Start-Continuum {
@@ -105,69 +148,32 @@ function Start-Continuum {
 # Packaged CI previews ship this same launcher beside the executable.
 # A local, manifest-verified package takes precedence over the pinned public
 # release; otherwise reviewing a PR would silently launch old application code.
-$localExecutable = Join-Path $PSScriptRoot 'codex_resume_flutter.exe'
 if ($plan.Mode -eq 'Package') {
-    $manifest = Join-Path $PSScriptRoot 'SHA256SUMS.txt'
-    if (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
-        throw 'Local preview checksum manifest missing; refusing to launch.'
-    }
-
-    $prefix = [IO.Path]::GetFullPath($PSScriptRoot).TrimEnd([char[]]@('/','\')) +
-        [IO.Path]::DirectorySeparatorChar
-    $entries = @(Get-Content -LiteralPath $manifest -ErrorAction Stop)
-    if ($entries.Count -eq 0) { throw 'Local preview checksum manifest is empty.' }
-    $verified = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    $verifiedPaths = [Collections.Generic.List[string]]::new()
-    foreach ($entry in $entries) {
-        $match = [regex]::Match($entry, '^([0-9A-Fa-f]{64})  ([^\\]+)$')
-        if (-not $match.Success) { throw 'Malformed local preview checksum entry.' }
-        $relative = $match.Groups[2].Value.Replace('/', '\')
-        $full = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $relative))
-        if (-not $full.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase) -or
-            -not $verified.Add($relative)) {
-            throw 'Unsafe or duplicated local preview checksum path.'
-        }
-        if (-not (Test-Path -LiteralPath $full -PathType Leaf) -or
-            (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash -ine $match.Groups[1].Value) {
-            throw "Local preview checksum failed: $relative. Nothing was launched."
-        }
-        $verifiedPaths.Add($full)
-    }
-    foreach ($required in @('codex_resume_flutter.exe','flutter_windows.dll',
-        'src\desktop\windows_bridge.ps1','src\backend\Invoke-CodexJob.ps1')) {
-        if (-not $verified.Contains($required)) {
-            throw "Local preview manifest does not cover required file: $required"
-        }
-    }
-    if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'data') -PathType Container)) {
-        throw 'Local preview missing Flutter data.'
-    }
-    # Unblock exactly the manifest-verified payload, not arbitrary extra files.
-    # A previous CI artifact may have the launcher added as an external sidecar.
-    foreach ($file in $verifiedPaths) {
-        Unblock-File -LiteralPath $file -ErrorAction Stop
-    }
-    Write-Host 'Launching this verified local preview, not the pinned public release.'
-    Start-Continuum -Executable $localExecutable
+    # Verify this one known helper before loading it from a downloaded package.
+    $verifier=Get-ContinuumPackageVerifier -Directory $PSScriptRoot -RequireManifest
+    Unblock-File -LiteralPath $verifier -ErrorAction Stop
+    . $verifier
+    $verified=Assert-ContinuumPreviewPackage -Directory $PSScriptRoot -Profile Current
+    foreach($file in $verified.VerifiedPaths){Unblock-File -LiteralPath $file -ErrorAction Stop}
+    Write-Host "Launching this verified local preview ($($verified.FileCount) files)."
+    Start-Continuum -Executable $verified.Executable
     return
 }
 
 if ($plan.Mode -eq 'Source') {
-    $missing=@('flutter.bat','git.exe','node.exe' | Where-Object {-not (Get-Command $_ -ErrorAction SilentlyContinue)})
-    if($missing.Count){
-        throw "Building this source requires Flutter 3.47.9, Git, Node.js and Visual Studio's Desktop development with C++ workload. Missing from PATH: $($missing -join ', '). See docs/GETTING-STARTED.md."
-    }
     Write-Host "Building the current source in $PSScriptRoot."
-    Write-Host 'The Windows build requires Visual Studio Desktop development with C++; Flutter will report missing toolchain components.'
+    Write-Host 'Checking Windows link capability, the pinned Flutter SDK and C++ build tools before the build.'
     $buildScripts=@(Get-ContinuumBuildScripts -Directory $PSScriptRoot)
     Write-Host "Trusting $($buildScripts.Count) build/runtime scripts in this source folder only; no execution-policy changes."
     foreach($file in $buildScripts){Unblock-File -LiteralPath $file -ErrorAction Stop}
+    if([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)){throw 'LOCALAPPDATA is missing. Reopen Run-Continuum.cmd in your normal Windows account.'}
     $output = Join-Path $env:LOCALAPPDATA ('Continuum\SourceBuilds\' + [guid]::NewGuid().ToString('N'))
     & (Join-Path $PSScriptRoot 'src\desktop\Build-WindowsPreview.ps1') -OutputDirectory $output
-    if ($LASTEXITCODE -ne 0) { throw 'Source build failed; application not launched.' }
     $executables = @(Get-ChildItem -LiteralPath $output -File -Recurse -Filter 'codex_resume_flutter.exe')
     if ($executables.Count -ne 1) { throw "Expected one packaged executable; found $($executables.Count)." }
-    Start-Continuum -Executable $executables[0].FullName
+    . (Get-ContinuumPackageVerifier -Directory $PSScriptRoot)
+    $verified=Assert-ContinuumPreviewPackage -Directory $executables[0].Directory.FullName -Profile Current
+    Start-Continuum -Executable $verified.Executable
     return
 }
 
@@ -175,14 +181,20 @@ if ($plan.Mode -eq 'Source') {
 $package = 'Continuum-Windows-v0.1.0+1-UNSIGNED-PREVIEW'
 $downloadUrl = 'https://github.com/Dukxud/Continuum/releases/download/v0.1.0-preview.1/Continuum-Windows-v0.1.0%2B1-UNSIGNED-PREVIEW.zip'
 $expectedSha256 = '08be6c6cd2bcbefcd8371348842ecc4ba04a565113f850654feeba6962a656f9'
+if([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)){throw 'LOCALAPPDATA is missing. Reopen Run-Continuum.cmd in your normal Windows account.'}
+$verifier=Get-ContinuumPackageVerifier -Directory $PSScriptRoot
+Unblock-File -LiteralPath $verifier -ErrorAction Stop
+. $verifier
 $install = Join-Path $env:LOCALAPPDATA 'Continuum\Previews\v0.1.0-preview.1'
 $executable = Join-Path (Join-Path $install $package) 'codex_resume_flutter.exe'
 Write-Host 'Launcher-only folder: selecting the pinned public release v0.1.0-preview.1.'
 Write-Host "Release ZIP SHA-256: $expectedSha256"
 
 if (Test-Path -LiteralPath $executable -PathType Leaf) {
+    $verified=Assert-ContinuumPreviewPackage -Directory (Split-Path -Parent $executable) -Profile PinnedPreview1
+    foreach($file in $verified.VerifiedPaths){Unblock-File -LiteralPath $file -ErrorAction Stop}
     Write-Host 'Opening the installed Continuum 0.1.0 Preview 1.'
-    Start-Continuum -Executable $executable
+    Start-Continuum -Executable $verified.Executable
     return
 }
 if (Test-Path -LiteralPath $install) {
@@ -203,22 +215,9 @@ try {
     $unpacked = Join-Path $staging 'unpacked'
     Expand-Archive -LiteralPath $archive -DestinationPath $unpacked -ErrorAction Stop
     $packageRoot = Join-Path $unpacked $package
-    foreach ($relative in @(
-        'codex_resume_flutter.exe',
-        'flutter_windows.dll',
-        'data',
-        'src\desktop\windows_bridge.ps1',
-        'src\backend\Invoke-CodexJob.ps1',
-        'components\RuntimeBundle'
-    )) {
-        if (-not (Test-Path -LiteralPath (Join-Path $packageRoot $relative))) {
-            throw "Verified archive has an incomplete executable package: $relative"
-        }
-    }
-
+    $verified=Assert-ContinuumPreviewPackage -Directory $packageRoot -Profile PinnedPreview1
     Write-Host 'SHA-256 verified. Unblocking files in this verified package only (no system policy change).'
-    Get-ChildItem -LiteralPath $packageRoot -File -Recurse |
-        Unblock-File -ErrorAction Stop
+    foreach($file in $verified.VerifiedPaths){Unblock-File -LiteralPath $file -ErrorAction Stop}
 
     [void](New-Item -ItemType Directory -Path (Split-Path -Parent $install) -Force)
     if (Test-Path -LiteralPath $install) { throw "Preview cache was created concurrently: $install" }
@@ -230,4 +229,5 @@ finally {
     }
 }
 
-Start-Continuum -Executable $executable
+$verified=Assert-ContinuumPreviewPackage -Directory (Split-Path -Parent $executable) -Profile PinnedPreview1
+Start-Continuum -Executable $verified.Executable

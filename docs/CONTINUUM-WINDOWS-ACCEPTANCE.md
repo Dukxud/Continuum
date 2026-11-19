@@ -34,7 +34,7 @@ The old [WinForms gate](history/WINDOWS-ACCEPTANCE.md) is historical, not the cu
 ## Future preflight (without a model turn)
 
 - [ ] Record exact source SHA, artifact/run and EXE path; do not mix files from multiple packages.
-- [ ] Confirm Windows x64, PowerShell 7, Node, Git and npm Codex dependencies. Record Codex version only with authorized invocation.
+- [ ] Confirm Windows x64, PowerShell 7.4 or newer, Node, Git and supported native/npm Codex dependencies. Source builds also require the [Windows build prerequisites](GETTING-STARTED.md#prerequisites). Record Codex version only with authorized invocation.
 - [ ] Review Full/Monitor/Micro at 100% and 125% scaling, date/time entry, Monday-first calendar, view switching, pin, close/save and appearance persistence.
 - [ ] Confirm the branded title-bar/Explorer/Alt+Tab icon in the exact binary; BP210 established Micro appearance, not every shell surface forever.
 - [ ] Validate runtime and package manifest. Mocks, analysis, compilation and screenshot generation do not establish real Codex behavior.

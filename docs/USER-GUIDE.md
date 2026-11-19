@@ -4,7 +4,7 @@ Schedule saved conversations, monitor reported usage, and inspect results from t
 
 ## Open and prepare
 
-Use the [build and launch instructions](GETTING-STARTED.md) or the recorded preview path in the [project status](CURRENT-STATE.md). Keep the complete package beside `codex_resume_flutter.exe`. Current source requires Windows x64, a signed-in desktop, PowerShell 7, Node, Git and an installed Codex CLI with a usable account. It accepts native `codex.exe` or the npm installation on `PATH`; older preview packages retain their recorded prerequisites. Building also requires Flutter and Visual Studio C++ tools.
+Use the [build and launch instructions](GETTING-STARTED.md) or the recorded preview path in the [project status](CURRENT-STATE.md). Keep the complete package beside `codex_resume_flutter.exe`. Current source requires Windows x64, a signed-in desktop, PowerShell 7.4 or newer, Node, Git and an installed Codex CLI with a usable account. It accepts native `codex.exe` or the npm installation on `PATH`; older preview packages retain their recorded prerequisites. Building also requires Flutter 3.47.9 with its bundled Dart SDK, Visual Studio C++ tools and plugin symbolic-link capability described in the setup guide.
 
 For a first trial, use a disposable saved Codex conversation and Git checkout. The app reads metadata and usage on startup; a model turn starts when a scheduled job runs. Avoid scheduling a conversation that is already active in another Codex process.
 
