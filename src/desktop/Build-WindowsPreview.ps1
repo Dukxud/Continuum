@@ -64,7 +64,7 @@ try{
     $destinationCreated=$true
     Copy-Item -Path (Join-Path $release '*') -Destination $destination -Recurse -Force -ErrorAction Stop
     $mustCopy=@('src/backend/Invoke-CodexJob.ps1','src/backend/CodexRunEngine.ps1','src/backend/CodexData.ps1',
-        'src/backend/CodexJobStore.ps1','src/backend/CodexSessionRepository.ps1','src/backend/CodexRepositoryEvidence.ps1','src/backend/CodexRunActivity.ps1','src/backend/CodexUsage.js','src/backend/CodexQuotaContinuation.ps1','src/backend/CodexTerminalRun.ps1','src/backend/CodexRunJob.vbs')
+        'src/backend/CodexJobStore.ps1','src/backend/CodexSessionRepository.ps1','src/backend/CodexRepositoryEvidence.ps1','src/backend/CodexRunActivity.ps1','src/backend/CodexUsage.js','src/backend/CodexCli.ps1','src/backend/CodexQuotaContinuation.ps1','src/backend/CodexTerminalRun.ps1','src/backend/CodexRunJob.vbs')
     foreach($relative in $mustCopy){
         $from=Join-Path $root $relative
         if(-not (Test-Path -LiteralPath $from -PathType Leaf)){throw "Required worker file missing: $relative"}
@@ -93,22 +93,20 @@ try{
         }
         Copy-Item -LiteralPath $from -Destination (Join-Path $destination $entry) -ErrorAction Stop
     }
-    $sourceCommit=(& git -C $root rev-parse HEAD).Trim()
-    if($LASTEXITCODE -ne 0){throw 'Cannot identify the source checkout for this preview.'}
-    $sourceChanges=@(& git -C $root status --porcelain --untracked-files=no)
-    if($LASTEXITCODE -ne 0){throw 'Cannot identify local source changes.'}
+    $sourceIdentity=Get-ContinuumSourceIdentity -SourceDirectory $root
     [ordered]@{
         application='Continuum'
         version=$preview.Version
-        sourceCommit=$sourceCommit
-        sourceModified=($sourceChanges.Count -gt 0)
+        sourceCommit=$sourceIdentity.SourceCommit
+        sourceModified=$sourceIdentity.SourceModified
+        sourceArchive=$sourceIdentity.SourceArchive
         builtAtUtc=[DateTimeOffset]::UtcNow.ToString('o')
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'build-info.json') -Encoding utf8
     @'
 CONTINUUM — UNSIGNED WINDOWS ENGINEERING PREVIEW
 Provided for evaluation; see the release notes for known limitations.
 No digital signatures or antivirus exclusions have been applied.
-Requires PowerShell 7, Node.js, Git and Codex CLI (npm installation).
+Requires PowerShell 7, Node.js, Git and Codex CLI (native or npm installation).
 Also requires Microsoft Visual C++ v14 Redistributable (x64):
 https://aka.ms/vc14/vc_redist.x64.exe
 Uses Windows Task Scheduler and the bundled backend under src/backend.

@@ -7,6 +7,7 @@ if errorlevel 1 (
   exit /b 1
 )
 set "CONTINUUM_LAUNCHER=%~dp0Run-Continuum.ps1"
+echo Continuum: checking this folder for the current source or a complete application package.
 echo Continuum: trusting this local launcher file only; no system execution-policy changes.
 pwsh.exe -NoLogo -NoProfile -STA -Command "Unblock-File -LiteralPath $env:CONTINUUM_LAUNCHER -ErrorAction Stop; & $env:CONTINUUM_LAUNCHER"
 if errorlevel 1 (

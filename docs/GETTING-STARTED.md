@@ -4,9 +4,13 @@ The [Windows engineering preview](https://github.com/Dukxud/Continuum/releases/t
 
 ## Download and run
 
-If you downloaded the **repository source ZIP**, double-click `Run-Continuum.cmd` at its root. It downloads the pinned public Windows preview once, verifies the release's published SHA-256 digest, extracts the complete package to `%LOCALAPPDATA%\Continuum\Previews\v0.1.0-preview.1`, and starts it. The launcher unblocks only files from that verified package; it does not modify PowerShell execution-policy settings. Later runs open the cached preview without downloading again. **This runs the published preview, not the repository's current source.**
+If you downloaded a **complete repository source ZIP**, extract it and double-click `Run-Continuum.cmd` at its root on Windows. The same command also works in a Git checkout or worktree. It builds that folder's current source, verifies the complete package, then starts the resulting application under `%LOCALAPPDATA%\Continuum\SourceBuilds\<unique-id>`. Every source launch makes a fresh package. PowerShell 7, Flutter, Git, Node.js and Visual Studio C++ build tools must already be installed; the launcher lists missing prerequisites and does not install SDKs or substitute an older application.
 
-**Reviewing a PR's Windows build:** Open its passing Actions run, download the `continuum-windows-<commit>` artifact, and extract it **once**. Double-click `Run-Continuum.cmd` beside `codex_resume_flutter.exe`. The launcher checks that package's SHA-256 manifest and runs **that PR build**, never the older public release. The GitHub *source ZIP* launcher instead downloads the pinned public preview.
+**Reviewing a PR from source:** Download the complete source archive for that PR's branch or commit, extract it, and use the same `Run-Continuum.cmd`. A source archive does not need Git metadata to build. The optional `-BuildFromSource` PowerShell switch remains available, but is unnecessary for a complete source tree. No GitHub Actions run is required for this route.
+
+**Opening a complete Windows review package:** Extract it and double-click `Run-Continuum.cmd` beside `codex_resume_flutter.exe`. A runtime-only folder opens its own application after verifying `SHA256SUMS.txt`. Complete source takes precedence over a stray sibling executable; incomplete source or runtime packages fail with an explicit error.
+
+The launcher prints the executable, build identity and effective backend path before starting it. It unblocks only allowlisted source scripts or verified package files, rejects linked source script paths, and does not change execution policy. A folder containing only the two launcher files retains the pinned public-preview download behavior; that is not the source review route above.
 
 1. Download `Continuum-Windows-v0.1.0+1-UNSIGNED-PREVIEW.zip` from the [preview release](https://github.com/Dukxud/Continuum/releases/tag/v0.1.0-preview.1).
 2. Extract the complete ZIP to a new folder. Keep its DLLs, `data`, `src`, and `components` folders beside the executable.
@@ -23,12 +27,14 @@ For source builds, continue below.
 | Windows | x64, with a signed-in desktop session |
 | PowerShell | PowerShell 7 in its standard `C:\Program Files\PowerShell\7` location |
 | Node.js and Git | Available on `PATH`; the recorded CI baseline uses Node 22 |
-| Codex CLI | npm installation, signed in to the account you intend to use |
+| Codex CLI | Current source accepts the official native `codex.exe` or npm installation on `PATH`, signed in to the account you intend to use |
 | Flutter | `flutter.bat` available on `PATH`; CI pins Flutter 3.47.9 |
 | Visual Studio | Desktop development with C++ workload and Windows build tools |
 | Windows build permissions | Symbolic-link support for Flutter plugins; enable [Developer Mode](https://learn.microsoft.com/en-us/windows/advanced-settings/developer-mode) on the build machine if Flutter requests it |
 
 The pinned versions describe the recorded build environment. Compatibility with a different Codex CLI or SDK version should be checked before scheduling work. See the [developer guide](../src/desktop/README.md) for the verification commands.
+
+The current source resolves both supported [Codex CLI installation forms](https://learn.chatgpt.com/docs/codex/cli). Node.js remains necessary for Continuum's metadata and Shared helpers even with native Codex. Restart Continuum after changing `PATH`. The older pinned public preview above predates this resolver change and retains its recorded npm prerequisite.
 
 Before building, run `flutter doctor -v` and resolve any Windows toolchain errors. See [troubleshooting](TROUBLESHOOTING.md#build-prerequisites) if runner generation reports that symlink support is missing.
 

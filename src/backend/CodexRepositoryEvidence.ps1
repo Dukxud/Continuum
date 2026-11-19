@@ -111,7 +111,13 @@ function ConvertTo-CodexLocalPath {
             $path=$uri.LocalPath
         }catch{return $null}
     }
-    if(-not [IO.Path]::IsPathFullyQualified($path)){return $null}
+    # Codex PathUri reserves file:///%00/bad/path/<base64> for paths that
+    # cannot be represented as ordinary local URIs. It is opaque metadata,
+    # not a native path to pass to Test-Path or Git. A single such hint must
+    # not abort discovery for the rest of this conversation.
+    if($path.IndexOf([char]0) -ge 0){return $null}
+    try{if(-not [IO.Path]::IsPathFullyQualified($path)){return $null}}
+    catch{return $null}
     return $path
 }
 
@@ -203,7 +209,7 @@ function Get-CodexSessionRepositoryEvidence {
         Paths=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         Names=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         Remotes=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-        Complete=$true; Lines=0; Reason=''
+        Complete=$true; Lines=0; Reason=''; Model=$null
     }
     # The exact-ID server preview is useful even for compressed/forked rollouts.
     Add-CodexRepositoryText $evidence $CodexPreview -UserAuthored
@@ -218,7 +224,7 @@ function Get-CodexSessionRepositoryEvidence {
         # incomplete result, never a supposedly unique root from a partial scan.
         while($null -ne ($line=$reader.ReadLine())){
             $evidence.Lines++
-            if($line -notmatch '"(?:session_meta|turn_context|user_message|item_completed|function_call|custom_tool_call|message|exec_command_begin|exec_command_end|mcp_tool_call_begin|mcp_tool_call_end)"'){continue}
+            if($line -notmatch '"(?:session_meta|turn_context|thread_settings_applied|user_message|item_completed|function_call|local_shell_call|custom_tool_call|message|exec_command_begin|exec_command_end|mcp_tool_call_begin|mcp_tool_call_end)"'){continue}
             try{$record=ConvertFrom-Json -InputObject $line -AsHashtable -ErrorAction Stop}catch{continue}
             $payload=$record.payload
             if($payload -isnot [System.Collections.IDictionary]){continue}
@@ -235,12 +241,17 @@ function Get-CodexSessionRepositoryEvidence {
                 }
                 'turn_context' {
                     Add-CodexRepositoryPath $evidence ([string]$payload.cwd)
+                    if($payload.model -is [string]){$evidence.Model=[string]$payload.model}
                 }
                 'response_item' {
                     if($payload.type -eq 'message' -and $payload.role -eq 'user'){
                         Add-CodexUserContent $evidence $payload.content
                     }elseif($payload.type -eq 'function_call'){
                         Add-CodexRepositoryArguments $evidence $payload.arguments
+                    }elseif($payload.type -eq 'local_shell_call' -and $payload.action.type -eq 'exec'){
+                        # This is a persisted structured legacy response item;
+                        # its working directory is separate from command text.
+                        Add-CodexRepositoryPath $evidence ([string]$payload.action.working_directory)
                     }elseif($payload.type -eq 'custom_tool_call' -and
                             [string]$payload.name -match '(?:^|[._])(?:exec|exec_command|shell_command)$'){
                         Add-CodexRepositoryArguments $evidence $payload.input
@@ -249,6 +260,17 @@ function Get-CodexSessionRepositoryEvidence {
                 'event_msg' {
                     if($payload.thread_id -and [string]$payload.thread_id -ine [string]$Session.Id){continue}
                     switch([string]$payload.type){
+                        'thread_settings_applied' {
+                            # A successful /cd is persisted before a new turn.
+                            # The event ownership guard above also applies to
+                            # copied snapshots retaining a foreign thread_id.
+                            if($payload.thread_settings){
+                                Add-CodexRepositoryPath $evidence ([string]$payload.thread_settings.cwd)
+                                foreach($path in @($payload.thread_settings.runtime_workspace_roots)){
+                                    Add-CodexRepositoryPath $evidence ([string]$path)
+                                }
+                            }
+                        }
                         'user_message' {Add-CodexRepositoryText $evidence ([string]$payload.message) -UserAuthored}
                         'item_completed' {
                             $item=$payload.item

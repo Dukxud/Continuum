@@ -62,6 +62,7 @@ function Save-SessionRepositoryAssociation {
 function Find-ReferencedSessionRepository {
     param([Parameter(Mandatory)]$Session,[string]$HomeDirectory=$HOME,
           [string]$CodexPreview=$null,$Evidence=$null,[string[]]$KnownRoots=@(),
+          [switch]$PathsAlreadyVerified,
           [ValidateRange(1,30000)][int]$TimeoutMilliseconds=10000,
           [ValidateRange(1,100000)][int]$MaximumDirectories=20000)
     if(-not $Evidence){$Evidence=Get-CodexSessionRepositoryEvidence -Session $Session -CodexPreview $CodexPreview}
@@ -72,10 +73,12 @@ function Find-ReferencedSessionRepository {
         return [pscustomobject]@{Root=$null;Source=$Reason;Candidates=$partial;AlternativeRoots=$partial;Incomplete=$true}
     }
     $roots=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach($path in $Evidence.Paths){
-        if($clock.ElapsedMilliseconds -ge $TimeoutMilliseconds){return (& $incomplete -Candidates @($roots))}
-        $root=Get-RepositoryRoot $path
-        if($root){[void]$roots.Add($root)}
+    if(-not $PathsAlreadyVerified){
+        foreach($path in $Evidence.Paths){
+            if($clock.ElapsedMilliseconds -ge $TimeoutMilliseconds){return (& $incomplete -Candidates @($roots))}
+            $root=Get-RepositoryRoot $path
+            if($root){[void]$roots.Add($root)}
+        }
     }
     if($clock.ElapsedMilliseconds -ge $TimeoutMilliseconds){return (& $incomplete -Candidates @($roots))}
     $direct=@($roots | Sort-Object -Unique)

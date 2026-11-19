@@ -1,6 +1,7 @@
 Import-Module (Join-Path $PSScriptRoot '../../components/GitRepository/GitRepository.psm1') -Force -ErrorAction Stop
 Import-Module (Join-Path $PSScriptRoot '../../components/SettingsStore/SettingsStore.psm1') -Force -ErrorAction Stop
 . (Join-Path $PSScriptRoot 'CodexJobStore.ps1')
+. (Join-Path $PSScriptRoot 'CodexCli.ps1')
 . (Join-Path $PSScriptRoot 'CodexSessionRepository.ps1')
 # Codex Resume Scheduler - local data readers (PowerShell 7).
 # Used by GUI background jobs; the scheduled CLI worker does not import this file.
@@ -77,25 +78,30 @@ function Get-RecentCliSessions {
 
 function Invoke-CodexMetadataQuery {
     param([Parameter(Mandatory)][string]$SourceDirectory,
-          [Parameter(Mandatory)][string[]]$Arguments)
+          [Parameter(Mandatory)][string[]]$Arguments,[ref]$Failure)
+    if($Failure){$Failure.Value=$null}
     try{
-        $shim=(Get-Command codex.cmd -ErrorAction Stop).Source
-        $cli=Join-Path (Split-Path -Parent $shim) 'node_modules/@openai/codex/bin/codex.js'
+        $cli=Get-CodexCliEntry
         $helper=Join-Path $SourceDirectory 'src/backend/CodexUsage.js'
         if(-not (Test-Path -LiteralPath $cli -PathType Leaf) -or
-           -not (Test-Path -LiteralPath $helper -PathType Leaf)){return $null}
-        $lines=@(& node.exe $helper --cli-js $cli @Arguments)
-        if($LASTEXITCODE -ne 0 -or -not $lines.Count){return $null}
+           -not (Test-Path -LiteralPath $helper -PathType Leaf)){throw 'Codex metadata helper or CLI entrypoint is missing.'}
+        $helperArguments=@($helper)+@(Get-CodexMetadataArguments -Entry $cli)+$Arguments
+        $lines=@(& node.exe @helperArguments)
+        if(-not $lines.Count){throw 'Codex metadata query returned no response.'}
         $result=$lines[-1] | ConvertFrom-Json -ErrorAction Stop
-        if($result.ok -eq $true){return $result}
-    }catch{}
+        if($LASTEXITCODE -eq 0 -and $result.ok -eq $true){return $result}
+        if($result.error){throw [string]$result.error}
+        throw 'Codex metadata query failed.'
+    }catch{if($Failure){$Failure.Value=$_.Exception.Message}}
     return $null
 }
 
 function Get-CodexThreadMetadata {
-    param([string]$SessionId,[Parameter(Mandatory)][string]$SourceDirectory)
+    param([string]$SessionId,[Parameter(Mandatory)][string]$SourceDirectory,[ref]$Failure)
     if($SessionId -notmatch '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$'){return $null}
-    $result=Invoke-CodexMetadataQuery -SourceDirectory $SourceDirectory -Arguments @('--thread-id',$SessionId)
+    $query=@{SourceDirectory=$SourceDirectory;Arguments=@('--thread-id',$SessionId)}
+    if($Failure){$query.Failure=$Failure}
+    $result=Invoke-CodexMetadataQuery @query
     if($result -and [string]$result.threadId -ieq $SessionId){return $result}
     return $null
 }
@@ -188,8 +194,11 @@ function Find-SessionRepository {
     param($Session,[string]$ReportedCwd=$null,
           [Parameter(Mandatory)][string]$AppDirectory,
           [string]$CheckoutHome=$HOME,[string]$CodexPreview=$null,
-          [string]$ReportedRepositoryUrl=$null)
+          [string]$ReportedRepositoryUrl=$null,$Evidence=$null,
+          [Diagnostics.Stopwatch]$LookupClock=$null,
+          [ValidateRange(1,45000)][int]$LookupTimeoutMilliseconds=40000)
     if(-not $Session){return $null}
+    if(-not $LookupClock){$LookupClock=[Diagnostics.Stopwatch]::StartNew()}
     $candidates=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $reportedRoot=Get-RepositoryRoot $ReportedCwd
     $direct=Get-RepositoryRoot ([string]$Session.Cwd)
@@ -210,10 +219,18 @@ function Find-SessionRepository {
         }catch{continue}
     }
 
-    $evidence=Get-CodexSessionRepositoryEvidence -Session $Session -CodexPreview $CodexPreview -ReportedRepositoryUrl $ReportedRepositoryUrl
+    if(-not $Evidence){
+        $readBudget=[int][Math]::Max(1,[Math]::Min(12000,$LookupTimeoutMilliseconds-$LookupClock.ElapsedMilliseconds))
+        $Evidence=Get-CodexSessionRepositoryEvidence -Session $Session -CodexPreview $CodexPreview -ReportedRepositoryUrl $ReportedRepositoryUrl -TimeoutMilliseconds $readBudget
+    }
+    if($LookupClock.ElapsedMilliseconds -ge $LookupTimeoutMilliseconds){
+        $Evidence.Complete=$false
+        $Evidence.Reason='Repository lookup exceeded its time budget.'
+    }
     $verificationClock=[Diagnostics.Stopwatch]::StartNew()
     foreach($path in $evidence.Paths){
-        if($verificationClock.Elapsed.TotalSeconds -gt 8){
+        if($verificationClock.Elapsed.TotalSeconds -gt 8 -or
+           $LookupClock.ElapsedMilliseconds -ge $LookupTimeoutMilliseconds){
             $evidence.Complete=$false
             $evidence.Reason='Repository path verification exceeded its time budget.'
             break
@@ -246,7 +263,14 @@ function Find-SessionRepository {
             if($entry -and $entry.schema -eq 1 -and $entry.root -is [string]){$known.Add($entry.root)}
         }
     }
-    return Find-ReferencedSessionRepository -Session $Session -HomeDirectory $CheckoutHome -Evidence $evidence -KnownRoots $known.ToArray()
+    $remaining=$LookupTimeoutMilliseconds-$LookupClock.ElapsedMilliseconds
+    if($remaining -le 0){
+        return [pscustomobject]@{Root=$null;Source='Repository lookup exceeded its time budget.'
+            Candidates=$roots;AlternativeRoots=$roots;Incomplete=$true}
+    }
+    # Every explicit path was already Git-checked above. Do not repeat those
+    # subprocesses while looking for a checkout named by remote/preview data.
+    return Find-ReferencedSessionRepository -Session $Session -HomeDirectory $CheckoutHome -Evidence $evidence -KnownRoots $known.ToArray() -PathsAlreadyVerified -TimeoutMilliseconds ([int][Math]::Min(10000,$remaining))
 }
 
 

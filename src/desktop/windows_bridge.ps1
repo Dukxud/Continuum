@@ -54,8 +54,8 @@ try {
             $model=[string]$request.model
             if($model -and $model -notmatch '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,100}$'){throw 'Invalid model identifier.'}
             $helper=Join-Path $source 'src/backend/CodexUsage.js'
-            $cli=Get-CodexCliJs
-            $arguments=@($helper,'--cli-js',$cli)
+            $cli=Get-CodexCliEntry
+            $arguments=@($helper)+@(Get-CodexMetadataArguments -Entry $cli)
             if($model){$arguments+=@('--model',$model)}
             $lines=@(& node.exe @arguments)
             if($LASTEXITCODE -ne 0 -or -not $lines){throw 'Codex account and model query failed.'}
@@ -64,23 +64,29 @@ try {
             $result=$snapshot
         }
         'select' {
+            $lookupClock=[Diagnostics.Stopwatch]::StartNew()
+            $lookupBudget=40000
             if(-not (Get-Command git -ErrorAction SilentlyContinue)){throw 'Git is not available to Continuum. Install Git or restart Continuum after updating PATH.'}
             $id=[string]$request.sessionId
-            $metadata=Get-CodexThreadMetadata -SessionId $id -SourceDirectory $source
+            $metadataFailure=$null
+            $metadata=Get-CodexThreadMetadata -SessionId $id -SourceDirectory $source -Failure ([ref]$metadataFailure)
             $session=Get-VerifiedCliSession -SessionId $id -SourceDirectory $source -Metadata $metadata -MetadataQueried
-            if(-not $session){throw 'Selected CLI conversation could not be verified.'}
+            if(-not $session){
+                $reason=if($metadataFailure){' '+$metadataFailure}else{''}
+                throw ('Selected CLI conversation could not be verified.'+$reason)
+            }
             $cwd=if($metadata){[string]$metadata.cwd}else{''}
             $preview=if($metadata){[string]$metadata.preview}else{''}
             $origin=if($metadata -and $metadata.gitInfo){[string]$metadata.gitInfo.originUrl}else{''}
-            $found=Find-SessionRepository -Session $session -ReportedCwd $cwd -AppDirectory $appDir -CodexPreview $preview -ReportedRepositoryUrl $origin
-            if(-not $found -and -not $preview){
+            if(-not $preview -and -not $origin){
                 # Compatibility fallback when an older server's exact read
-                # omits preview. Do not substitute another session or a title.
+                # omits preview. Obtain it before the single rollout scan,
+                # instead of scanning the entire conversation a second time.
                 $preview=Get-CodexPickerPreview -SourceDirectory $source -SessionId $id
-                if($preview){
-                    $found=Find-SessionRepository -Session $session -ReportedCwd $cwd -AppDirectory $appDir -CodexPreview $preview
-                }
             }
+            $readBudget=[int][Math]::Max(1,[Math]::Min(12000,$lookupBudget-$lookupClock.ElapsedMilliseconds))
+            $evidence=Get-CodexSessionRepositoryEvidence -Session $session -CodexPreview $preview -ReportedRepositoryUrl $origin -TimeoutMilliseconds $readBudget
+            $found=Find-SessionRepository -Session $session -ReportedCwd $cwd -AppDirectory $appDir -Evidence $evidence -LookupClock $lookupClock -LookupTimeoutMilliseconds $lookupBudget
             if($request.repository){
                 # A restored manual choice is revalidated, not silently
                 # replaced by an automatic hint. Invalid paths fall through.
@@ -91,7 +97,10 @@ try {
                         Candidates=@($selected)+$alternatives;AlternativeRoots=$alternatives}
                 }
             }
-            $result=@{sessionId=$id;model=Read-SessionModel $session;found=$found}
+            # Model association is optional and comes from the same bounded
+            # snapshot. A second unbounded tail read must not delay the repo.
+            $associatedModel=if($evidence.Complete){$evidence.Model}else{$null}
+            $result=@{sessionId=$id;model=$associatedModel;found=$found}
         }
         'schedule' {
             $result=Register-FlutterSchedule -Request $request -SourceDirectory $source -AppDirectory $appDir

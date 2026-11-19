@@ -64,7 +64,7 @@ function Open-FlutterSharedTerminal {
     if($LASTEXITCODE -ne 0 -or $lines.Count -eq 0){throw 'Shared session owner is not reachable.'}
     $program=Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
     if(-not (Test-Path -LiteralPath $program -PathType Leaf)){throw 'PowerShell 7 is missing.'}
-    $cli=Get-CodexCliJs
+    $cli=Get-CodexCliEntry
     $cmd="& '$($node.Replace("'","''"))' '$($script.Replace("'","''"))' native '$($job.Replace("'","''"))' '$($cli.Replace("'","''"))'"
     $encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))
     $wt=Get-Command wt.exe -ErrorAction SilentlyContinue

@@ -1,4 +1,4 @@
-# Windows launcher regression checks: cached launch and failed integrity verification.
+# Native Windows launch routing with fixture builders and intercepted launches.
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows) { throw 'This test requires Windows.' }
 
@@ -12,10 +12,17 @@ if ((Get-Content -LiteralPath $batch -Raw) -notmatch 'Run-Continuum\.ps1') {
 }
 
 $originalLocalAppData = $env:LOCALAPPDATA
+$originalBackendOverride = $env:CODEX_SCHEDULER_SOURCE
 $tempRoot = Join-Path $env:TEMP ('continuum-launcher-test-' + [guid]::NewGuid().ToString('N'))
 $script:launches = [System.Collections.Generic.List[string]]::new()
 try {
     $env:LOCALAPPDATA = Join-Path $tempRoot 'profile'
+    # Cache/download cases deliberately use a launcher-only folder. Running
+    # the repository's own launcher now builds its actual source by default.
+    $launcherOnly=Join-Path $tempRoot 'launcher-only'
+    [void](New-Item -ItemType Directory -Path $launcherOnly -Force)
+    Copy-Item -LiteralPath $launcher,$batch -Destination $launcherOnly
+    $standaloneLauncher=Join-Path $launcherOnly 'Run-Continuum.ps1'
     $package = 'Continuum-Windows-v0.1.0+1-UNSIGNED-PREVIEW'
     $exe = Join-Path $env:LOCALAPPDATA ('Continuum\Previews\v0.1.0-preview.1\' + $package + '\codex_resume_flutter.exe')
     [void](New-Item -ItemType Directory -Path (Split-Path -Parent $exe) -Force)
@@ -27,7 +34,7 @@ try {
             param([string]$FilePath,[string]$WorkingDirectory)
             $script:launches.Add($FilePath)
         }
-        . $launcher
+        . $standaloneLauncher
     }
     if ($script:launches.Count -ne 1 -or $script:launches[0] -cne $exe) {
         throw 'Cached launcher did not open the expected executable.'
@@ -43,7 +50,7 @@ try {
         function Expand-Archive { throw 'A mismatched download must never be extracted.' }
         function Start-Process { throw 'A mismatched download must never be launched.' }
         $rejected = $false
-        try { . $launcher }
+        try { . $standaloneLauncher }
         catch {
             if ($_.Exception.Message -notmatch 'SHA-256 does not match') { throw }
             $rejected = $true
@@ -127,10 +134,95 @@ try {
         if(-not $rejected){throw 'A tampered local preview was accepted.'}
     }
     if($script:launches.Count -ne 0){throw 'Tampered packaged preview caused a launch.'}
-    Write-Host 'PASS — cached launch, packaged PR launch, and tampered release/package rejection.'
+
+    # A complete source ZIP uses the build entrypoint without requiring .git.
+    # This fixture builder writes an inert EXE; no Flutter command runs here.
+    $sourceFolder=Join-Path $tempRoot 'source-archive'
+    [void](New-Item -ItemType Directory -Path $sourceFolder -Force)
+    Copy-Item -LiteralPath $launcher,$batch -Destination $sourceFolder
+    foreach($relative in @('src/desktop/pubspec.yaml','src/desktop/pubspec.lock',
+        'src/desktop/lib/main.dart','src/desktop/windows_bridge.ps1',
+        'src/backend/CodexRunEngine.ps1','src/desktop/scripts/Get-PreviewMetadata.ps1',
+        'src/desktop/scripts/Initialize-WindowsRunner.ps1','src/desktop/scripts/Install-WindowsIcon.ps1',
+        'tests/flutter-port-source.test.ps1','tests/flutter-port-bridge.test.ps1')){
+        $file=Join-Path $sourceFolder $relative
+        [void](New-Item -ItemType Directory -Path (Split-Path -Parent $file) -Force)
+        [IO.File]::WriteAllText($file,'fixture file; never executed')
+    }
+    foreach($relative in @('src/desktop/bridge','components/RuntimeBundle','components/OneTimeTasks',
+        'components/GitRepository','components/JobOutcomes','components/SettingsStore','components/SharedCodexSession')){
+        [void](New-Item -ItemType Directory -Path (Join-Path $sourceFolder $relative) -Force)
+    }
+    @'
+param([string]$OutputDirectory)
+$package=Join-Path $OutputDirectory 'isolated-built-preview'
+[void](New-Item -ItemType Directory -Path $package -Force)
+[IO.File]::WriteAllText((Join-Path $package 'codex_resume_flutter.exe'),'fixture executable; never executed')
+@{version='0.0.0-test';sourceCommit=$null;sourceModified=$null;sourceArchive=$true} |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $package 'build-info.json') -Encoding utf8
+[IO.File]::WriteAllText($env:CONTINUUM_TEST_BUILD_CAPTURE,$OutputDirectory)
+$global:LASTEXITCODE=0
+'@ | Set-Content -LiteralPath (Join-Path $sourceFolder 'src/desktop/Build-WindowsPreview.ps1') -Encoding utf8
+    $sourceLauncher=Join-Path $sourceFolder 'Run-Continuum.ps1'
+    $env:CONTINUUM_TEST_BUILD_CAPTURE=Join-Path $tempRoot 'source-build-output.txt'
+    $env:CONTINUUM_TEST_LAUNCH_CAPTURE=$capture
+    try{
+        foreach($scenario in @('archive-default','archive-with-old-exe','explicit-archive')){
+            if($scenario -eq 'archive-with-old-exe'){
+                [IO.File]::WriteAllText((Join-Path $sourceFolder 'codex_resume_flutter.exe'),'old sibling executable')
+            }
+            Remove-Item -LiteralPath $capture,$env:CONTINUUM_TEST_BUILD_CAPTURE -ErrorAction SilentlyContinue
+            & {
+                function flutter.bat { throw 'Fixture launcher must call its builder, not Flutter directly.' }
+                function git.exe { throw 'Fixture launcher unexpectedly invoked Git.' }
+                function node.exe { throw 'Fixture launcher unexpectedly invoked Node.' }
+                function Invoke-WebRequest { throw 'A source build must never download the pinned release.' }
+                function Start-Process {
+                    param([string]$FilePath,[string]$WorkingDirectory)
+                    [IO.File]::WriteAllText($env:CONTINUUM_TEST_LAUNCH_CAPTURE,$FilePath)
+                }
+                if($scenario -eq 'explicit-archive'){. $sourceLauncher -BuildFromSource}
+                else{. $sourceLauncher}
+            }
+            if(-not (Test-Path -LiteralPath $env:CONTINUUM_TEST_BUILD_CAPTURE)){throw "Source builder was not used: $scenario"}
+            $builtAt=[IO.File]::ReadAllText($env:CONTINUUM_TEST_BUILD_CAPTURE)
+            $builtExe=Join-Path $builtAt 'isolated-built-preview/codex_resume_flutter.exe'
+            if([IO.File]::ReadAllText($capture) -cne $builtExe){throw "Source launcher selected a stale executable: $scenario"}
+        }
+
+        # The explicit override remains effective and is visible in provenance.
+        $env:CODEX_SCHEDULER_SOURCE=Join-Path $tempRoot 'operator-backend'
+        $messages=@(& {
+            function flutter.bat {}
+            function git.exe {}
+            function node.exe {}
+            function Start-Process {
+                param([string]$FilePath,[string]$WorkingDirectory)
+                [IO.File]::WriteAllText($env:CONTINUUM_TEST_LAUNCH_CAPTURE,$FilePath)
+            }
+            . $sourceLauncher
+        } 6>&1)
+        if(($messages | Out-String) -notmatch 'CODEX_SCHEDULER_SOURCE override' -or
+            $env:CODEX_SCHEDULER_SOURCE -cne (Join-Path $tempRoot 'operator-backend')){
+            throw 'Backend override was not retained and reported.'
+        }
+
+        & {
+            function Get-Command { param([string]$Name,[string]$ErrorAction) return $null }
+            function Start-Process { throw 'A source build without prerequisites must not launch.' }
+            function Invoke-WebRequest { throw 'Missing build prerequisites must not trigger a pinned download.' }
+            $rejected=$false
+            try{. $sourceLauncher}catch{$rejected=$_.Exception.Message -match 'Missing from PATH:'}
+            if(-not $rejected){throw 'Missing source-build prerequisites were not reported.'}
+        }
+    }finally{
+        Remove-Item Env:CONTINUUM_TEST_BUILD_CAPTURE,Env:CONTINUUM_TEST_LAUNCH_CAPTURE -ErrorAction SilentlyContinue
+    }
+    Write-Host 'PASS — source archive routing, prerequisites, backend provenance, cached/local package launch and tamper rejection.'
 }
 finally {
     $env:LOCALAPPDATA = $originalLocalAppData
+    $env:CODEX_SCHEDULER_SOURCE = $originalBackendOverride
     if (Test-Path -LiteralPath $tempRoot) {
         Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }

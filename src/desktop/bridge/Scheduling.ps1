@@ -51,8 +51,9 @@ function Register-FlutterSchedule {
     if(-not $message){throw 'Enter an instruction.'}
     # Register only with a fresh model-specific catalog and verified workspace.
     $helper=Join-Path $SourceDirectory 'src/backend/CodexUsage.js'
-    $cli=Get-CodexCliJs
-    $lines=@(& node.exe $helper --cli-js $cli --model $model)
+    $cli=Get-CodexCliEntry
+    $arguments=@($helper)+@(Get-CodexMetadataArguments -Entry $cli)+@('--model',$model)
+    $lines=@(& node.exe @arguments)
     if($LASTEXITCODE -ne 0 -or -not $lines){throw 'Live Codex account verification failed.'}
     $usage=($lines | Select-Object -Last 1) | ConvertFrom-Json -ErrorAction Stop
     if(-not $usage.ok -or $usage.catalogError){throw 'Live model catalog or quota unavailable; scheduling is disabled.'}

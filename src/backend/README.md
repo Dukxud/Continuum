@@ -8,6 +8,7 @@ These scripts serve the current Flutter application and the retained WinForms in
 | [CodexRunJob.vbs](CodexRunJob.vbs) | Launch the worker through Windows Script Host and preserve its exit code |
 | [CodexRunEngine.ps1](CodexRunEngine.ps1) | Validate the pinned runtime and execution context, then run the selected mode |
 | [CodexData.ps1](CodexData.ps1) | Read conversations, repositories, preferences, and job status |
+| [CodexCli.ps1](CodexCli.ps1) | Resolve the native Windows Codex executable or npm JavaScript entry consistently for metadata and execution |
 | [CodexUsage.js](CodexUsage.js) | Read Codex account, model, thread, and rate-limit metadata |
 
 The [Flutter bridge](../../src/desktop/windows_bridge.ps1) and legacy UI publish snapshots from the repository or package root. `Get-CodexRuntimeFiles` is the allowlist of root-relative paths copied into each immutable runtime. It includes this directory and the required reusable components, without the legacy UI.

@@ -26,6 +26,7 @@ Flutter desktop UI
 | Windows dispatch | `src/desktop/windows_bridge.ps1` | Decode JSON, select a handler, and serialize success or failure |
 | Bridge handlers | `src/desktop/bridge/` | Read models, schedule validation/registration, Shared actions, and preferences |
 | Metadata/usage | `src/backend/CodexUsage.js`, session/repository readers | Codex-supported account/model/rate/thread metadata; no prompt just to refresh quota |
+| Codex entrypoint | `src/backend/CodexCli.ps1` | One native/npm installation resolver for metadata, scheduling and execution |
 | Worker | `src/backend/CodexRunEngine.ps1`, `src/backend/CodexQuotaContinuation.ps1`, `src/backend/CodexTerminalRun.ps1` | Pinned execution checks, original conversation, bounded retry, durable result |
 | Shared session | `components/SharedCodexSession/{main,host,remote,client,protocol}.mjs` | One App Server, pipe authentication, remote TUI credentials, requests and scheduled-turn lifecycle |
 | Generic services | `components/RuntimeBundle`, `OneTimeTasks`, `GitRepository`, `JobOutcomes`, `SettingsStore` | Independently scoped persistence/validation/infrastructure |
@@ -56,7 +57,11 @@ The inventory combines metadata-only Codex `thread/list` results for CLI/exec so
 
 Repository resolution combines reported CWD, the exact-ID saved association, matching job evidence, and supported user/tool records from an initial-byte rollout snapshot. The parser includes legacy and paginated Codex records. Reference-only evidence searches bounded conventional development directories and previously verified locations, checking all configured remotes against explicit identities or whole project names. It does not execute stored code or use assistant/tool-result prose as repository evidence.
 
+One snapshot supplies both repository evidence and the latest structured turn model. Persisted local shell directories and thread-settings snapshots are supported; foreign-owned settings are ignored, and opaque Codex path URIs are rejected before filesystem inspection. Metadata, the snapshot and subsequent verification share a 40-second lookup budget. Limits are checked between operations; blocked native filesystem/Git calls are not forcibly interrupted by that clock.
+
 A verified reported root has precedence and retains alternatives. Otherwise conflicting roots remain unresolved. A scan stopped by a resource bound or read/identity failure returns an incomplete result, with no automatic fallback root. Flutter distinguishes incomplete, conflicting, unresolved and unavailable discovery, preserves manual edits against late results, and saves an outgoing session's choice before switching. The [repository investigation](REPOSITORY-DISCOVERY.md) records the full path trace, bounds, schemas, and verification scope.
+
+The Dart transport consumes child output and diagnostic streams immediately and applies its deadline to exit plus stream completion. Repository lookup exceptions remain attached to the repository field through successful usage refreshes. The metadata helper closes App Server input before bounded process-tree cleanup, so terminating an npm wrapper cannot leave the caller indefinitely waiting for inherited output pipes.
 
 ## Shared owner lifetime
 
@@ -69,5 +74,7 @@ After the scheduled turn completes successfully, native TUI leases can retain th
 ## Build and native icon
 
 `src/desktop/Build-WindowsPreview.ps1` and `src/desktop/Run-WindowsReview.ps1` generate the Windows runner, then install the checked-in `src/desktop/branding/continuum.ico` via `src/desktop/scripts/Install-WindowsIcon.ps1` before compilation. The release package includes the Flutter runtime, backend, bridge, required components, license, source identity metadata, and checksum manifest. Package versions derive from `pubspec.yaml`; application and development-tool dependency locks are committed. See [Windows acceptance](CONTINUUM-WINDOWS-ACCEPTANCE.md) for build and native icon verification.
+
+The existing root launcher chooses from the folder's contents: a complete source ZIP, checkout or worktree builds a fresh package; a runtime-only folder verifies and opens its sibling executable. Partial source/runtime folders fail rather than selecting the public preview. The launcher prints build and backend identity, including an explicit `CODEX_SCHEDULER_SOURCE` override. Source archives record unknown commit identity; Git identity is used only when the source folder is the actual checkout/worktree root.
 
 Flutter UI portability is not worker portability: macOS/Linux/web task execution is unimplemented. This is an unsigned Windows engineering preview, not a production release. [Security](SECURITY-AND-PRIVACY.md) and [release policy](RELEASE-POLICY.md).

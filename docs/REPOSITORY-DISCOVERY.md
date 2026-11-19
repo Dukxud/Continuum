@@ -1,9 +1,13 @@
 # Repository discovery investigation
 
-This records the 18 November 2026 investigation of PR #31. The failing baseline is
+The first sections record the 18 November 2026 investigation of PR #31. The failing baseline is
 `152b15b212afff6981efc45e642d6f0a2a59f09e`. Source inspection and isolated regressions
 establish the defects below; they do not establish which installed executable or
 rollout format was present on an inaccessible Windows computer.
+
+The [18 November runtime follow-up](#runtime-follow-up--18-november-2026) records
+the subsequent failure after PR #31 was merged. Earlier passing fixtures did not
+exercise every subprocess boundary or every persisted Codex path representation.
 
 ## Why retaining the previous selection was insufficient
 
@@ -215,3 +219,183 @@ precedence.
 | History | `docs/history/README.md`; `ADVERSARIAL-SOURCE-REVIEW.md`; `ARCHITECTURE-WINFORMS.md`; `DISTRIBUTION-READINESS.md`; `FLUTTER-BEHAVIOR-AUDIT.md`; `FLUTTER-PARITY.md`; `LEGACY-WINFORMS-README.md`; `WINDOWS-ACCEPTANCE.md` |
 | Source and components | `src/README.md`; `src/backend/README.md`; `src/desktop/README.md`; `components/README.md`; `components/AeroProgress/README.md` |
 | Tests and legacy package | `tests/README.md`; `legacy/winforms/README.md`; `legacy/winforms/PACKAGE-README.md` |
+
+## Runtime follow-up — 18 November 2026
+
+Dates in this follow-up use the client's America/Chicago time zone.
+
+The new baseline is PR #31's merged source, `7f083df`. The reported screen says
+**Repository lookup unavailable; retrying automatically**. That text comes from
+the controller's exception path. It establishes that the operation failed, rather
+than successfully reporting no matching checkout. The old interface replaced the
+useful exception with that generic warning and a subsequent successful usage
+refresh cleared the separate error. The original exception is therefore not
+recoverable from that screenshot alone.
+
+This investigation reproduced the following defects independently. They are
+concrete failures in the source, not a claim that one specific fixture matches the
+unavailable Windows installation's original error.
+
+### Runtime and schema failures reproduced
+
+| Path | Reproduction and correction |
+| --- | --- |
+| Codex installation → metadata helper | The old resolver required `codex.cmd` and an adjacent npm JavaScript entry. Official Codex also supports native Windows installation. `CodexCli.ps1` now resolves native `codex.exe` or the supported npm entry, and consumers pass the correct native/JavaScript launch form. Node remains a Continuum dependency. |
+| Metadata helper → npm wrapper → native server | A child fixture returned valid metadata, then retained inherited output pipes after its npm wrapper was killed. The old helper printed successful JSON but did not exit before a four-second test deadline. The corrected helper first closes input, waits for graceful completion, then applies bounded cleanup to its own process tree. Official npm layouts use their native binary directly where available. |
+| PowerShell child → Dart transport | A real child process showed that stream decoding could fail independently while the adapter awaited exit. The shared production transport now attaches both output consumers immediately, waits for exit and stream completion under one deadline, drains diagnostic bytes without requiring UTF-8, and reports invalid JSON-output encoding as a controlled error. |
+| Bridge exception → repository field | An actual dispatcher error was lost after a successful quota refresh. The repository warning now retains that exception and exposes the complete text in its tooltip. A later response still cannot overwrite a newer conversation selection or manual edit. |
+| Persisted command URI → Git inspection | Codex reserves `file:///%00/bad/path/<base64>` for paths that cannot be represented as ordinary local URIs. Decoding it created a native NUL path. On PowerShell 7.7, `Test-Path` threw before the Git reader's exception handler, aborting discovery even when another valid checkout was present. The decoder rejects this opaque representation and native NUL hints; Git path inspection also contains path exceptions. |
+| Persisted `local_shell_call` → evidence parser | A real Git fixture with the repository only in `action.working_directory` remained unresolved. The parser now reads this explicit field for the documented `exec` action. It does not parse the command text. |
+| Persisted `thread_settings_applied` → evidence parser | A real Git fixture with the repository only in `thread_settings.cwd` remained unresolved. This event records successful persistent settings updates, including directory changes before another turn. The parser now reads the CWD and explicit runtime workspace roots, accepts legacy records without `thread_id`, and rejects snapshots owned by a different thread. |
+
+The opaque-path regression first failed all four initial cases against the merged
+baseline on PowerShell 7.7. After path containment, the additional persisted-shell
+and settings positives still failed on both PowerShell 7.7.0 and 7.4.0. With the
+parser corrections, all nine initial runtime-path cases passed on both versions.
+Three further checks cover reuse of one acquired snapshot after the live file
+changes, the latest structured turn model in the same pass, and an expired shared
+lookup budget returning an incomplete result. The resulting **12 cases passed**
+on PowerShell 7.7.0 and 7.4.0 (1.812 seconds and 1.954 seconds respectively).
+These fixtures use actual local Git checkouts and isolated application directories.
+
+Selection now acquires one evidence snapshot for repository and model extraction.
+Optional metadata and preview work precede that read, and directory/remote
+verification reuses its results. The reference-matching pass does not repeat Git
+checks for direct evidence paths already verified. A shared 40-second budget accounts for metadata,
+history scanning and Git verification, leaving room within the adapter's
+55-second deadline. An expired fallback lookup reports incomplete; an already
+verified authoritative reported root retains its established precedence. These
+checks occur between operations and do not promise to interrupt a blocked native
+Git or filesystem call.
+
+The five Dart subprocess regressions run the real PowerShell child and production
+JSON dispatcher. Four failed before the transport/controller correction. All five
+passed afterward: durable dispatcher errors, late-error protection for a manual
+choice, a Unicode checkout with metadata unavailable, invalid diagnostic-stream
+bytes with valid JSON output, and controlled rejection of invalid output encoding.
+The complete Flutter run passed **120 tests**, with **one explicit skip** for the
+native Windows adapter on Linux. Strict analysis and formatting passed.
+
+The final repository/backend gate passed ten PowerShell suite files:
+`repository-detection`, `session-repository-reference`,
+`session-repository-persistence`, `session-repository-evidence` (27 cases),
+`session-discovery-sources`, `session-activity`, `settings-persistence`,
+`flutter-port-source`, `repository-runtime-paths` (12 cases), and
+`repository-bridge-flow`. The last runs the actual JSON dispatcher in fresh
+children and passed after the shared-budget and single-snapshot changes.
+The separate `codex-cli-resolution` suite also passed.
+
+The full Node run reported **85 passes out of 88 tests**. The same three Shared
+session failures involved Unix-socket `EPERM` and a mock timeout on this host;
+this is not an entirely passing Node suite. Targeted runtime regressions cover
+the actual subprocess launch and shutdown failure independently of those socket
+tests. The metadata/discovery/title/launch group passed **15 of 15**; the
+launch/Shared/usage/model group passed **23 of 23**. These groups share the three
+launch cases and must not be added as disjoint totals.
+
+### Delivering the source correction through the established launcher
+
+The previous default source-ZIP route still selected the old pinned preview. That
+could leave a source fix entirely outside the running application. The existing
+`Run-Continuum.cmd` now builds a complete source folder by default, whether it is
+a source archive, checkout or worktree. It creates a fresh complete package under
+`%LOCALAPPDATA%\Continuum\SourceBuilds\<unique-id>`, verifies it and starts it.
+The required Windows build tools must be installed; missing tools produce an
+explicit error, with no SDK installation or older-application fallback.
+
+A runtime-only package still opens its own manifest-verified sibling executable.
+Complete source wins over a stray executable, and incomplete source/runtime
+folders fail. Only a folder containing the launcher alone retains the pinned
+public-release route. The launcher prints the executable, source/build identity
+and effective backend, including any `CODEX_SCHEDULER_SOURCE` override.
+
+Source archives are identified as archives with no fabricated commit. Git build
+identity is accepted only from the actual source root, including worktrees, so an
+archive unpacked inside an unrelated parent repository cannot inherit that
+parent's revision. Source-mode unblocking is restricted to required scripts and
+rejects linked paths; execution policy is unchanged. These source/decision checks
+do not constitute a Windows build or an observed native launch.
+
+The old routing failed six of eight portable decision cases. The corrected and
+expanded launcher suite passed **12 of 12**, including real linked-directory and
+linked-file rejection. The separate source-identity suite passed **seven of
+seven** using actual clean/dirty Git repositories, untracked source, a worktree,
+ordinary archives, an archive inside an unrelated repository, and broken Git
+metadata. The existing preview-version metadata suite also passed. Updated
+Windows launcher fixtures parse, but their execution and a compiled Windows EXE
+remain untested on this Linux host.
+
+### Official contracts checked
+
+The authoritative Codex source remains pinned to
+[`b82943092cf52b69ab13ab1a5bb2beb7820deef7`](https://github.com/openai/codex/tree/b82943092cf52b69ab13ab1a5bb2beb7820deef7).
+The audit read the actual source behind each newly reproduced record:
+
+- [PathUri conversion](https://github.com/openai/codex/blob/b82943092cf52b69ab13ab1a5bb2beb7820deef7/codex-rs/utils/path-uri/src/lib.rs#L108-L118)
+  defines the opaque path sentinel and its platform-specific byte encoding.
+- [Response items and local shell actions](https://github.com/openai/codex/blob/b82943092cf52b69ab13ab1a5bb2beb7820deef7/codex-rs/protocol/src/models.rs)
+  define `local_shell_call`, `action.type`, and `working_directory`.
+- [Thread settings snapshots](https://github.com/openai/codex/blob/b82943092cf52b69ab13ab1a5bb2beb7820deef7/codex-rs/protocol/src/protocol.rs#L2553-L2590),
+  [their emission](https://github.com/openai/codex/blob/b82943092cf52b69ab13ab1a5bb2beb7820deef7/codex-rs/core/src/session/thread_settings.rs),
+  and [resume metadata extraction](https://github.com/openai/codex/blob/b82943092cf52b69ab13ab1a5bb2beb7820deef7/codex-rs/state/src/extract.rs)
+  establish the settings CWD, runtime roots and ownership rules.
+- [Rollout persistence policy](https://github.com/openai/codex/blob/b82943092cf52b69ab13ab1a5bb2beb7820deef7/codex-rs/rollout/src/policy.rs)
+  confirms that local shell calls and settings snapshots are durable evidence.
+
+The persistence review also corrects the interpretation of two earlier fixture
+categories. At this pinned revision, `exec_command_begin` and `exec_command_end`
+are transient events; accepting one if explicitly present does not prove it will
+exist in an ordinary saved rollout. Legacy history omits completed command items,
+whereas paginated history retains them. Legacy `mcp_tool_call_end` is persisted.
+The warehouse-only `executed_tool_calls` metadata is explicitly ignored when Codex
+deserializes old records. It is not a public substitute for missing structured
+history, and Continuum does not infer executed calls from arbitrary Code Mode
+JavaScript, comments, quoted output, or assistant prose.
+
+The official documentation review covered these pages and the sections bearing
+on installation, storage, selection, paths and process communication:
+
+| Official page | Scope read and checked |
+| --- | --- |
+| [App Server](https://learn.chatgpt.com/docs/app-server) | Stdio protocol, initialization, metadata-only `thread/read`, list ordering and filters, thread/item pagination, command and dynamic-tool schemas, events, errors and remote Code Mode hosting. |
+| [Codex CLI](https://learn.chatgpt.com/docs/codex/cli) | Complete installation and CLI overview, including native Windows and npm alternatives. |
+| [Environment variables](https://learn.chatgpt.com/docs/config-file/environment-variables) | Complete page: `CODEX_HOME`, SQLite state location, installer location and standalone cache. |
+| [Advanced configuration](https://learn.chatgpt.com/docs/config-file/config-advanced) | Profiles and precedence, state home, project configuration, root markers and history persistence. |
+| [Developer commands](https://learn.chatgpt.com/docs/developer-commands) | Interactive/app-server entrypoints, exec/resume/fork, directory/worktree commands and global flag behavior. |
+| [Noninteractive mode](https://learn.chatgpt.com/docs/non-interactive-mode) | Complete page: explicit-ID resume, ephemeral runs, stdout/stderr and JSON output. CLI execution events are not assumed to be identical to stored rollout records. |
+| [Windows app](https://learn.chatgpt.com/docs/windows/windows-app) | Complete page: native and WSL execution, installation/PATH, Git and separate default homes. |
+
+The documented `thread.id` identifies the selected conversation; the newer
+`sessionId` describes a shared session tree and is not interchangeable with it.
+Metadata-only reads do not resume a conversation or start a turn. Default list
+ordering differs from Continuum's intentional update-time ordering. The audit
+preserved exact-ID selection and CLI/exec source checks rather than broadening
+the scheduler to every App Server source kind.
+
+All **36 tracked Markdown files** were reread for this follow-up: the 35-file
+inventory above plus this investigation. Historical build and CI records remain
+dated evidence. No GitHub Actions were invoked.
+
+### What this follow-up does and does not establish
+
+A genuine `@openai/codex` 0.170.0 App Server was also exercised in an isolated
+`CODEX_HOME`, without account credentials or model turns. Initialization and
+read-only thread metadata requests succeeded through both the native and npm
+entry paths. This checks the current protocol and launch mechanism beyond mocks;
+it does not reproduce the user's private session history or account state.
+
+The opt-in `tests/genuine-codex-repository-probe.ps1` then exercised the complete
+PowerShell dispatcher → installed-command resolver → Node helper → genuine Codex
+→ Git path. Exact metadata (795 ms), chooser load (1,120 ms), repository selection
+from a current checkout (2,030 ms), preference save (813 ms), and selection for an
+outside-Git conversation through its exact remote and an existing known checkout
+(1,847 ms) all passed. The probe uses disposable application/Codex state, empty
+file-based credentials and no inherited tokens. Windows task enumeration is
+stubbed; no account, model-turn, resume or scheduling request is made.
+
+The development host is Linux. No native Windows UI/build or Task Scheduler
+acceptance result is implied by the portable PowerShell, Node and Flutter checks.
+The screenshot's original hidden exception and the exact installed package still
+remain unverified. The corrected error path preserves the concrete failure if
+one remains after these fixes. No merge or GitHub Actions run was performed for
+this follow-up.

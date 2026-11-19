@@ -6,6 +6,141 @@ const readline = require('node:readline');
 const path = require('node:path');
 const fs = require('node:fs');
 const { createHash } = require('node:crypto');
+const { createRequire } = require('node:module');
+
+function codexAppServerCommand(entry) {
+  const extension = path.extname(entry).toLowerCase();
+  if (!path.isAbsolute(entry) || !fs.statSync(entry).isFile())
+    throw new Error('Codex entry must be an existing absolute file.');
+  if (extension !== '.js') {
+    if (extension && extension !== '.exe')
+      throw new Error('Codex native entry must be an executable, not a shell shim.');
+    return { executable: entry, args: [], env: process.env };
+  }
+  // Official npm installs contain a native binary. Use it directly so Windows
+  // does not interpose a Node wrapper between us and the protocol process.
+  // Unknown/older package layouts retain the supported JavaScript entry path.
+  try {
+    const packageRoot = fs.realpathSync(path.join(path.dirname(entry), '..'));
+    const metadata = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
+    const targets = {
+      'win32-x64': 'x86_64-pc-windows-msvc',
+      'win32-arm64': 'aarch64-pc-windows-msvc',
+      'linux-x64': 'x86_64-unknown-linux-musl',
+      'linux-arm64': 'aarch64-unknown-linux-musl',
+      'darwin-x64': 'x86_64-apple-darwin',
+      'darwin-arm64': 'aarch64-apple-darwin',
+    };
+    const platform = `${process.platform}-${process.arch}`;
+    const target = targets[platform];
+    if (metadata.name === '@openai/codex' && target) {
+      const vendors = [];
+      try {
+        const installed = createRequire(entry).resolve(`@openai/codex-${platform}/package.json`);
+        vendors.push(path.join(path.dirname(installed), 'vendor'));
+      } catch {}
+      vendors.push(path.join(packageRoot, 'vendor'));
+      const binary = process.platform === 'win32' ? 'codex.exe' : 'codex';
+      for (const vendor of vendors) {
+        for (const folder of ['bin', 'codex']) {
+          const executable = path.join(vendor, target, folder, binary);
+          if (fs.existsSync(executable) && fs.statSync(executable).isFile())
+            return {
+              executable,
+              args: [],
+              env: { ...process.env, CODEX_MANAGED_PACKAGE_ROOT: packageRoot },
+            };
+        }
+      }
+    }
+  } catch {}
+  return { executable: process.execPath, args: [entry], env: process.env };
+}
+
+function startCodexAppServer(entry) {
+  const command = codexAppServerCommand(entry);
+  const child = spawn(command.executable, [...command.args, 'app-server', '--listen', 'stdio://'], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    windowsHide: true,
+    env: command.env,
+    // A private process group lets Unix clean up this child's descendants
+    // without matching names or affecting another Codex process.
+    detached: process.platform !== 'win32',
+  });
+  let closed = false,
+    stopping = null;
+  const close = new Promise((resolve) =>
+    child.once('close', () => {
+      closed = true;
+      resolve();
+    }),
+  );
+  const stop = () => {
+    if (stopping) return stopping;
+    stopping = new Promise((resolve, reject) => {
+      if (closed) return resolve();
+      let force,
+        treeKiller,
+        cleanupError = null;
+      const killGroup = (signal) => {
+        try {
+          if (child.pid) process.kill(-child.pid, signal);
+        } catch (error) {
+          if (error.code !== 'ESRCH') cleanupError = error;
+        }
+      };
+      // Close input first. Killing a Windows npm Node wrapper immediately can
+      // orphan its native child, which still owns stdout/stderr pipe handles.
+      child.stdin.on('error', () => {});
+      child.stdin.end();
+      const grace = setTimeout(() => {
+        if (closed || !child.pid) return;
+        if (process.platform === 'win32') {
+          // Do not target a stale/reusable PID if a nonstandard launcher exited
+          // independently while a descendant retained its pipe handles.
+          if (child.exitCode !== null || child.signalCode !== null) {
+            cleanupError = new Error('Codex launcher exited before its process tree closed.');
+            return;
+          }
+          const taskkill = path.join(
+            process.env.SystemRoot || 'C:\\Windows',
+            'System32',
+            'taskkill.exe',
+          );
+          treeKiller = spawn(taskkill, ['/PID', String(child.pid), '/T', '/F'], {
+            stdio: 'ignore',
+            windowsHide: true,
+          });
+          treeKiller.once('error', (error) => (cleanupError = error));
+          treeKiller.once('close', (code) => {
+            if (code && !closed) cleanupError = new Error('Codex process-tree cleanup failed.');
+          });
+        } else {
+          killGroup('SIGTERM');
+          force = setTimeout(() => killGroup('SIGKILL'), 250);
+        }
+      }, 750);
+      const deadline = setTimeout(() => {
+        clearTimeout(grace);
+        clearTimeout(force);
+        treeKiller?.kill();
+        child.stdin.destroy();
+        child.stdout.destroy();
+        child.stderr.destroy();
+        child.unref();
+        reject(cleanupError || new Error('Codex App Server process did not close after shutdown.'));
+      }, 2500);
+      close.then(() => {
+        clearTimeout(grace);
+        clearTimeout(force);
+        clearTimeout(deadline);
+        resolve();
+      });
+    });
+    return stopping;
+  };
+  return { child, stop };
+}
 
 const validEpoch = (n) => (Number.isSafeInteger(n) && n > 0 ? n : null);
 function describeWindow(w, slot) {
@@ -167,10 +302,7 @@ function readCodexState(
   { model = null, timeoutMs = 18000, catalog = true, modelsOnly = false, threadId = null } = {},
 ) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [cliJs, 'app-server', '--listen', 'stdio://'], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      windowsHide: true,
-    });
+    const { child, stop } = startCodexAppServer(cliJs);
     let settled = false,
       stderr = '',
       pages = [],
@@ -188,11 +320,10 @@ function readCodexState(
       settled = true;
       clearTimeout(timer);
       lines.close();
-      child.stdin.on('error', () => {});
-      child.stdin.end();
-      child.kill();
-      if (err) reject(err);
-      else resolve(result);
+      stop().then(() => {
+        if (err) reject(err);
+        else resolve(result);
+      }, reject);
     }
     function send(data) {
       if (!settled) child.stdin.write(JSON.stringify(data) + '\n');
@@ -221,7 +352,7 @@ function readCodexState(
     }
     child.on('error', (e) => finish(e));
     child.stdin.on('error', (e) => finish(e));
-    child.on('exit', (code) => {
+    child.on('close', (code) => {
       if (!settled) finish(new Error(`Codex App Server exited (${code}). ${stderr.slice(-150)}`));
     });
     child.stderr.on('data', (p) => {
@@ -383,10 +514,7 @@ function readThreadMetadata(cliJs, { threadIds = [], timeoutMs, inventory = fals
   const valid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
   const wanted = new Set(threadIds);
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [cliJs, 'app-server', '--listen', 'stdio://'], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      windowsHide: true,
-    });
+    const { child, stop } = startCodexAppServer(cliJs);
     const lines = readline.createInterface({ input: child.stdout });
     const threads = {};
     const sessions = [];
@@ -412,11 +540,10 @@ function readThreadMetadata(cliJs, { threadIds = [], timeoutMs, inventory = fals
       clearTimeout(listTimer);
       for (const entry of reads.values()) clearTimeout(entry.timer);
       lines.close();
-      child.stdin.on('error', () => {});
-      child.stdin.end();
-      child.kill();
-      if (error) reject(error);
-      else resolve(value);
+      stop().then(() => {
+        if (error) reject(error);
+        else resolve(value);
+      }, reject);
     }
     function send(message) {
       if (!settled) child.stdin.write(JSON.stringify(message) + '\n');
@@ -467,7 +594,7 @@ function readThreadMetadata(cliJs, { threadIds = [], timeoutMs, inventory = fals
     }
     child.on('error', (error) => finish(error));
     child.stdin.on('error', (error) => finish(error));
-    child.on('exit', (code) => {
+    child.on('close', (code) => {
       if (!settled)
         finish(new Error('Codex App Server exited (' + code + '). ' + stderr.slice(-120)));
     });
@@ -552,10 +679,16 @@ function readThreadMetadata(cliJs, { threadIds = [], timeoutMs, inventory = fals
   });
 }
 async function main() {
-  const flag = process.argv.indexOf('--cli-js');
+  const jsFlag = process.argv.indexOf('--cli-js');
+  const exeFlag = process.argv.indexOf('--cli-exe');
+  if (jsFlag >= 0 && exeFlag >= 0) throw new Error('Specify exactly one Codex entry.');
+  const flag = exeFlag >= 0 ? exeFlag : jsFlag;
   const cliJs = flag >= 0 ? process.argv[flag + 1] : null;
-  if (!cliJs || !fs.existsSync(cliJs) || path.extname(cliJs).toLowerCase() !== '.js')
-    throw new Error('Codex npm CLI entry not found.');
+  if (!cliJs || !fs.existsSync(cliJs)) throw new Error('Codex CLI entry not found.');
+  const extension = path.extname(cliJs).toLowerCase();
+  if (exeFlag >= 0 && (!path.isAbsolute(cliJs) || (extension && extension !== '.exe')))
+    throw new Error('Codex native entry must be an absolute executable, not a shell shim.');
+  if (jsFlag >= 0 && extension !== '.js') throw new Error('Codex npm CLI entry not found.');
   const modelFlag = process.argv.indexOf('--model');
   const model = modelFlag >= 0 ? process.argv[modelFlag + 1] : null;
   const threadFlag = process.argv.indexOf('--thread-id');
@@ -583,6 +716,7 @@ if (require.main === module)
     process.exitCode = 1;
   });
 module.exports = {
+  codexAppServerCommand,
   describeWindow,
   normalizeModels,
   selectBucket,

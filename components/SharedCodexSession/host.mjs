@@ -2,7 +2,7 @@ import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, join } from 'node:path';
+import { dirname, extname, isAbsolute, join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import {
   AppServerProtocol,
@@ -16,6 +16,16 @@ import { openRemoteProtocol, unusedLoopbackPort } from './remote.mjs';
 const MAX_INPUT_BYTES = 64 * 1024;
 const MAX_EVENTS = 160;
 const MAX_TEXT = 12000;
+
+export function codexProcessCommand(entry, args, nodeBinary = process.execPath) {
+  if (!isAbsolute(entry)) throw new Error('Codex entry must be absolute');
+  const extension = extname(entry).toLowerCase();
+  if (['.js', '.mjs', '.cjs'].includes(extension))
+    return { executable: nodeBinary, args: [entry, ...args] };
+  if (extension && extension !== '.exe')
+    throw new Error('Codex native entry must be an executable, not a shell shim');
+  return { executable: entry, args };
+}
 
 export function locationFor(appDir, jobName) {
   if (!isAbsolute(appDir) || !isJobName(jobName))
@@ -72,7 +82,7 @@ export class SharedSessionHost extends EventEmitter {
       !job.message?.trim()
     )
       throw new Error('Invalid scheduled session');
-    if (!isAbsolute(codexEntry)) throw new Error('Codex JavaScript entry must be absolute');
+    const command = codexProcessCommand(codexEntry, ['app-server'], nodeBinary);
     this.job = job;
     this.jobName = jobName;
     this.appDir = appDir;
@@ -81,7 +91,7 @@ export class SharedSessionHost extends EventEmitter {
     this.spawnServer =
       spawnServer ??
       ((args) =>
-        spawn(nodeBinary, [codexEntry, 'app-server', ...args], {
+        spawn(command.executable, [...command.args, ...args], {
           stdio: ['pipe', 'pipe', 'pipe'],
           cwd: job.repo,
           windowsHide: true,
