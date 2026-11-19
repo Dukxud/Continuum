@@ -4,19 +4,21 @@ The [Windows engineering preview](https://github.com/Dukxud/Continuum/releases/t
 
 ## Download and run
 
-If you downloaded a **complete repository source ZIP**, extract it and double-click `Run-Continuum.cmd` at its root on Windows. The same command also works in a Git checkout or worktree. It builds that folder's current source, verifies the complete package, then starts the resulting application under `%LOCALAPPDATA%\Continuum\SourceBuilds\<unique-id>`. Every source launch makes a fresh package. PowerShell 7, Flutter, Git, Node.js and Visual Studio C++ build tools must already be installed; the launcher lists missing prerequisites and does not install SDKs or substitute an older application.
+If you downloaded a **complete repository source ZIP**, extract it and double-click `Run-Continuum.cmd` at its root on Windows x64. The same command also works in a Git checkout or worktree. It builds that folder's current source, verifies the complete package, then starts the resulting application under `%LOCALAPPDATA%\Continuum\SourceBuilds\<unique-id>`. Every source launch makes a fresh package. The compatible toolchain and symbolic-link permission listed below must already be available; the launcher does not install SDKs, change Windows settings or substitute an older application.
 
 **Reviewing a PR from source:** Download the complete source archive for that PR's branch or commit, extract it, and use the same `Run-Continuum.cmd`. A source archive does not need Git metadata to build. The optional `-BuildFromSource` PowerShell switch remains available, but is unnecessary for a complete source tree. No GitHub Actions run is required for this route.
 
 **Opening a complete Windows review package:** Extract it and double-click `Run-Continuum.cmd` beside `codex_resume_flutter.exe`. A runtime-only folder opens its own application after verifying `SHA256SUMS.txt`. Complete source takes precedence over a stray sibling executable; incomplete source or runtime packages fail with an explicit error.
 
-The launcher prints the executable, build identity and effective backend path before starting it. It unblocks only allowlisted source scripts or verified package files, rejects linked source script paths, and does not change execution policy. A folder containing only the two launcher files retains the pinned public-preview download behavior; that is not the source review route above.
+The launcher prints the executable, build identity and effective backend path before starting it. It unblocks only allowlisted source scripts or verified package files, rejects linked source script paths, and does not change execution policy. Its pinned-preview fallback also requires the supplied package verifier; copying only the two launcher files is rejected. Keep the complete source or application package together for review.
+
+Current release builds use the backend and bridge beside their own executable, including when the EXE is opened directly. They do not search parent checkouts or the launch working directory for missing files. An intentional `CODEX_SCHEDULER_SOURCE` override must identify a complete backend and bridge; a relative override resolves once from the app's working directory at startup and becomes absolute. The normal launcher starts the app in its package directory. An invalid override stops startup with an error. Remove a stale override before opening the bundled application.
 
 1. Download `Continuum-Windows-v0.1.0+1-UNSIGNED-PREVIEW.zip` from the [preview release](https://github.com/Dukxud/Continuum/releases/tag/v0.1.0-preview.1).
 2. Extract the complete ZIP to a new folder. Keep its DLLs, `data`, `src`, and `components` folders beside the executable.
 3. Open `codex_resume_flutter.exe`. Windows x64, PowerShell 7 in its standard installation location, Node.js, Git, the [Microsoft Visual C++ v14 Redistributable (x64)](https://aka.ms/vc14/vc_redist.x64.exe), and an installed, signed-in npm Codex CLI are required.
 
-Flutter, Visual Studio, and Developer Mode are build prerequisites; they are not required for running the downloaded package. The preview is unsigned; read its release notes for known limitations. `SHA256SUMS.txt` on the release page verifies the downloaded ZIP, and the manifest inside the package covers its individual files.
+Flutter, Visual Studio and permission to create plugin symbolic links are source-build prerequisites; they are not required for running the downloaded package. Developer Mode normally supplies that link permission for an ordinary Windows user. The preview is unsigned; read its release notes for known limitations. `SHA256SUMS.txt` on the release page verifies the downloaded ZIP, and the manifest inside the package covers its individual files.
 
 For source builds, continue below.
 
@@ -25,22 +27,31 @@ For source builds, continue below.
 | Dependency | Requirement |
 | --- | --- |
 | Windows | x64, with a signed-in desktop session |
-| PowerShell | PowerShell 7 in its standard `C:\Program Files\PowerShell\7` location |
-| Node.js and Git | Available on `PATH`; the recorded CI baseline uses Node 22 |
+| PowerShell | PowerShell 7.4 or newer for current source and its runtime helpers |
+| Node.js and Git | Node.js 22 or newer and Git 2.28 or newer on `PATH`; the source-build bridge check uses `git init -b` |
 | Codex CLI | Current source accepts the official native `codex.exe` or npm installation on `PATH`, signed in to the account you intend to use |
-| Flutter | `flutter.bat` available on `PATH`; CI pins Flutter 3.47.9 |
-| Visual Studio | Desktop development with C++ workload and Windows build tools |
-| Windows build permissions | Symbolic-link support for Flutter plugins; enable [Developer Mode](https://learn.microsoft.com/en-us/windows/advanced-settings/developer-mode) on the build machine if Flutter requests it |
+| Flutter/Dart | Flutter 3.47.9 with its bundled Dart 3.13.7; `flutter.bat` on `PATH`. The preflight checks this Flutter version, the app's Dart `>=3.13.0 <4.0.0` requirement and the SDK files; dependencies retain the committed lock |
+| Visual Studio | Desktop development with C++ workload, MSVC x64/x86 tools, CMake tools and Windows SDK; finish installation and any requested reboot |
+| Windows build permissions | Actual symbolic-link creation must work in the source location. For error 1314, enable [Developer Mode](https://learn.microsoft.com/en-us/windows/advanced-settings/developer-mode) in Windows Settings and rerun the same launcher |
+| Scheduled-job host | Working Windows Script Host and VBScript engine; the source preflight checks a disposable script that only exits with a known code |
 
-The pinned versions describe the recorded build environment. Compatibility with a different Codex CLI or SDK version should be checked before scheduling work. See the [developer guide](../src/desktop/README.md) for the verification commands.
+The source build requires the pinned Flutter version and leaves installed SDKs unchanged. Compatibility with a different Codex CLI should be checked before scheduling work. See the [developer guide](../src/desktop/README.md) for the verification commands.
 
 The current source resolves both supported [Codex CLI installation forms](https://learn.chatgpt.com/docs/codex/cli). Node.js remains necessary for Continuum's metadata and Shared helpers even with native Codex. Restart Continuum after changing `PATH`. The older pinned public preview above predates this resolver change and retains its recorded npm prerequisite.
 
-Before building, run `flutter doctor -v` and resolve any Windows toolchain errors. See [troubleshooting](TROUBLESHOOTING.md#build-prerequisites) if runner generation reports that symlink support is missing.
+Before building, run `flutter doctor -v` and resolve the **Windows version** and **Visual Studio - develop Windows apps** findings. Flutter's [Windows setup guide](https://docs.flutter.dev/platform-integration/windows/setup) describes this toolchain; Visual Studio Code alone does not provide it. An overall doctor result also includes other platforms and is not proof of Windows readiness.
+
+The preflight reports independent missing prerequisites together before starting the build. If Flutter cannot run, it reports that the dependent plugin-link probe could not run rather than claiming that capability passed. A missing VBScript engine is handled through Windows **Optional features**, subject to the machine's policy; see [Microsoft's feature guidance](https://techcommunity.microsoft.com/blog/windows-itpro-blog/vbscript-deprecation-timelines-and-next-steps/4148301).
+
+If Flutter reports **Building with plugins requires symlink support**, open Windows Settings with `ms-settings:developers`, enable Developer Mode, then rerun `Run-Continuum.cmd`. Enabling that setting requires the permissions allowed by your machine's administrator or organization; the launcher cannot grant them. [Troubleshooting](TROUBLESHOOTING.md#build-prerequisites) distinguishes this privilege failure from other filesystem errors.
+
+Keep the source in a writable Windows location with a simple path. Flutter 3.47.9 rejects project-path characters `'#!$^&*=|,;<>?` because of CMake/MSBuild escaping; spaces and parentheses are allowed. Preserve the committed `pubspec.lock`. Package downloads or later compiler errors require their own diagnosis even after prerequisites pass.
+
+Windows desktop support must be enabled in Flutter, and its configured build directory must resolve to the project's `build` folder. The preflight reports a conflicting project, global or environment setting and its recovery command; it does not change Flutter configuration. A relative `PUB_CACHE` resolves from `src/desktop`.
 
 ## Build the preview
 
-Run the following in **PowerShell 7**. It creates a new checkout under your user profile, then builds and verifies a complete Windows package. It does not launch the app or schedule a job.
+Run the following in **PowerShell 7.4 or newer**. It creates a new checkout under your user profile, then builds and verifies a complete Windows package. It does not launch the app or schedule a job.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -63,7 +74,7 @@ The builder generates the Windows runner, installs the checked-in icon, runs sou
 
 ## Open the app
 
-After a successful build, run this in PowerShell 7:
+After a successful build, run this in PowerShell 7.4 or newer:
 
 ```powershell
 $continuumExe = Join-Path $HOME 'Downloads\Continuum-Preview\Continuum-Windows-v0.1.0+1-UNSIGNED-PREVIEW\codex_resume_flutter.exe'

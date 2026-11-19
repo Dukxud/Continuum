@@ -81,13 +81,27 @@ function Get-CodexRuntimeFiles {
         'components/SettingsStore/SettingsStore.psm1'
     )
 }
+function Get-CodexPowerShellExecutable {
+    param([string]$Executable='')
+    if(-not $Executable){$Executable=Join-Path $PSHOME ($IsWindows ? 'pwsh.exe' : 'pwsh')}
+    if(-not [IO.Path]::IsPathFullyQualified($Executable) -or
+       $Executable -match '["\x00-\x1F]' -or
+       [IO.Path]::GetFileName($Executable) -notin @('pwsh.exe','pwsh') -or
+       -not (Test-Path -LiteralPath $Executable -PathType Leaf)){
+        throw 'The current PowerShell executable could not be verified.'
+    }
+    return [IO.Path]::GetFullPath($Executable)
+}
+
 function Get-CodexTaskArguments {
     param([string]$Runner,[string]$JobFile,
-          [ValidateSet('background','terminal','shared')][string]$ExecutionMode='background')
+          [ValidateSet('background','terminal','shared')][string]$ExecutionMode='background',
+          [string]$PowerShellExecutable='')
     if ($Runner.Contains('"') -or $JobFile.Contains('"')) { throw 'Unsafe quote in task path.' }
-    # A terminal run deliberately gets a console; existing tasks keep their
-    # original one-argument, hidden launch contract.
-    $arguments='//B //Nologo "' + $Runner + '" "' + $JobFile + '"'
+    # Pin the current host for portable/Store installations as well as MSI.
+    # A terminal run deliberately gets a console; background remains hidden.
+    $hostExecutable=Get-CodexPowerShellExecutable -Executable $PowerShellExecutable
+    $arguments='//B //Nologo "' + $Runner + '" "' + $JobFile + '" "' + $hostExecutable + '"'
     if($ExecutionMode -eq 'terminal'){$arguments+=' terminal'}
     return $arguments
 }
@@ -252,7 +266,9 @@ function Invoke-CodexScheduledJob {
         $codex = if([IO.Path]::GetExtension($cli) -ieq '.js'){
             (Get-Command node.exe -ErrorAction Stop).Source
         }else{$cli}
-        $entryArguments=if([IO.Path]::GetExtension($cli) -ieq '.js'){@($cli)}else{@()}
+        # Keep the single npm entry as an array. A scalar string splats one
+        # character at a time, making Node try to execute '/' or 'C'.
+        $entryArguments=@(if([IO.Path]::GetExtension($cli) -ieq '.js'){$cli})
         [void](New-Item -Path $AppDirectory -ItemType Directory -Force -ErrorAction Stop)
         $PSNativeCommandUseErrorActionPreference = $false
         if($executionMode -eq 'shared'){

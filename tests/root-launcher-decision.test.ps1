@@ -6,7 +6,7 @@ $launcher=Join-Path $root 'Run-Continuum.ps1'
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($launcher,[ref]$tokens,[ref]$errors)
 if(@($errors).Count){throw $errors[0].Message}
-foreach($name in @('Get-ContinuumLaunchPlan','Get-ContinuumBuildScripts','Start-Continuum')){
+foreach($name in @('Get-ContinuumLaunchPlan','Get-ContinuumBuildScripts','Get-ContinuumPackageVerifier','Start-Continuum')){
     $definition=$ast.Find({param($node)
         $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
     },$false)
@@ -42,8 +42,12 @@ function New-SourceFixture([string]$Name){
         'src/desktop/scripts/Get-PreviewMetadata.ps1',
         'src/desktop/scripts/Initialize-WindowsRunner.ps1',
         'src/desktop/scripts/Install-WindowsIcon.ps1',
+        'src/desktop/scripts/Test-WindowsBuildPrerequisites.ps1',
+        'src/desktop/scripts/Invoke-PreviewBuild.ps1',
+        'src/desktop/scripts/Assert-PreviewPackage.ps1',
         'src/desktop/windows_bridge.ps1','src/backend/CodexRunEngine.ps1',
-        'tests/flutter-port-source.test.ps1','tests/flutter-port-bridge.test.ps1'
+        'tests/flutter-port-source.test.ps1','tests/flutter-port-bridge.test.ps1',
+        'tests/windows-task-host.test.ps1','tests/flutter-windows-icon.test.ps1'
     )){New-FixtureFile $directory $relative}
     return $directory
 }
@@ -103,6 +107,11 @@ try{
         New-FixtureFile $trusted 'src/backend/external/nested.ps1'
         $scripts=@(Get-ContinuumBuildScripts $trusted)
         Require ($scripts -contains (Join-Path $trusted 'src/backend/CodexRunEngine.ps1')) 'Required backend script was not included.'
+        foreach($relative in @('src/desktop/scripts/Test-WindowsBuildPrerequisites.ps1',
+            'src/desktop/scripts/Invoke-PreviewBuild.ps1','src/desktop/scripts/Assert-PreviewPackage.ps1',
+            'tests/windows-task-host.test.ps1','tests/flutter-windows-icon.test.ps1')){
+            Require ($scripts -contains (Join-Path $trusted $relative)) "Required build stage is still blocked for source ZIPs: $relative"
+        }
         Require (-not ($scripts -contains (Join-Path $trusted 'unrelated.ps1')) -and
             -not ($scripts -contains (Join-Path $trusted 'src/backend/external/nested.ps1'))) 'Source trust escaped its explicit script allowlist.'
     }
@@ -154,6 +163,43 @@ try{
             $messages.Contains('source archive; commit unavailable')) 'Effective backend or archive provenance was omitted.'
         Require ($env:CODEX_SCHEDULER_SOURCE -ceq (Join-Path $fixture 'explicit-backend') -and
             $script:launchedPath -ceq $exe -and $script:launchedDirectory -ceq $trusted) 'Explicit backend override or launch target was changed.'
+    }
+    Run-Case 'package verifier must be covered exactly once before it is loaded' {
+        $package=Join-Path $fixture 'verifier-bootstrap'
+        $relative='src/desktop/scripts/Assert-PreviewPackage.ps1'
+        New-FixtureFile $package $relative
+        $helper=Join-Path $package $relative
+        $manifest=Join-Path $package 'SHA256SUMS.txt'
+        $line=(Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash+'  '+$relative
+        Set-Content -LiteralPath $manifest $line
+        Require ((Get-ContinuumPackageVerifier $package -RequireManifest) -ceq $helper) 'Manifest-covered verifier was rejected.'
+        Add-Content -LiteralPath $manifest $line
+        $failure='';try{Get-ContinuumPackageVerifier $package -RequireManifest | Out-Null}catch{$failure=$_.Exception.Message}
+        Require ($failure.Contains('exactly once')) 'Duplicate verifier digest was accepted.'
+        Set-Content -LiteralPath $manifest $line
+        Add-Content -LiteralPath $helper 'changed'
+        $failure='';try{Get-ContinuumPackageVerifier $package -RequireManifest | Out-Null}catch{$failure=$_.Exception.Message}
+        Require ($failure.Contains('checksum failed')) 'Changed verifier was accepted before execution.'
+    }
+    Run-Case 'launcher-only folder requires its known verifier sidecar' {
+        $failure='';try{Get-ContinuumPackageVerifier (Join-Path $fixture 'launcher-only') | Out-Null}catch{$failure=$_.Exception.Message}
+        Require ($failure.Contains('do not copy the launcher files alone')) 'Missing standalone verifier has no useful remedy.'
+    }
+    Run-Case 'CMD resolver uses absolute PATH entries in order and never the current directory' {
+        # Extract and execute the production pure resolver from the constant
+        # bootstrap command; this does not emulate cmd.exe or Windows startup.
+        $batch=[IO.File]::ReadAllText((Join-Path $root 'Run-Continuum.cmd'))
+        $command=[regex]::Match($batch,'(?m)^.* -Command "([^\r\n]+)"\r?$').Groups[1].Value
+        Require ([bool]$command) 'CMD bootstrap command was not found.'
+        $tokens=$null;$errors=$null
+        $bootstrap=[Management.Automation.Language.Parser]::ParseInput($command,[ref]$tokens,[ref]$errors)
+        Require (@($errors).Count -eq 0) 'CMD bootstrap PowerShell code does not parse.'
+        $resolver=$bootstrap.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Get-ContinuumPowerShellCandidates'},$false)
+        Require ([bool]$resolver) 'CMD absolute-path resolver is missing.'
+        . ([scriptblock]::Create($resolver.Extent.Text))
+        $candidates=@(Get-ContinuumPowerShellCandidates -SearchPath '.;;relative;C:drive-relative;%LOCALAPPDATA%\PowerShell\7;"D:\portable PowerShell";"C:\unmatched;C:\Tools;\\server\share\tools;/unix' -FallbackRoots @('C:\Program Files'))
+        $expected=@('D:\portable PowerShell\pwsh.exe','C:\Tools\pwsh.exe','\\server\share\tools\pwsh.exe','C:\Program Files\PowerShell\7\pwsh.exe')
+        Require (($candidates -join '|') -ceq ($expected -join '|')) "Unexpected host candidates: $($candidates -join ', ')"
     }
 }finally{
     $env:CODEX_SCHEDULER_SOURCE=$originalBackendOverride

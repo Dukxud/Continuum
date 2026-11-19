@@ -4,6 +4,41 @@ param(
     [string]$OutputDirectory=(Join-Path $HOME 'Downloads\Continuum-Preview'),
     [switch]$PackageVerifiedBuild
 )
+
+function Copy-ContinuumReleaseFiles {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$SourceDirectory,
+          [Parameter(Mandatory)][string]$DestinationDirectory)
+    if(-not (Test-Path -LiteralPath $SourceDirectory -PathType Container)){
+        throw 'Flutter release output directory is missing.'
+    }
+    $entries=@(Get-ChildItem -LiteralPath $SourceDirectory -Force -ErrorAction Stop)
+    if(-not $entries.Count){throw 'Flutter release output is empty.'}
+    foreach($entry in $entries){
+        Copy-Item -LiteralPath $entry.FullName -Destination $DestinationDirectory -Recurse -Force -ErrorAction Stop
+    }
+}
+
+function Test-ContinuumPackageParent {
+    param([Parameter(Mandatory)][string]$ActualParent,
+          [Parameter(Mandatory)][string]$ExpectedParent)
+    # Both callers already resolved full paths. Trim both operands equally:
+    # the parent of D:\.verify-<id> is D:\, not the truncated D:.
+    $separators=[char[]]@('/','\')
+    return [string]::Equals($ActualParent.TrimEnd($separators),
+        $ExpectedParent.TrimEnd($separators),[StringComparison]::OrdinalIgnoreCase)
+}
+
+function New-ContinuumPackageArchive {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$SourceDirectory,
+          [Parameter(Mandatory)][string]$DestinationPath)
+    # Compress-Archive silently omits hidden payloads. The .NET archive API
+    # preserves the complete enumerated tree and refuses an existing output.
+    [IO.Compression.ZipFile]::CreateFromDirectory($SourceDirectory,$DestinationPath,
+        [IO.Compression.CompressionLevel]::Optimal,$true)
+}
+
 $ErrorActionPreference='Stop'
 $project=$PSScriptRoot
 $root=[IO.Path]::GetFullPath((Join-Path $project '../..'))
@@ -11,11 +46,9 @@ if(-not $IsWindows){throw 'The preview package targets Windows.'}
 if($PackageVerifiedBuild -and $env:GITHUB_ACTIONS -ne 'true'){
     throw 'Prevalidated-package mode is restricted to the isolated GitHub Actions build.'
 }
-$flutter=$null
-if(-not $PackageVerifiedBuild){
-    $flutter=(Get-Command flutter.bat -ErrorAction SilentlyContinue)
-    if(-not $flutter){throw 'Flutter SDK not on PATH.'}
-}
+. (Join-Path $project 'scripts/Invoke-PreviewBuild.ps1')
+. (Join-Path $project 'scripts/Test-WindowsBuildPrerequisites.ps1')
+. (Join-Path $project 'scripts/Assert-PreviewPackage.ps1')
 . (Join-Path $project 'scripts/Get-PreviewMetadata.ps1')
 $preview=Get-ContinuumPreviewMetadata -PubspecPath (Join-Path $project 'pubspec.yaml')
 $label=$preview.PackageName
@@ -25,27 +58,15 @@ $zip=Join-Path $OutputDirectory ($label+'.zip')
 if((Test-Path -LiteralPath $destination) -or (Test-Path -LiteralPath $zip)){
     throw "Review package already exists: $destination or $zip"
 }
-& pwsh -NoProfile -File (Join-Path $root 'tests/flutter-port-source.test.ps1')
-if($LASTEXITCODE -ne 0){throw 'Flutter source integrity check failed.'}
 if(-not $PackageVerifiedBuild){
-Push-Location $project
-try{
-    & pwsh -NoProfile -STA -File (Join-Path $root 'tests/flutter-port-bridge.test.ps1')
-    if($LASTEXITCODE -ne 0){throw 'Live Windows bridge integration failed.'}
-    & pwsh -NoProfile -File (Join-Path $project 'scripts/Initialize-WindowsRunner.ps1')
-    if($LASTEXITCODE -ne 0){throw 'Windows runner initialization failed.'}
-    & $flutter.Source pub get --enforce-lockfile
-    if($LASTEXITCODE -ne 0){throw 'Flutter dependencies failed.'}
-    & $flutter.Source analyze --no-pub
-    if($LASTEXITCODE -ne 0){throw 'Dart analyzer found errors; preview was not launched.'}
-    & $flutter.Source test --no-pub --exclude-tags visual-capture
-    if($LASTEXITCODE -ne 0){throw 'Flutter tests failed. No preview will be built.'}
-    & $flutter.Source build windows --release --no-pub
-    if($LASTEXITCODE -ne 0){throw 'Flutter release build failed.'}
-}finally{Pop-Location}
+    $tools=Assert-ContinuumWindowsBuildPrerequisites -ProjectDirectory $project -OutputDirectory $OutputDirectory
+    Invoke-ContinuumPreviewBuild -ProjectDirectory $project -Tools $tools -BuildRelease
+}else{
+    Invoke-ContinuumBuildStep -Name 'Prevalidated package source integrity' `
+        -FilePath (Join-Path $PSHOME 'pwsh.exe') `
+        -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-File',(Join-Path $root 'tests/flutter-port-source.test.ps1')) `
+        -WorkingDirectory $project
 }
-& pwsh -NoProfile -File (Join-Path $project 'scripts/Install-WindowsIcon.ps1') -VerifyOnly
-if($LASTEXITCODE -ne 0){throw 'Continuum native icon verification failed.'}
 $release=Join-Path $project 'build\windows\x64\runner\Release'
 $exe=Join-Path $release 'codex_resume_flutter.exe'
 if(-not (Test-Path -LiteralPath $exe -PathType Leaf)){throw 'Flutter executable is missing.'}
@@ -54,6 +75,9 @@ foreach($required in @('flutter_windows.dll','data')){
         throw "Flutter release payload incomplete: $required"
     }
 }
+Invoke-ContinuumBuildStep -Name 'Compiled Windows icon verification' -FilePath (Join-Path $PSHOME 'pwsh.exe') `
+    -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-File',(Join-Path $root 'tests/flutter-windows-icon.test.ps1'),'-ExecutablePath',$exe) `
+    -WorkingDirectory $project
 [void](New-Item -ItemType Directory -Path $OutputDirectory -Force)
 $destinationCreated=$false
 $archiveCreated=$false
@@ -62,7 +86,7 @@ try{
     # Creation must fail if another build claimed this destination after preflight.
     [void](New-Item -ItemType Directory -Path $destination -ErrorAction Stop)
     $destinationCreated=$true
-    Copy-Item -Path (Join-Path $release '*') -Destination $destination -Recurse -Force -ErrorAction Stop
+    Copy-ContinuumReleaseFiles -SourceDirectory $release -DestinationDirectory $destination
     $mustCopy=@('src/backend/Invoke-CodexJob.ps1','src/backend/CodexRunEngine.ps1','src/backend/CodexData.ps1',
         'src/backend/CodexJobStore.ps1','src/backend/CodexSessionRepository.ps1','src/backend/CodexRepositoryEvidence.ps1','src/backend/CodexRunActivity.ps1','src/backend/CodexUsage.js','src/backend/CodexCli.ps1','src/backend/CodexQuotaContinuation.ps1','src/backend/CodexTerminalRun.ps1','src/backend/CodexRunJob.vbs')
     foreach($relative in $mustCopy){
@@ -83,6 +107,9 @@ try{
     [void](New-Item -ItemType Directory -Path $bridgeFolder -Force)
     Copy-Item -LiteralPath (Join-Path $project 'windows_bridge.ps1') -Destination $bridgeFolder -ErrorAction Stop
     Copy-Item -LiteralPath (Join-Path $project 'bridge') -Destination $bridgeFolder -Recurse -ErrorAction Stop
+    $packageScripts=Join-Path $bridgeFolder 'scripts'
+    [void](New-Item -ItemType Directory -Path $packageScripts -Force)
+    Copy-Item -LiteralPath (Join-Path $project 'scripts/Assert-PreviewPackage.ps1') -Destination $packageScripts -ErrorAction Stop
     Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $destination -ErrorAction Stop
     # Ship the same root-level launcher that source-ZIP users already know.
     # When packaged beside an EXE it verifies and launches this exact build.
@@ -106,7 +133,7 @@ try{
 CONTINUUM — UNSIGNED WINDOWS ENGINEERING PREVIEW
 Provided for evaluation; see the release notes for known limitations.
 No digital signatures or antivirus exclusions have been applied.
-Requires PowerShell 7, Node.js, Git and Codex CLI (native or npm installation).
+Requires PowerShell 7.4 or newer, Node.js, Git and Codex CLI (native or npm installation).
 Also requires Microsoft Visual C++ v14 Redistributable (x64):
 https://aka.ms/vc14/vc_redist.x64.exe
 Uses Windows Task Scheduler and the bundled backend under src/backend.
@@ -116,7 +143,7 @@ Directly running codex_resume_flutter.exe is also possible.
 A working signed-in desktop is required.
 No publisher authentication or full device acceptance is asserted.
 '@ | Set-Content -LiteralPath (Join-Path $destination 'PREVIEW-NOTES.txt') -Encoding utf8
-    $files=@(Get-ChildItem -LiteralPath $destination -File -Recurse |
+    $files=@(Get-ChildItem -LiteralPath $destination -File -Recurse -Force |
         Where-Object { $_.Name -ne 'SHA256SUMS.txt' } |
         Sort-Object FullName)
     $lines=@(foreach($file in $files){
@@ -124,7 +151,8 @@ No publisher authentication or full device acceptance is asserted.
         "$(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256 | Select-Object -ExpandProperty Hash)  $relative"
     })
     $lines | Set-Content -LiteralPath (Join-Path $destination 'SHA256SUMS.txt') -Encoding utf8
-    Compress-Archive -LiteralPath $destination -DestinationPath $stagedZip -CompressionLevel Optimal
+    $verifiedPackage=Assert-ContinuumPreviewPackage -Directory $destination
+    New-ContinuumPackageArchive -SourceDirectory $destination -DestinationPath $stagedZip
     if(-not (Test-Path -LiteralPath $stagedZip -PathType Leaf)){throw 'Preview ZIP was not created.'}
     if((Get-Item -LiteralPath $stagedZip).Length -lt 1048576){throw 'Unexpectedly small Windows review package.'}
     # Extract and independently validate the actual distributed ZIP, not
@@ -133,26 +161,11 @@ No publisher authentication or full device acceptance is asserted.
     try{
         Expand-Archive -LiteralPath $stagedZip -DestinationPath $verify -ErrorAction Stop
         $extracted=Join-Path $verify $label
-        $manifest=Get-Content -LiteralPath (Join-Path $extracted 'SHA256SUMS.txt') -ErrorAction Stop
-        $actualFiles=@(Get-ChildItem -LiteralPath $extracted -Recurse -File |
-            Where-Object { $_.Name -ne 'SHA256SUMS.txt' })
-        if($manifest.Count -ne $actualFiles.Count){throw 'Packaged manifest file count mismatch.'}
-        foreach($entry in $manifest){
-            $parsed=[regex]::Match($entry,'^([0-9A-F]{64})  ([^\\]+)$')
-            if(-not $parsed.Success){throw 'Malformed package checksum entry.'}
-            $digest=$parsed.Groups[1].Value
-            $relative=$parsed.Groups[2].Value
-            if($relative.StartsWith('/') -or $relative.StartsWith('..') -or $relative.Contains('/../')){
-                throw 'Unsafe package checksum path.'
-            }
-            $path=Join-Path $extracted $relative.Replace('/','\')
-            if(-not (Test-Path -LiteralPath $path -PathType Leaf)){throw "Package file missing: $relative"}
-            $actual=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
-            if($actual -cne $digest){throw "Package checksum failed: $relative"}
-        }
+        $extractedPackage=Assert-ContinuumPreviewPackage -Directory $extracted
+        if($extractedPackage.FileCount -ne $verifiedPackage.FileCount){throw 'Extracted package differs from the staged package.'}
     }finally{
         $resolvedVerify=[IO.Path]::GetFullPath($verify)
-        if((Split-Path -Parent $resolvedVerify) -ine $OutputDirectory.TrimEnd('\') -or
+        if(-not (Test-ContinuumPackageParent -ActualParent (Split-Path -Parent $resolvedVerify) -ExpectedParent $OutputDirectory) -or
             (Split-Path -Leaf $resolvedVerify) -notlike '.verify-*'){
             throw 'Refusing cleanup outside the package verification directory.'
         }
@@ -161,12 +174,12 @@ No publisher authentication or full device acceptance is asserted.
     # Move without overwrite only after verifying the archive being published.
     [IO.File]::Move($stagedZip,$zip,$false)
     $archiveCreated=$true
-    Write-Host "Verified $($manifest.Count) checksums from the extracted Windows package." -ForegroundColor Green
+    Write-Host "Verified $($extractedPackage.FileCount) checksums from the extracted Windows package." -ForegroundColor Green
     Write-Host "Unsigned Windows Flutter review package: $zip" -ForegroundColor Green
     Write-Host "Standalone executable: $(Join-Path $destination 'codex_resume_flutter.exe')"
 }catch{
     $resolvedDestination=[IO.Path]::GetFullPath($destination)
-    if((Split-Path -Parent $resolvedDestination) -ine $OutputDirectory.TrimEnd('\') -or
+    if(-not (Test-ContinuumPackageParent -ActualParent (Split-Path -Parent $resolvedDestination) -ExpectedParent $OutputDirectory) -or
         (Split-Path -Leaf $resolvedDestination) -cne $label){
         throw 'Refusing cleanup outside this preview destination.'
     }

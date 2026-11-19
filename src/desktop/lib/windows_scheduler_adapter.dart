@@ -7,47 +7,93 @@ import 'bridge.dart';
 
 class WindowsSchedulerAdapter implements SchedulerAdapter {
   WindowsSchedulerAdapter({String? sourceDirectory})
-    : sourceDirectory = sourceDirectory ?? findSourceDirectory();
+    : sourceDirectory = sourceDirectory == null
+          ? findSourceDirectory()
+          : _resolveExplicitSource(
+              sourceDirectory,
+              Directory.current.absolute,
+              'sourceDirectory',
+            );
   final String sourceDirectory;
 
   static String findSourceDirectory() {
-    final custom = Platform.environment['CODEX_SCHEDULER_SOURCE'];
-    if (custom != null && custom.isNotEmpty) {
-      if (File('$custom\\src\\backend\\CodexRunEngine.ps1').existsSync()) {
-        return custom;
-      }
-      throw SchedulerException(
-        'CODEX_SCHEDULER_SOURCE is not a Scheduler checkout.',
-      );
-    }
     return findSourceDirectoryFrom(
       executableDirectory: File(Platform.resolvedExecutable).parent.absolute,
       workingDirectory: Directory.current.absolute,
+      sourceOverride: Platform.environment['CODEX_SCHEDULER_SOURCE'],
       // Debug `flutter run` relies on checkout CWD. A packaged release must
-      // fail closed rather than silently load worker code from CWD.
+      // use only its adjacent bundle unless an override is explicit.
       allowWorkingDirectory: !const bool.fromEnvironment('dart.vm.product'),
     );
   }
 
-  /// The executable's bundled worker must win over an unrelated current
-  /// directory that happens to contain similarly named scripts.
+  static bool _containsBackend(Directory directory) =>
+      File.fromUri(directory.uri.resolve('src/backend/CodexRunEngine.ps1'))
+          .existsSync() &&
+      File.fromUri(directory.uri.resolve('src/desktop/windows_bridge.ps1'))
+          .existsSync();
+
+  static String _resolveExplicitSource(
+    String supplied,
+    Directory workingDirectory,
+    String label,
+  ) {
+    Directory? resolved;
+    if (supplied.trim().isNotEmpty) {
+      try {
+        // Keep relative overrides relative to the caller's CWD, as before,
+        // then store an absolute path before the bridge changes its own CWD.
+        resolved = Directory.fromUri(
+          workingDirectory.absolute.uri.resolveUri(Directory(supplied).uri),
+        ).absolute;
+        if (resolved.path.endsWith(Platform.pathSeparator) &&
+            resolved.parent.path != resolved.path) {
+          resolved = Directory(
+            resolved.path.substring(0, resolved.path.length - 1),
+          );
+        }
+      } on ArgumentError {
+        resolved = null;
+      }
+    }
+    if (resolved == null || !_containsBackend(resolved)) {
+      throw SchedulerException(
+        '$label must point to a complete Continuum backend containing '
+        'src/backend/CodexRunEngine.ps1 and src/desktop/windows_bridge.ps1.'
+        '${resolved == null ? '' : ' Resolved directory: ${resolved.path}'}',
+      );
+    }
+    return resolved.path;
+  }
+
+  /// Release discovery is confined to the executable directory. Debug discovery
+  /// may walk checkout ancestors and the working directory used by flutter run.
   static String findSourceDirectoryFrom({
     required Directory executableDirectory,
     required Directory workingDirectory,
+    String? sourceOverride,
     bool allowWorkingDirectory = true,
   }) {
-    for (final start in [
-      executableDirectory,
-      if (allowWorkingDirectory) workingDirectory,
-    ]) {
+    if (sourceOverride != null && sourceOverride.isNotEmpty) {
+      return _resolveExplicitSource(
+        sourceOverride,
+        workingDirectory,
+        'CODEX_SCHEDULER_SOURCE',
+      );
+    }
+    if (!allowWorkingDirectory) {
+      final bundled = executableDirectory.absolute;
+      if (_containsBackend(bundled)) return bundled.path;
+      throw SchedulerException(
+        'The complete Continuum application package must be beside the '
+        'executable. Extract the full package, or set CODEX_SCHEDULER_SOURCE '
+        'to a complete backend.',
+      );
+    }
+    for (final start in [executableDirectory, workingDirectory]) {
       var current = start.absolute;
       for (var depth = 0; depth < 12; depth++) {
-        if (File(current.path + r'\src\backend\CodexRunEngine.ps1')
-                .existsSync() &&
-            File(current.path + r'\src\desktop\windows_bridge.ps1')
-                .existsSync()) {
-          return current.path;
-        }
+        if (_containsBackend(current)) return current.path;
         if (current.parent.path == current.path) break;
         current = current.parent;
       }
@@ -65,16 +111,17 @@ class WindowsSchedulerAdapter implements SchedulerAdapter {
     if (!Platform.isWindows) {
       throw SchedulerException('Windows adapter requires Windows.');
     }
-    final bridge = sourceDirectory + r'\src\desktop\windows_bridge.ps1';
+    final bridge = File.fromUri(
+      Directory(sourceDirectory).uri.resolve('src/desktop/windows_bridge.ps1'),
+    ).path;
     if (!File(bridge).existsSync()) {
       throw SchedulerException('Missing Windows adapter: $bridge');
     }
-    final executable =
-        (Platform.environment['ProgramFiles'] ?? r'C:\Program Files') +
-        r'\PowerShell\7\pwsh.exe';
-    if (!File(executable).existsSync()) {
-      throw SchedulerException('PowerShell 7 is required.');
-    }
+    final executable = resolveWindowsPowerShell(
+      pathDirectories: (Platform.environment['PATH'] ?? '').split(';'),
+      programW6432Directory: Platform.environment['ProgramW6432'],
+      programFilesDirectory: Platform.environment['ProgramFiles'],
+    );
     final encoded = base64Encode(utf8.encode(jsonEncode(payload)));
     return invokeSchedulerProcess(
       action,
@@ -96,6 +143,40 @@ class WindowsSchedulerAdapter implements SchedulerAdapter {
       workingDirectory: sourceDirectory,
     );
   }
+}
+
+/// Use the same installed PowerShell selected by the root launcher's PATH.
+/// Native Program Files precedes an inherited 32-bit Program Files fallback.
+/// This filesystem-only resolver can be tested without starting Windows code.
+String resolveWindowsPowerShell({
+  required Iterable<String> pathDirectories,
+  String? programW6432Directory,
+  String? programFilesDirectory,
+}) {
+  final directories = <String>[...pathDirectories];
+  for (final root in [programW6432Directory, programFilesDirectory]) {
+    if (root != null && root.isNotEmpty) {
+      directories.add(
+        Directory(root).uri.resolve('PowerShell/7/').toFilePath(),
+      );
+    }
+  }
+  final seen = <String>{};
+  for (var path in directories) {
+    path = path.trim();
+    if (path.length >= 2 && path.startsWith('"') && path.endsWith('"')) {
+      path = path.substring(1, path.length - 1);
+    }
+    if (path.isEmpty || !Directory(path).isAbsolute) continue;
+    final directory = Directory(path);
+    if (!seen.add(directory.path.toLowerCase())) continue;
+    final executable = File.fromUri(directory.uri.resolve('pwsh.exe'));
+    if (executable.existsSync()) return executable.path;
+  }
+  throw SchedulerException(
+    'PowerShell 7.4 or newer is required. Install it or add pwsh.exe to PATH, '
+    'then restart Continuum.',
+  );
 }
 
 /// The production subprocess boundary, separate from Windows installation

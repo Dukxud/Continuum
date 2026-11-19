@@ -37,6 +37,8 @@ The active PowerShell backend lives in [src/backend/](../src/backend/), while [l
 
 Packages and new immutable worker snapshots preserve these repository-relative paths. Their root is resolved from the entry script, independently of the process working directory. Previously scheduled jobs keep their existing snapshot and launch paths.
 
+The release Flutter adapter selects only the exact executable directory for its bundled backend and bridge. Debug builds may search executable ancestors and then the development working directory. An explicit `CODEX_SCHEDULER_SOURCE` is resolved once relative to the caller's current working directory, normalized to an absolute path, and validated for both entry files; invalid explicit input fails without automatic fallback. The adapter uses the same absolute selection for the bridge argument and process working directory. The normal launcher starts the app in the package directory, while direct/debug callers retain their own working-directory base.
+
 ## Quota data is not position or subscription tier
 
 The usage reader selects a model-attributed bucket, normalizes primary/secondary windows and labels their reported duration. The presentation uses the returned list directly. Weekly can be the only or first window. No `Plus`/`Pro` special case was introduced; the same code renders a singleton or pair. This does not change permissions, quota enforcement or continuation eligibility. [Exact contract](QUOTA-PRESENTATION.md).

@@ -62,8 +62,7 @@ function Open-FlutterSharedTerminal {
     # This action never starts an App Server or creates a fork.
     $lines=@(& $node $script status $job)
     if($LASTEXITCODE -ne 0 -or $lines.Count -eq 0){throw 'Shared session owner is not reachable.'}
-    $program=Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
-    if(-not (Test-Path -LiteralPath $program -PathType Leaf)){throw 'PowerShell 7 is missing.'}
+    $program=Get-CodexPowerShellExecutable
     $cli=Get-CodexCliEntry
     $cmd="& '$($node.Replace("'","''"))' '$($script.Replace("'","''"))' native '$($job.Replace("'","''"))' '$($cli.Replace("'","''"))'"
     $encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))

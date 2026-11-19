@@ -19,11 +19,13 @@ Get-Process -Name codex_resume_flutter -ErrorAction SilentlyContinue |
     Select-Object Id,Path
 ```
 
-New packages include `build-info.json` beside the executable with the application version, source commit, build time, and whether tracked source files were modified. For an older package, use its recorded source SHA and checksum. In a source checkout, `git log -1 --format="%H %s"` identifies the commit; `git status --short` shows local changes.
+New packages include `build-info.json` beside the executable with the application version, source commit, build time, and tracked/untracked source changes. A source ZIP records archive provenance and no invented commit. For an older package, use its recorded source SHA and checksum. In a source checkout, `git log -1 --format="%H %s"` identifies the commit; `git status --short` shows local changes.
 
-The current `Run-Continuum.cmd` builds a complete source folder by default, including a source ZIP without Git metadata, then opens a fresh verified package under `%LOCALAPPDATA%\Continuum\SourceBuilds`. A runtime-only package opens its own sibling executable after manifest verification. A source folder wins over a stray executable, and an incomplete source/runtime folder fails explicitly. Only a launcher-only folder still selects the pinned public preview. Replacing just the two launcher scripts cannot install a backend or UI correction; use the complete source or application package.
+The current `Run-Continuum.cmd` builds a complete source folder by default, including a source ZIP without Git metadata, then opens a fresh verified package under `%LOCALAPPDATA%\Continuum\SourceBuilds`. A runtime-only package opens its own sibling executable after manifest verification. A source folder wins over a stray executable, and an incomplete source/runtime folder fails explicitly. The pinned-preview fallback requires the supplied verifier and checks the cached package on every launch. Replacing just the two launcher scripts cannot install a backend or UI correction; copying them without their verifier now fails explicitly. Use the complete source or application package.
 
 Before launch, the console prints the executable, build identity and effective backend path. If `CODEX_SCHEDULER_SOURCE` is set, the launcher displays that explicit backend override; confirm it identifies the intended source. A source ZIP records `sourceArchive: true` with no invented commit ID. A checkout/worktree records its own Git root and revision, never the revision of an unrelated parent repository. See the [source-build instructions](GETTING-STARTED.md).
+
+Current release builds, including direct EXE launch, require their own adjacent `src/backend/CodexRunEngine.ps1` and `src/desktop/windows_bridge.ps1`. An incomplete package fails instead of loading scripts from a parent checkout or another working directory. Restore the complete package if startup reports a missing bundled backend. For an intentional `CODEX_SCHEDULER_SOURCE` override, use a directory containing both files. Relative values resolve once from the app's startup working directory and become absolute before any bridge call. The normal launcher uses the package directory as that starting location; a manual launch can use a different working directory. An invalid override reports an error without falling back; remove an obsolete override and reopen Continuum to use the bundled backend. These changes do not modify older downloaded executables.
 
 ## Repository unresolved, Outside Git, or conflicting checkouts
 
@@ -46,11 +48,36 @@ If Windows reports a missing `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`, or `MSVCP
 
 ## Build prerequisites
 
-Run `flutter doctor -v` and resolve Windows toolchain errors. The builder requires `flutter.bat` on `PATH` and Visual Studio's **Desktop development with C++** workload.
+Current source builds require Windows x64, PowerShell 7.4 or newer, Node.js 22 or newer, Git 2.28 or newer, and Flutter 3.47.9 with its bundled Dart 3.13.7. The preflight checks the pinned Flutter version and the application's Dart `>=3.13.0 <4.0.0` requirement. Keep the committed dependency lock in place.
 
-If runner generation reports **Building with plugins requires symlink support**, enable [Windows Developer Mode](https://learn.microsoft.com/en-us/windows/advanced-settings/developer-mode) on the build machine, then rerun the build. This requirement was encountered during the source-layout review; the same revision passed on the hosted Windows builder.
+Run `flutter doctor -v` and inspect its **Windows version** and **Visual Studio - develop Windows apps** sections. Install or repair Visual Studio's **Desktop development with C++** workload, including MSVC x64/x86 tools, CMake and a Windows SDK, and finish any pending reboot. Visual Studio Code alone is not this compiler toolchain. Other doctor findings can concern unrelated platforms. [Official Flutter setup](https://docs.flutter.dev/platform-integration/windows/setup).
+
+The preflight collects independent prerequisite failures into one report. It also runs a disposable Windows Script Host script that only returns a known exit code. If that check reports a missing VBScript engine, inspect Windows **Settings → System → Optional features** and restore the VBScript feature if permitted. If policy blocks it, ask the machine's administrator; Continuum does not change policy or install the feature. [Microsoft's VBScript guidance](https://techcommunity.microsoft.com/blog/windows-itpro-blog/vbscript-deprecation-timelines-and-next-steps/4148301).
+
+### Plugin symbolic links
+
+**Building with plugins requires symlink support** is a Windows capability failure, not a package-version conflict. For error **1314**, open Windows Settings using `ms-settings:developers`, enable [Developer Mode](https://learn.microsoft.com/en-us/windows/advanced-settings/developer-mode), then run the same `Run-Continuum.cmd` again. On newer Windows this setting is under **System → Advanced → For developers**; older versions use **For developers**. Enabling it requires permissions allowed by the machine's administrator or organization. Continuum does not change the setting or elevate the build.
+
+Keep other link failures distinct:
+
+| Error | What to inspect |
+| --- | --- |
+| 1314 / required privilege not held | Developer Mode or the machine's permitted symbolic-link capability. |
+| 5 / access denied | Access to the source/link location and the exact target printed by the tool. Enabling Developer Mode does not establish that every folder is writable. |
+| 1 / invalid function | Filesystem and source/SDK/cache locations. Flutter suggests a local project location on the same drive as the SDK for this error. |
+| Other errors | Preserve the exact stage, exit status and tool output; a different failure is not proof that Developer Mode is missing. |
+
+Flutter recreates plugin links when its plugin list changes. Do not replace them with manually seeded junctions or patch the installed Flutter SDK. A successful capability probe does not certify later downloads, all plugin paths or compilation. Dart's default Windows package cache is `%LOCALAPPDATA%\Pub\Cache`; an explicit `PUB_CACHE` overrides it, and a relative value is resolved from the pub working directory (`src/desktop`). [Dart cache configuration](https://dart.dev/tools/pub/environment-variables).
+
+### Later build stages
+
+Flutter 3.47.9 rejects project-path characters `'#!$^&*=|,;<>?` because of CMake/MSBuild escaping. Use a writable source location with a simple name; spaces and parentheses are supported. The source launcher and direct builder must report prerequisite, runner, locked dependency, analysis, test, compilation and package failures separately. An error prevents later stages and launch; it is not success merely because a prior test passed.
+
+If preflight reports a nondefault Flutter build directory, inspect `flutter config --machine` and use the reported `flutter config --build-dir=build` command before retrying. Continuum packages the x64 release from `build/windows/x64/runner/Release`. If Windows desktop support is disabled, correct the named source of the setting: project `flutter.config`, global Flutter configuration, or `FLUTTER_WINDOWS`. The launcher reports these settings without changing them.
 
 If the builder reports **Review package already exists**, choose a fresh `-OutputDirectory`. It preserves existing packages. If a CI artifact has expired, use the [source-build instructions](GETTING-STARTED.md).
+
+The [delivery audit](WINDOWS-DELIVERY-AUDIT.md) records the exact upstream contracts, corrected paths and the scope of consecutive source checks. Portable regressions do not establish that this Windows computer can complete a native build.
 
 ## Weekly appears as five-hour, or a phantom empty row
 

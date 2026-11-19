@@ -42,6 +42,10 @@ if(process.argv.includes('app-server')){
 node "%~dp0node_modules\@openai\codex\bin\codex.js" %*
 exit /b %errorlevel%
 '@ | Set-Content -LiteralPath $shim -Encoding ascii
+    if(-not $IsWindows){
+        $node=(Get-Command node -CommandType Application -ErrorAction Stop).Source
+        [void](New-Item -ItemType SymbolicLink -Path (Join-Path $bin 'node.exe') -Target $node)
+    }
     $repo=Join-Path $temp 'workspace'
     [void](New-Item -ItemType Directory -Path $repo -Force)
     & git -C $repo init --quiet -b feature
@@ -69,7 +73,7 @@ exit /b %errorlevel%
             log=(Join-Path $temp 'worker.log')
         } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $jobPath
         $psi=[Diagnostics.ProcessStartInfo]::new()
-        $psi.FileName=(Get-Command pwsh.exe -ErrorAction Stop).Source
+        $psi.FileName=Join-Path $PSHOME ($IsWindows ? 'pwsh.exe' : 'pwsh')
         foreach($argument in @('-NoLogo','-NoProfile','-File',(Join-Path $runtime.Directory 'src/backend/Invoke-CodexJob.ps1'),'-JobFile',$jobPath)){
             [void]$psi.ArgumentList.Add($argument)
         }
@@ -77,7 +81,7 @@ exit /b %errorlevel%
         $psi.RedirectStandardOutput=$true
         $psi.RedirectStandardError=$true
         $psi.CreateNoWindow=$true
-        $psi.Environment['PATH']="$bin;$env:PATH"
+        $psi.Environment['PATH']=$bin+[IO.Path]::PathSeparator+$env:PATH
         $psi.Environment['LOCALAPPDATA']=$settingsDir
         $psi.Environment['CODEX_STUB_DENY']=if($denyUsage){'1'}else{'0'}
         $psi.Environment['CODEX_STUB_EXIT']=[string]$expectedExit
@@ -187,7 +191,7 @@ exit /b %errorlevel%
     # isolated parent-to-child lifecycle test.
     $probePath=$env:PATH
     try {
-        $env:PATH="$bin;$probePath"
+        $env:PATH=$bin+[IO.Path]::PathSeparator+$probePath
         $env:CODEX_STUB_THREAD_MISSING='0'
         Assert-CodexConversationAvailable -SessionId '00000000-0000-0000-0000-000000000001'
         $env:CODEX_STUB_THREAD_MISSING='1'

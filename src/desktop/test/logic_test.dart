@@ -783,48 +783,50 @@ void main() {
     },
   );
 
-  test('packaged worker takes priority over untrusted current directory', () {
-    if (!Platform.isWindows) return;
-    final sandbox = Directory.systemTemp.createTempSync(
-      'flutter-worker-search-',
-    );
-    addTearDown(() => sandbox.deleteSync(recursive: true));
-    final sep = Platform.pathSeparator;
-    Directory createSource(String name) {
-      final dir = Directory('${sandbox.path}$sep$name')..createSync();
-      File('${dir.path}${sep}src${sep}backend${sep}CodexRunEngine.ps1')
-          .createSync(recursive: true);
-      File('${dir.path}${sep}src/desktop${sep}windows_bridge.ps1')
-          .createSync(recursive: true);
-      return dir;
-    }
+  test(
+    'debug worker search prefers executable ancestry to current directory',
+    () {
+      final sandbox = Directory.systemTemp.createTempSync(
+        'flutter-worker-search-',
+      );
+      addTearDown(() => sandbox.deleteSync(recursive: true));
+      Directory createSource(String name) {
+        final dir = Directory.fromUri(sandbox.uri.resolve(name))..createSync();
+        File.fromUri(dir.uri.resolve('src/backend/CodexRunEngine.ps1'))
+            .createSync(recursive: true);
+        File.fromUri(dir.uri.resolve('src/desktop/windows_bridge.ps1'))
+            .createSync(recursive: true);
+        return dir;
+      }
 
-    final bundled = createSource('bundle');
-    final untrusted = createSource('cwd');
-    final exeDir = Directory('${bundled.path}${sep}bin')..createSync();
-    expect(
-      WindowsSchedulerAdapter.findSourceDirectoryFrom(
-        executableDirectory: exeDir,
-        workingDirectory: untrusted,
-      ),
-      bundled.path,
-    );
-    expect(
-      WindowsSchedulerAdapter.findSourceDirectoryFrom(
-        executableDirectory: sandbox,
-        workingDirectory: untrusted,
-      ),
-      untrusted.path,
-    );
-    expect(
-      () => WindowsSchedulerAdapter.findSourceDirectoryFrom(
-        executableDirectory: sandbox,
-        workingDirectory: untrusted,
-        allowWorkingDirectory: false,
-      ),
-      throwsA(isA<SchedulerException>()),
-    );
-  });
+      final bundled = createSource('bundle');
+      final untrusted = createSource('cwd');
+      final exeDir = Directory.fromUri(bundled.uri.resolve('bin'))
+        ..createSync();
+      expect(
+        WindowsSchedulerAdapter.findSourceDirectoryFrom(
+          executableDirectory: exeDir,
+          workingDirectory: untrusted,
+        ),
+        bundled.path,
+      );
+      expect(
+        WindowsSchedulerAdapter.findSourceDirectoryFrom(
+          executableDirectory: sandbox,
+          workingDirectory: untrusted,
+        ),
+        untrusted.path,
+      );
+      expect(
+        () => WindowsSchedulerAdapter.findSourceDirectoryFrom(
+          executableDirectory: sandbox,
+          workingDirectory: untrusted,
+          allowWorkingDirectory: false,
+        ),
+        throwsA(isA<SchedulerException>()),
+      );
+    },
+  );
 
   test(
     'unchanged, reverted, and repeated preferences skip redundant writes',
