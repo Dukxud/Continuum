@@ -9,6 +9,21 @@ $count=0
 function Check([string]$Name,[scriptblock]$Body){& $Body;$script:count++;Write-Host "PASS $Name"}
 function Assert-That([bool]$Condition,[string]$Message){if(-not $Condition){throw $Message}}
 try{
+    Check 'owned process host uses an auditable script file rather than an encoded command' {
+        $implementation=[IO.File]::ReadAllText((Join-Path $root 'src/desktop/scripts/Invoke-PreviewBuild.ps1'))
+        Assert-That ($implementation.Contains("'owner.ps1'") -and
+            $implementation.Contains("'-File',$ownerScript") -and
+            -not $implementation.Contains('-EncodedCommand')) 'Build process host still uses an opaque command.'
+    }
+    if($IsWindows){
+        Check 'actual Windows batch file runs inside the owned host with its exit code' {
+            $batch=Join-Path $fixture 'batch tool with spaces.cmd'
+            [IO.File]::WriteAllText($batch,("@echo off"+[Environment]::NewLine+
+                "echo BATCH-CHECK"+[Environment]::NewLine+"exit /b 29"+[Environment]::NewLine))
+            $run=Invoke-ContinuumBuildProcess -FilePath $batch -ArgumentList @() -WorkingDirectory $fixture
+            Assert-That ($run.ExitCode -eq 29 -and $run.Stdout.Contains('BATCH-CHECK')) 'Batch tool result was lost.'
+        }
+    }
     $child=Join-Path $fixture 'tool with spaces.ps1'
     @'
 param([string]$Value,[int]$ExitCode=0,[int]$Delay=0)
