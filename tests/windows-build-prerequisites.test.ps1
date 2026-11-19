@@ -27,6 +27,20 @@ function Assert-ProbeClean([string]$Directory){
     Assert-That ($left.Count -eq 0) 'Capability probe left an owned temporary directory behind.'
 }
 try{
+    Check 'one child PowerShell denial does not falsely blame five separate tools' {
+        & {
+            function Invoke-ContinuumBuildProcess {
+                param($FilePath,$ArgumentList,$WorkingDirectory,$TimeoutSeconds)
+                throw [UnauthorizedAccessException]::new('Access is denied.')
+            }
+            $failure=''
+            try{Assert-ContinuumBuildSubprocessAvailable -ProjectDirectory $fixture}
+            catch{$failure=$_.Exception.Message}
+            Assert-That ($failure.Contains('shared process runner') -and
+                $failure.Contains('NOT been validated') -and
+                $failure.Contains('Access is denied')) "Shared process failure was misreported: $failure"
+        }
+    }
     Check 'machine output finds complete JSON after a banner and quoted braces' {
         $parsed=ConvertFrom-ContinuumPrerequisiteJson -Text "SDK initialization [progress]`n{`"status`":`"ready`"}`n{`"frameworkVersion`":`"3.47.9`",`"message`":`"quoted } [ and \`" text`"}`n" -Description 'fixture' -RootKind Object -RequiredProperty frameworkVersion
         Assert-That ($parsed['frameworkVersion'] -ceq '3.47.9') 'Version object was not found.'
